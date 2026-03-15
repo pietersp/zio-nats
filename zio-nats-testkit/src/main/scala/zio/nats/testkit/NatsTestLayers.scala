@@ -27,7 +27,7 @@ object NatsTestLayers {
         ZIO.attemptBlocking {
           val c = NatsContainer()
           c.start()
-          Thread.sleep(500) // allow port binding to settle on Podman/WSL
+          Thread.sleep(2000) // allow port binding to settle on Podman/WSL
           c
         }
       )(c => ZIO.attemptBlocking(c.stop()).ignoreLogged)
