@@ -1,7 +1,6 @@
 import zio._
 import zio.nats._
 import zio.nats.config.NatsConfig
-import zio.nats.subject.Subject
 
 /** Minimal zio-nats quick-start.
   *
