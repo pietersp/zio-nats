@@ -2,6 +2,7 @@ package zio.nats.config
 
 import io.nats.client.{AuthHandler, Options}
 import zio._
+import zio.nats.serialization.SerializationFormat
 
 /** Configuration for a NATS connection.
   *
@@ -26,6 +27,7 @@ final case class NatsConfig(
   username: Option[String] = None,
   password: Option[String] = None,
   credentialPath: Option[String] = None,
+  format: SerializationFormat = SerializationFormat.json,
   optionsCustomizer: Options.Builder => Options.Builder = identity
 ) {
 
