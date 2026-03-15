@@ -40,7 +40,11 @@ lazy val zioNats = (project in file("zio-nats"))
       "dev.zio" %% "zio-streams"            % zioVersion,
       "dev.zio" %% "zio-blocks-schema"      % zioBlocksVersion,
       "io.nats"  % "jnats"                 % jnatsVersion
-    )
+    ),
+    Compile / unmanagedSourceDirectories += {
+      val sv = scalaVersion.value
+      (Compile / sourceDirectory).value / s"scala-${sv.substring(0, 4)}"
+    }
   )
 
 lazy val zioNatsTestkit = (project in file("zio-nats-testkit"))

@@ -4,6 +4,9 @@ import io.nats.client.{JetStream => JJetStream}
 import io.nats.client.api.PublishAck
 import io.nats.client.{PublishOptions, ConsumerContext => JConsumerContext, StreamContext => JStreamContext}
 import zio._
+import zio.blocks.schema.Schema
+import zio.nats.config.NatsConfig
+import zio.nats.subject.Subject
 
 /** JetStream publishing service and context access. */
 trait JetStream {
@@ -33,7 +36,12 @@ trait JetStream {
     options: PublishOptions
   ): IO[NatsError, PublishAck]
 
-  /** Async publish - returns immediately with a Task that resolves when ack arrives. */
+  // --- Type-safe publish (serializes T to bytes using Schema) ---
+
+  /** Publish a value of type T, serialized using the configured format. */
+  def publish[T: Schema](subject: Subject, data: T): ZIO[NatsConfig, NatsError, PublishAck]
+
+  // --- Async publish ---
   def publishAsync(subject: String, data: Chunk[Byte]): IO[NatsError, Task[PublishAck]]
 
   /** Async publish with options. */
@@ -53,6 +61,9 @@ trait JetStream {
 object JetStream {
 
   def publish(subject: String, data: Chunk[Byte]): ZIO[JetStream, NatsError, PublishAck] =
+    ZIO.serviceWithZIO[JetStream](_.publish(subject, data))
+
+  def publish[T: Schema](subject: Subject, data: T): ZIO[JetStream & NatsConfig, NatsError, PublishAck] =
     ZIO.serviceWithZIO[JetStream](_.publish(subject, data))
 
   def publishAsync(
@@ -102,6 +113,12 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
     val msg = NatsMessage.toJava(subject, data, headers = headers)
     ZIO.attemptBlocking(js.publish(msg, options)).mapError(NatsError.fromThrowable)
   }
+
+  override def publish[T: Schema](subject: Subject, data: T): ZIO[NatsConfig, NatsError, PublishAck] =
+    ZIO.serviceWithZIO[NatsConfig] { config =>
+      val bytes = config.format.encode(data).left.map(e => NatsError.SerializationError(e.getMessage, e))
+      ZIO.fromEither(bytes).flatMap(b => ZIO.attemptBlocking(js.publish(subject.value, b.toArray)).mapError(NatsError.fromThrowable))
+    }
 
   override def publishAsync(
     subject: String,
