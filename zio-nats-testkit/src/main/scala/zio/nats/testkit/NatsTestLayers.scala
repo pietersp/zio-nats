@@ -16,18 +16,13 @@ import zio.nats.config.NatsConfig
   */
 object NatsTestLayers {
 
-  /** ZLayer that starts a NATS Docker container and provides it as a service.
-    *
-    * A short sleep after start() ensures the port binding is ready on Podman/WSL
-    * before we attempt to connect (Podman has slight latency vs Docker for port publishing).
-    */
+  /** ZLayer that starts a NATS Docker container and provides it as a service. */
   val container: ZLayer[Any, Throwable, NatsContainer] =
     ZLayer.scoped {
       ZIO.acquireRelease(
         ZIO.attemptBlocking {
           val c = NatsContainer()
           c.start()
-          Thread.sleep(2000) // allow port binding to settle on Podman/WSL
           c
         }
       )(c => ZIO.attemptBlocking(c.stop()).ignoreLogged)
@@ -39,10 +34,42 @@ object NatsTestLayers {
       NatsConfig(servers = List(c.clientUrl))
     )
 
-  /** Full Nats service layer backed by a testcontainer.
+  /** Try to connect to NATS, retrying with exponential backoff until successful or timeout. */
+  private def awaitNatsConnection(config: NatsConfig, timeout: Duration): ZIO[Any, Throwable, Unit] = {
+    val maxAttempts = 20
+    val baseDelay = 100.millis
+
+    def attempt(n: Int): ZIO[Any, Throwable, Unit] = {
+      if (n >= maxAttempts) {
+        ZIO.fail(new RuntimeException(s"NATS server not reachable after ${timeout} (${maxAttempts} attempts)"))
+      } else {
+        ZIO.attemptBlocking {
+          val conn = io.nats.client.Nats.connect(config.toOptions)
+          conn.close()
+        }.catchAll { _ =>
+          if (n < maxAttempts - 1) {
+            ZIO.sleep(baseDelay * (n + 1)).flatMap(_ => attempt(n + 1))
+          } else {
+            ZIO.fail(new RuntimeException(s"NATS server not reachable after ${timeout}"))
+          }
+        }
+      }
+    }
+
+    attempt(0)
+  }
+
+  /** Full Nats service layer backed by a testcontainer with connection verification.
     *
-    * Composes: container -> config -> Nats.live
+    * Composes: container -> config -> wait for connection -> Nats.live
     */
   val nats: ZLayer[Any, Throwable, Nats] =
-    container >>> config >>> Nats.live.mapError(e => new RuntimeException(e.message, e))
+    container >>> config >>> ZLayer.fromFunction { (cfg: NatsConfig) =>
+      zio.Unsafe.unsafe { implicit u =>
+        zio.Runtime.default.unsafe
+          .run(awaitNatsConnection(cfg, 10.seconds))
+          .getOrThrow()
+        cfg
+      }
+    } >>> Nats.live.mapError(e => new RuntimeException(e.message, e))
 }
