@@ -12,7 +12,7 @@ object Person {
 }
 
 object SerializationFormatSpec extends ZIOSpecDefault {
-  def spec = suite("SerializationFormat")(
+  def spec: Spec[Any, Throwable] = suite("SerializationFormat")(
     test("json format encodes and decodes") {
       val format = SerializationFormat.json
       val person = Person("Alice", 30)
