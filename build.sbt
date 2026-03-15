@@ -1,5 +1,5 @@
 val scala213 = "2.13.18"
-val scala3   = "3.8.1"
+val scala3   = "3.3.7"
 
 val zioVersion            = "2.1.16"
 val zioBlocksVersion      = "0.0.29"
