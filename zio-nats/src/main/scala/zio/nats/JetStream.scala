@@ -12,25 +12,25 @@ import zio.nats.subject.Subject
 trait JetStream {
 
   /** Publish to a JetStream subject (synchronous server ack). */
-  def publish(subject: String, data: Chunk[Byte]): IO[NatsError, PublishAck]
+  def publish(subject: Subject, data: Chunk[Byte]): IO[NatsError, PublishAck]
 
   /** Publish with NATS headers. */
   def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     headers: Map[String, List[String]]
   ): IO[NatsError, PublishAck]
 
   /** Publish with PublishOptions (message ID, expected-sequence, etc.). */
   def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     options: PublishOptions
   ): IO[NatsError, PublishAck]
 
   /** Publish with headers and options. */
   def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     headers: Map[String, List[String]],
     options: PublishOptions
@@ -42,11 +42,11 @@ trait JetStream {
   def publish[T: Schema](subject: Subject, data: T): ZIO[NatsConfig, NatsError, PublishAck]
 
   // --- Async publish ---
-  def publishAsync(subject: String, data: Chunk[Byte]): IO[NatsError, Task[PublishAck]]
+  def publishAsync(subject: Subject, data: Chunk[Byte]): IO[NatsError, Task[PublishAck]]
 
   /** Async publish with options. */
   def publishAsync(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     options: PublishOptions
   ): IO[NatsError, Task[PublishAck]]
@@ -60,14 +60,14 @@ trait JetStream {
 
 object JetStream {
 
-  def publish(subject: String, data: Chunk[Byte]): ZIO[JetStream, NatsError, PublishAck] =
+  def publish(subject: Subject, data: Chunk[Byte]): ZIO[JetStream, NatsError, PublishAck] =
     ZIO.serviceWithZIO[JetStream](_.publish(subject, data))
 
   def publish[T: Schema](subject: Subject, data: T): ZIO[JetStream & NatsConfig, NatsError, PublishAck] =
     ZIO.serviceWithZIO[JetStream](_.publish(subject, data))
 
   def publishAsync(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte]
   ): ZIO[JetStream, NatsError, Task[PublishAck]] =
     ZIO.serviceWithZIO[JetStream](_.publishAsync(subject, data))
@@ -85,32 +85,32 @@ object JetStream {
 
 private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
 
-  override def publish(subject: String, data: Chunk[Byte]): IO[NatsError, PublishAck] =
-    ZIO.attemptBlocking(js.publish(subject, data.toArray)).mapError(NatsError.fromThrowable)
+  override def publish(subject: Subject, data: Chunk[Byte]): IO[NatsError, PublishAck] =
+    ZIO.attemptBlocking(js.publish(subject.value, data.toArray)).mapError(NatsError.fromThrowable)
 
   override def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     headers: Map[String, List[String]]
   ): IO[NatsError, PublishAck] = {
-    val msg = NatsMessage.toJava(subject, data, headers = headers)
+    val msg = NatsMessage.toJava(subject.value, data, headers = headers)
     ZIO.attemptBlocking(js.publish(msg)).mapError(NatsError.fromThrowable)
   }
 
   override def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     options: PublishOptions
   ): IO[NatsError, PublishAck] =
-    ZIO.attemptBlocking(js.publish(subject, data.toArray, options)).mapError(NatsError.fromThrowable)
+    ZIO.attemptBlocking(js.publish(subject.value, data.toArray, options)).mapError(NatsError.fromThrowable)
 
   override def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     headers: Map[String, List[String]],
     options: PublishOptions
   ): IO[NatsError, PublishAck] = {
-    val msg = NatsMessage.toJava(subject, data, headers = headers)
+    val msg = NatsMessage.toJava(subject.value, data, headers = headers)
     ZIO.attemptBlocking(js.publish(msg, options)).mapError(NatsError.fromThrowable)
   }
 
@@ -121,21 +121,21 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
     }
 
   override def publishAsync(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte]
   ): IO[NatsError, Task[PublishAck]] =
     ZIO.attempt {
-      val future = js.publishAsync(subject, data.toArray)
+      val future = js.publishAsync(subject.value, data.toArray)
       ZIO.fromCompletionStage(future)
     }.mapError(NatsError.fromThrowable)
 
   override def publishAsync(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     options: PublishOptions
   ): IO[NatsError, Task[PublishAck]] =
     ZIO.attempt {
-      val future = js.publishAsync(subject, data.toArray, options)
+      val future = js.publishAsync(subject.value, data.toArray, options)
       ZIO.fromCompletionStage(future)
     }.mapError(NatsError.fromThrowable)
 

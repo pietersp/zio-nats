@@ -2,14 +2,9 @@ import zio._
 import zio.nats._
 import zio.nats.config.NatsConfig
 import zio.nats.subject.Subject
-import io.nats.client.api.{
-  AckPolicy,
-  ConsumerConfiguration,
-  KeyValueConfiguration,
-  StorageType,
-  StreamConfiguration
-}
+import zio.nats.configuration._
 import io.nats.client.FetchConsumeOptions
+import io.nats.client.api.StorageType
 
 /** Realistic zio-nats example.
   *
@@ -38,42 +33,43 @@ object RealisticApp extends ZIOAppDefault {
 
       // --- Create a JetStream stream ---
       _ <- jsm.addStream(
-             StreamConfiguration.builder()
-               .name("ORDERS")
-               .subjects("orders.>")
-               .storageType(StorageType.Memory)
-               .build()
+             StreamConfig(
+               name = "ORDERS",
+               subjects = List("orders.>"),
+               storageType = StorageType.Memory
+             ).toJava
            )
 
       // --- Create a durable pull consumer ---
       _ <- jsm.addOrUpdateConsumer(
              "ORDERS",
-             ConsumerConfiguration.builder()
-               .durable("order-processor")
-               .filterSubject("orders.>")
-               .ackPolicy(AckPolicy.Explicit)
-               .build()
+             ConsumerConfig.durable("order-processor")
+               .copy(
+                 filterSubject = Some("orders.>"),
+                 ackPolicy = io.nats.client.api.AckPolicy.Explicit
+               ).toJava
            )
 
       // --- Create a KV bucket to track state ---
       _ <- kvm.create(
-             KeyValueConfiguration.builder()
-               .name("app-state")
-               .storageType(StorageType.Memory)
-               .build()
+             KeyValueConfig(
+               name = "app-state",
+               storageType = StorageType.Memory
+             ).toJava
            )
+
       kv <- KeyValue.bucket("app-state")
       _  <- kv.put("processed", "0")
 
       // --- Publish 5 orders via JetStream ---
       _ <- ZIO.foreach(1 to 5)(i =>
-             js.publish(s"orders.new", s"order-$i".toNatsData)
+             js.publish(Subject("orders.new"), s"order-$i".toNatsData)
            )
       _ <- Console.printLine("Published 5 orders").orDie
 
       // --- Consume the orders as a ZStream, ack each one ---
       ctx       <- js.consumerContext("ORDERS", "order-processor")
-      fetchOpts  = FetchConsumeOptions.builder().maxMessages(5).expiresIn(5000).build()
+      fetchOpts = FetchConsumeOptions.builder().maxMessages(5).expiresIn(5000).build()
       _ <- JetStreamConsumer
              .fetch(ctx, fetchOpts)
              .mapZIO { msg =>

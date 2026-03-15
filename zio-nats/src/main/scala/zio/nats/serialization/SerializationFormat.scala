@@ -13,7 +13,7 @@ object SerializationFormat {
   val json: SerializationFormat = JsonFormatImpl
 }
 
-object JsonFormatImpl extends SerializationFormat {
+private object JsonFormatImpl extends SerializationFormat {
   override def encode[T: Schema](value: T): Either[Throwable, Chunk[Byte]] = {
     try {
       val codec = Schema[T].derive(JsonFormat)

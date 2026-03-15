@@ -6,6 +6,7 @@ import zio._
 import zio.test._
 import zio.test.TestAspect._
 import zio.nats.testkit.NatsTestLayers
+import zio.nats.subject.Subject
 
 object JetStreamSpec extends ZIOSpecDefault {
 
@@ -65,7 +66,7 @@ object JetStreamSpec extends ZIOSpecDefault {
           jsm <- ZIO.service[JetStreamManagement]
           js  <- ZIO.service[JetStream]
           _   <- createStream(jsm, "pub-stream", "pub.>")
-          ack <- js.publish("pub.test", Chunk.fromArray("hello-js".getBytes))
+          ack <- js.publish(Subject("pub.test"), Chunk.fromArray("hello-js".getBytes))
           _   <- jsm.deleteStream("pub-stream")
         } yield assertTrue(
           ack.getStream == "pub-stream",
@@ -78,7 +79,7 @@ object JetStreamSpec extends ZIOSpecDefault {
           jsm     <- ZIO.service[JetStreamManagement]
           js      <- ZIO.service[JetStream]
           _       <- createStream(jsm, "async-stream", "async.>")
-          ackTask <- js.publishAsync("async.test", Chunk.fromArray("async".getBytes))
+          ackTask <- js.publishAsync(Subject("async.test"), Chunk.fromArray("async".getBytes))
           ack     <- ackTask
           _       <- jsm.deleteStream("async-stream")
         } yield assertTrue(
@@ -93,8 +94,8 @@ object JetStreamSpec extends ZIOSpecDefault {
           js   <- ZIO.service[JetStream]
           _    <- createStream(jsm, "dedup-stream", "dedup.>")
           opts  = PublishOptions.builder().messageId("msg-1").build()
-          ack1 <- js.publish("dedup.test", Chunk.fromArray("first".getBytes), opts)
-          ack2 <- js.publish("dedup.test", Chunk.fromArray("first".getBytes), opts)
+          ack1 <- js.publish(Subject("dedup.test"), Chunk.fromArray("first".getBytes), opts)
+          ack2 <- js.publish(Subject("dedup.test"), Chunk.fromArray("first".getBytes), opts)
           _    <- jsm.deleteStream("dedup-stream")
         } yield assertTrue(
           !ack1.isDuplicate,
@@ -115,9 +116,9 @@ object JetStreamSpec extends ZIOSpecDefault {
                           .filterSubject("fetch.>")
                           .build()
           _          <- jsm.addOrUpdateConsumer("fetch-stream", consConfig)
-          _          <- js.publish("fetch.1", Chunk.fromArray("a".getBytes))
-          _          <- js.publish("fetch.2", Chunk.fromArray("b".getBytes))
-          _          <- js.publish("fetch.3", Chunk.fromArray("c".getBytes))
+          _          <- js.publish(Subject("fetch.1"), Chunk.fromArray("a".getBytes))
+          _          <- js.publish(Subject("fetch.2"), Chunk.fromArray("b".getBytes))
+          _          <- js.publish(Subject("fetch.3"), Chunk.fromArray("c".getBytes))
           ctx        <- js.consumerContext("fetch-stream", "fetch-cons")
           opts        = FetchConsumeOptions.builder().maxMessages(3).expiresIn(5000).build()
           msgs       <- JetStreamConsumer.fetch(ctx, opts).tap(_.ack).runCollect
@@ -135,7 +136,7 @@ object JetStreamSpec extends ZIOSpecDefault {
                           .filterSubject("next.>")
                           .build()
           _          <- jsm.addOrUpdateConsumer("next-stream", consConfig)
-          _          <- js.publish("next.test", Chunk.fromArray("single".getBytes))
+          _          <- js.publish(Subject("next.test"), Chunk.fromArray("single".getBytes))
           ctx        <- js.consumerContext("next-stream", "next-cons")
           msg        <- JetStreamConsumer.next(ctx, 5.seconds)
           _          <- msg.map(_.ack).getOrElse(ZIO.unit)
@@ -156,8 +157,8 @@ object JetStreamSpec extends ZIOSpecDefault {
                           .filterSubject("consume.>")
                           .build()
           _          <- jsm.addOrUpdateConsumer("consume-stream", consConfig)
-          _          <- js.publish("consume.1", Chunk.fromArray("x".getBytes))
-          _          <- js.publish("consume.2", Chunk.fromArray("y".getBytes))
+          _          <- js.publish(Subject("consume.1"), Chunk.fromArray("x".getBytes))
+          _          <- js.publish(Subject("consume.2"), Chunk.fromArray("y".getBytes))
           ctx        <- js.consumerContext("consume-stream", "consume-cons")
           msgs       <- JetStreamConsumer.consume(ctx)
                           .tap(_.ack)

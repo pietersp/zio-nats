@@ -46,14 +46,14 @@ trait Nats {
   // --- Type-safe publish (serializes T to bytes using Schema) ---
 
   /** Publish a value of type T, serialized using the configured format. */
-  def publish[T: Schema](subject: Subject, data: T): ZIO[Nats & NatsConfig, NatsError, Unit]
+  def publish[T: Schema](subject: Subject, data: T): ZIO[NatsConfig, NatsError, Unit]
 
   /** Publish a value with NATS headers. */
   def publish[T: Schema](
     subject: Subject,
     data: T,
     headers: Map[String, List[String]]
-  ): ZIO[Nats & NatsConfig, NatsError, Unit]
+  ): ZIO[NatsConfig, NatsError, Unit]
 
   // --- Request/Reply ---
 
@@ -120,14 +120,14 @@ object Nats {
     ZIO.serviceWithZIO[Nats](_.publish(subject, data, replyTo))
 
   def publish[T: Schema](subject: Subject, data: T): ZIO[Nats & NatsConfig, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats](_.publish(subject, data))
+    ZIO.serviceWithZIO[Nats](_.publish[T](subject, data))
 
   def publish[T: Schema](
     subject: Subject,
     data: T,
     headers: Map[String, List[String]]
   ): ZIO[Nats & NatsConfig, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats](_.publish(subject, data, headers))
+    ZIO.serviceWithZIO[Nats](_.publish[T](subject, data, headers))
 
   def request(
     subject: Subject,
@@ -175,26 +175,16 @@ object Nats {
   // --- Type-safe extension methods ---
 
   def subscribeAs[T: Schema](subject: Subject): ZStream[Nats & NatsConfig, NatsError, T] =
-    for {
-      nats <- ZStream.service[Nats]
-      config <- ZStream.service[NatsConfig]
-      msg <- nats.subscribe(subject)
-      decoded <- ZStream.fromZIO(
-        ZIO.fromEither(config.format.decode[T](msg.data))
-          .mapError(e => NatsError.SerializationError(e.getMessage, e))
-      )
-    } yield decoded
+    ZStream.serviceWithStream[Nats](_.subscribe(subject)).mapZIO(decodeMessage[T])
 
   def subscribeAs[T: Schema](subject: Subject, queue: Subject): ZStream[Nats & NatsConfig, NatsError, T] =
-    for {
-      nats <- ZStream.service[Nats]
-      config <- ZStream.service[NatsConfig]
-      msg <- nats.subscribe(subject, queue)
-      decoded <- ZStream.fromZIO(
-        ZIO.fromEither(config.format.decode[T](msg.data))
-          .mapError(e => NatsError.SerializationError(e.getMessage, e))
-      )
-    } yield decoded
+    ZStream.serviceWithStream[Nats](_.subscribe(subject, queue)).mapZIO(decodeMessage[T])
+
+  private def decodeMessage[T: Schema](msg: NatsMessage): ZIO[NatsConfig, NatsError, T] =
+    ZIO.serviceWithZIO[NatsConfig] { config =>
+      ZIO.fromEither(config.format.decode[T](msg.data))
+        .mapError(e => NatsError.SerializationError(e.getMessage, e))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -234,24 +224,20 @@ private[nats] final class NatsLive(conn: JConnection) extends Nats {
     ZIO.attempt(conn.publish(msg)).mapError(NatsError.fromThrowable)
   }
 
-  override def publish[T: Schema](subject: Subject, data: T): ZIO[Nats & NatsConfig, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats] { nats =>
-      ZIO.serviceWithZIO[NatsConfig] { config =>
-        val bytes = config.format.encode(data).left.map(e => NatsError.SerializationError(e.getMessage, e))
-        ZIO.fromEither(bytes).flatMap(b => nats.publish(subject, b))
-      }
+  override def publish[T: Schema](subject: Subject, data: T): ZIO[NatsConfig, NatsError, Unit] =
+    ZIO.serviceWithZIO[NatsConfig] { config =>
+      ZIO.fromEither(config.format.encode(data).left.map(e => NatsError.SerializationError(e.getMessage, e)))
+        .flatMap(b => publish(subject, b))
     }
 
   override def publish[T: Schema](
     subject: Subject,
     data: T,
     headers: Map[String, List[String]]
-  ): ZIO[Nats & NatsConfig, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats] { nats =>
-      ZIO.serviceWithZIO[NatsConfig] { config =>
-        val bytes = config.format.encode(data).left.map(e => NatsError.SerializationError(e.getMessage, e))
-        ZIO.fromEither(bytes).flatMap(b => nats.publish(subject, b, headers))
-      }
+  ): ZIO[NatsConfig, NatsError, Unit] =
+    ZIO.serviceWithZIO[NatsConfig] { config =>
+      ZIO.fromEither(config.format.encode(data).left.map(e => NatsError.SerializationError(e.getMessage, e)))
+        .flatMap(b => publish(subject, b, headers))
     }
 
   override def request(

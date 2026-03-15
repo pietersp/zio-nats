@@ -1,7 +1,5 @@
 package zio.nats.subject
 
-import scala.language.implicitConversions
-
 class Subject(val value: String) extends AnyRef {
   override def equals(other: Any): Boolean = other match {
     case that: Subject => this.value == that.value
@@ -13,7 +11,4 @@ class Subject(val value: String) extends AnyRef {
 
 object Subject {
   def apply(s: String): Subject = new Subject(s)
-  def fromString(s: String): Subject = new Subject(s)
-  
-  implicit def stringToSubject(s: String): Subject = Subject(s)
 }
