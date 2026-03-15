@@ -13,10 +13,11 @@ inThisBuild(
     scalaVersion       := scala213,
     crossScalaVersions := Seq(scala213, scala3),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    scalacOptions ++= Seq("-deprecation", "-feature"),
     scalacOptions ++= {
       CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((2, _)) => Seq("-Xsource:3", "-deprecation", "-feature")
-        case _            => Seq("-deprecation", "-feature")
+        case Some((2, _)) => Seq("-Xsource:3")
+        case _            => Seq.empty
       }
     }
   )
