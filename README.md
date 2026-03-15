@@ -11,6 +11,7 @@ A ZIO 2 wrapper for the [jnats](https://github.com/nats-io/nats.java) NATS clien
 - Full API coverage: core pub/sub, JetStream, Key-Value, Object Store
 - `ZStream`-based subscriptions and consumers — no callbacks in user code
 - Typed error model (`NatsError` sealed ADT)
+- Type-safe serialization with [zio-blocks Schema](https://zio.dev/zio-blocks)
 - Cross-compiled for Scala 2.13 and Scala 3
 
 ## Installation
@@ -121,6 +122,88 @@ nats.subscribe("work.queue", "workers")
 ```scala
 val reply: IO[NatsError, NatsMessage] =
   nats.request("rpc.add", payload, timeout = 5.seconds)
+```
+
+## Type-Safe Serialization (zio-blocks)
+
+zio-nats supports type-safe publish/subscribe using [zio-blocks Schema](https://zio.dev/zio-blocks). Provide an implicit `Schema[T]` and the library handles serialization automatically.
+
+### Setup
+
+Add zio-blocks-schema dependency:
+
+```scala
+libraryDependencies += "dev.zio" %% "zio-blocks-schema" % "0.0.29"
+```
+
+Define schemas for your types:
+
+```scala
+import zio.blocks.schema.Schema
+
+case class Person(name: String, age: Int)
+object Person {
+  implicit val schema: Schema[Person] = Schema.derived
+}
+
+case class Order(id: String, amount: Double)
+object Order {
+  implicit val schema: Schema[Order] = Schema.derived
+}
+```
+
+### Type-Safe Publish
+
+```scala
+// Publish typed data - automatically serialized to JSON
+nats.publish(Subject("users"), Person("Alice", 30))
+
+// With headers
+nats.publish(Subject("orders"), Order("ord-123", 99.99), 
+  headers = Map("Content-Type" -> List("application/json")))
+```
+
+### Type-Safe Subscribe
+
+```scala
+// Subscribe and deserialize to typed data
+nats.subscribeAs[Person](Subject("users")).runForeach { person =>
+  ZIO.debug(s"Got: ${person.name}")
+}
+
+// With queue group
+nats.subscribeAs[Order](Subject("orders"), Subject("processors")).runDrain
+```
+
+### Subject Type
+
+Use `Subject` for type-safe subjects:
+
+```scala
+import zio.nats.subject.Subject
+
+val users = Subject("users")
+nats.publish(users, Person("Bob", 25))
+```
+
+### JetStream Type-Safe Publish
+
+```scala
+val js: ZLayer[JetStream, NatsError, JetStream] = Nats.live >>> JetStream.live
+
+JetStream.publish(Subject("events"), Event("click", timestamp))
+  .provide(js)
+```
+
+### Configuration
+
+The serialization format is configurable via `NatsConfig`:
+
+```scala
+NatsConfig(
+  servers = List("nats://localhost:4222"),
+  format = SerializationFormat.json  // default
+)
 ```
 
 ## JetStream
@@ -374,6 +457,8 @@ NatsConfig(
   password             = None,
   credentialPath       = None,
   authHandler          = None,
+  // Serialization format (default: JSON)
+  format               = SerializationFormat.json,
   // Escape hatch for any Options.Builder field not covered above:
   optionsCustomizer    = identity
 )
