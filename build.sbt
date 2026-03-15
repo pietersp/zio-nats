@@ -36,10 +36,10 @@ lazy val zioNats = (project in file("zio-nats"))
   .settings(
     name := "zio-nats",
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio"                    % zioVersion,
-      "dev.zio" %% "zio-streams"            % zioVersion,
-      "dev.zio" %% "zio-blocks-schema"      % zioBlocksVersion,
-      "io.nats"  % "jnats"                 % jnatsVersion
+      "dev.zio" %% "zio"               % zioVersion,
+      "dev.zio" %% "zio-streams"       % zioVersion,
+      "dev.zio" %% "zio-blocks-schema" % zioBlocksVersion,
+      "io.nats"  % "jnats"             % jnatsVersion
     ),
     Compile / unmanagedSourceDirectories += {
       val sv = scalaVersion.value
@@ -69,8 +69,8 @@ lazy val zioNatsTest = (project in file("zio-nats-test"))
     // Podman/Docker socket configuration for testcontainers.
     // Forking is required so env vars are passed to the test JVM.
     // parallelExecution = false ensures containers don't race each other.
-    Test / fork               := true,
-    Test / parallelExecution  := false,
+    Test / fork              := true,
+    Test / parallelExecution := false,
     Test / envVars ++= {
       val podmanSocket = "/tmp/podman/podman-machine-default-api.sock"
       val dockerSocket = "/var/run/docker.sock"
