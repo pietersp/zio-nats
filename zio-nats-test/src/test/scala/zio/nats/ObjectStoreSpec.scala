@@ -1,6 +1,5 @@
 package zio.nats
 
-import io.nats.client.api._
 import zio._
 import zio.test._
 import zio.test.TestAspect._
@@ -12,14 +11,8 @@ object ObjectStoreSpec extends ZIOSpecDefault {
 
     test("create bucket, put, get, and delete an object") {
       for {
-        osm  <- ZIO.service[ObjectStoreManagement]
-        nats <- ZIO.service[Nats]
-        _    <- osm.create(
-                  ObjectStoreConfiguration.builder()
-                    .name("os-basic")
-                    .storageType(StorageType.Memory)
-                    .build()
-                )
+        osm     <- ZIO.service[ObjectStoreManagement]
+        _       <- osm.create(ObjectStoreConfig(name = "os-basic", storageType = StorageType.Memory))
         os      <- ObjectStore.bucket("os-basic")
         info    <- os.put("my-object", Chunk.fromArray("hello-object".getBytes))
         data    <- os.get("my-object")
@@ -27,41 +20,29 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         _       <- os.delete("my-object")
         _       <- osm.delete("os-basic")
       } yield assertTrue(
-        info.getObjectName == "my-object",
+        info.name == "my-object",
         data.toArray.sameElements("hello-object".getBytes),
-        objInfo.getObjectName == "my-object",
-        objInfo.getSize == 12L
+        objInfo.name == "my-object",
+        objInfo.size == 12L
       )
     },
 
     test("list objects in bucket") {
       for {
-        osm  <- ZIO.service[ObjectStoreManagement]
-        nats <- ZIO.service[Nats]
-        _    <- osm.create(
-                  ObjectStoreConfiguration.builder()
-                    .name("os-list")
-                    .storageType(StorageType.Memory)
-                    .build()
-                )
-        os   <- ObjectStore.bucket("os-list")
-        _    <- os.put("obj-1", Chunk.fromArray("data1".getBytes))
-        _    <- os.put("obj-2", Chunk.fromArray("data2".getBytes))
-        lst  <- os.list
-        _    <- osm.delete("os-list")
-      } yield assertTrue(lst.map(_.getObjectName).sorted == List("obj-1", "obj-2"))
+        osm <- ZIO.service[ObjectStoreManagement]
+        _   <- osm.create(ObjectStoreConfig(name = "os-list", storageType = StorageType.Memory))
+        os  <- ObjectStore.bucket("os-list")
+        _   <- os.put("obj-1", Chunk.fromArray("data1".getBytes))
+        _   <- os.put("obj-2", Chunk.fromArray("data2".getBytes))
+        lst <- os.list
+        _   <- osm.delete("os-list")
+      } yield assertTrue(lst.map(_.name).sorted == List("obj-1", "obj-2"))
     },
 
     test("large object is chunked and reassembled correctly") {
       for {
-        osm  <- ZIO.service[ObjectStoreManagement]
-        nats <- ZIO.service[Nats]
-        _    <- osm.create(
-                  ObjectStoreConfiguration.builder()
-                    .name("os-large")
-                    .storageType(StorageType.Memory)
-                    .build()
-                )
+        osm     <- ZIO.service[ObjectStoreManagement]
+        _       <- osm.create(ObjectStoreConfig(name = "os-large", storageType = StorageType.Memory))
         os      <- ObjectStore.bucket("os-large")
         bigData  = Chunk.fromArray(Array.fill(128 * 1024)(42.toByte))
         _       <- os.put("big-obj", bigData)
@@ -73,15 +54,9 @@ object ObjectStoreSpec extends ZIOSpecDefault {
     test("watch emits object changes") {
       for {
         osm      <- ZIO.service[ObjectStoreManagement]
-        nats     <- ZIO.service[Nats]
-        _        <- osm.create(
-                      ObjectStoreConfiguration.builder()
-                        .name("os-watch")
-                        .storageType(StorageType.Memory)
-                        .build()
-                    )
+        _        <- osm.create(ObjectStoreConfig(name = "os-watch", storageType = StorageType.Memory))
         os       <- ObjectStore.bucket("os-watch")
-        received <- Promise.make[Nothing, ObjectInfo]
+        received <- Promise.make[Nothing, ObjectSummary]
         fiber    <- os.watch
                       .filter(!_.isDeleted)
                       .tap(info => received.succeed(info))
@@ -93,7 +68,7 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         info     <- received.await
         _        <- fiber.interrupt
         _        <- osm.delete("os-watch")
-      } yield assertTrue(info.getObjectName == "watched-obj")
+      } yield assertTrue(info.name == "watched-obj")
     }
 
   ).provideShared(

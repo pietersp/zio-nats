@@ -11,7 +11,7 @@ import zio.stream._
   * All resources (FetchConsumer, IterableConsumer, MessageConsumer) are
   * automatically closed when the ZStream is interrupted or finishes.
   */
-object JetStreamConsumer {
+private[nats] object JetStreamConsumer {
 
   /** Consume messages indefinitely via callback, as a ZStream.
     *

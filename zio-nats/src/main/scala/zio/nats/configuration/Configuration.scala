@@ -14,6 +14,7 @@ import io.nats.client.api.{
   Source,
   External
 }
+import zio.Duration
 import scala.jdk.CollectionConverters._
 
 case class StreamConfig(
@@ -101,16 +102,16 @@ case class ConsumerConfig(
   startSeq: Long = 0,
   startTime: Option[java.time.ZonedDateTime] = None,
   ackPolicy: AckPolicy = AckPolicy.Explicit,
-  ackWait: Long = 30 * 1000,
+  ackWait: Duration = zio.Duration.fromMillis(30 * 1000),
   maxDeliver: Long = -1,
   maxAckPending: Long = -1,
-  idleHeartbeat: Long = -1,
+  idleHeartbeat: Duration = zio.Duration.Zero,
   replayPolicy: ReplayPolicy = ReplayPolicy.Instant,
   rateLimit: Long = -1,
   sampleFrequency: Option[String] = None,
   maxPullWaiting: Long = -1,
   maxBatch: Long = -1,
-  maxExpires: Long = -1,
+  maxExpires: Duration = zio.Duration.Zero,
   maxBytes: Long = -1,
   headersOnly: Boolean = false
 ) {
@@ -135,15 +136,15 @@ object ConsumerConfig {
 
     if (config.startSeq > 0) builder.startSequence(config.startSeq)
     config.startTime.foreach(t => builder.startTime(t))
-    if (config.ackWait > 0) builder.ackWait(config.ackWait)
+    if (config.ackWait.toMillis > 0) builder.ackWait(config.ackWait.toMillis)
     if (config.maxDeliver > 0) builder.maxDeliver(config.maxDeliver)
     if (config.maxAckPending > 0) builder.maxAckPending(config.maxAckPending)
-    if (config.idleHeartbeat > 0) builder.idleHeartbeat(config.idleHeartbeat)
+    if (config.idleHeartbeat.toMillis > 0) builder.idleHeartbeat(config.idleHeartbeat.toMillis)
     if (config.rateLimit > 0) builder.rateLimit(config.rateLimit)
     config.sampleFrequency.foreach(s => builder.sampleFrequency(s))
     if (config.maxPullWaiting > 0) builder.maxPullWaiting(config.maxPullWaiting)
     if (config.maxBatch > 0) builder.maxBatch(config.maxBatch)
-    if (config.maxExpires > 0) builder.maxExpires(config.maxExpires)
+    if (config.maxExpires.toMillis > 0) builder.maxExpires(config.maxExpires.toMillis)
     if (config.maxBytes > 0) builder.maxBytes(config.maxBytes)
     if (config.headersOnly) builder.headersOnly(java.lang.Boolean.TRUE)
 

@@ -1,0 +1,38 @@
+package zio.nats
+
+import io.nats.client.{ConsumerContext => JConsumerContext}
+import zio._
+import zio.stream._
+
+/** High-level consumer handle returned by [[JetStream.consumer]]. */
+trait Consumer {
+  def streamName:   String
+  def consumerName: String
+
+  def fetch(options: FetchOptions = FetchOptions.default): ZStream[Any, NatsError, NatsMessage]
+  def consume(options: ConsumeOptions = ConsumeOptions.default): ZStream[Any, NatsError, NatsMessage]
+  def iterate(
+    options:     ConsumeOptions = ConsumeOptions.default,
+    pollTimeout: Duration       = 5.seconds
+  ): ZStream[Any, NatsError, NatsMessage]
+  def next(timeout: Duration = 5.seconds): IO[NatsError, Option[NatsMessage]]
+}
+
+private[nats] final class ConsumerLive(
+  val streamName:   String,
+  val consumerName: String,
+  ctx:              JConsumerContext
+) extends Consumer {
+
+  def fetch(options: FetchOptions): ZStream[Any, NatsError, NatsMessage] =
+    JetStreamConsumer.fetch(ctx, options.toJava)
+
+  def consume(options: ConsumeOptions): ZStream[Any, NatsError, NatsMessage] =
+    JetStreamConsumer.consume(ctx, Some(options.toJava))
+
+  def iterate(options: ConsumeOptions, pollTimeout: Duration): ZStream[Any, NatsError, NatsMessage] =
+    JetStreamConsumer.iterate(ctx, Some(options.toJava), pollTimeout)
+
+  def next(timeout: Duration): IO[NatsError, Option[NatsMessage]] =
+    JetStreamConsumer.next(ctx, timeout)
+}
