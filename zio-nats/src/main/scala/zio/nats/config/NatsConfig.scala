@@ -32,7 +32,10 @@ final case class NatsConfig(
 ) {
 
   /** Build jnats Options from this config. */
-  private[nats] def toOptions: Options = {
+  private[nats] def toOptions: Options = toOptionsBuilder.build()
+
+  /** Build jnats Options.Builder from this config (allows further customization). */
+  private[nats] def toOptionsBuilder: Options.Builder = {
     var builder = new Options.Builder()
     servers.foreach(s => builder = builder.server(s))
     connectionName.foreach(n => builder = builder.connectionName(n))
@@ -52,8 +55,7 @@ final case class NatsConfig(
       p <- password
     } builder = builder.userInfo(u.toCharArray, p.toCharArray)
     credentialPath.foreach(p => builder = builder.credentialPath(p))
-    builder = optionsCustomizer(builder)
-    builder.build()
+    optionsCustomizer(builder)
   }
 }
 

@@ -1,5 +1,6 @@
 package zio.nats.testkit
 
+import io.nats.client.{ErrorListener, Options}
 import zio._
 import zio.nats._
 import zio.nats.config.NatsConfig
@@ -38,10 +39,23 @@ object NatsTestLayers {
   private val retrySchedule: Schedule[Any, Any, Any] =
     Schedule.exponential(100.millis).zipRight(Schedule.upTo(10.seconds))
 
+  /** A silent error listener that suppresses noisy connection logs during retry. */
+  private val silentErrorListener: ErrorListener = new ErrorListener {
+    override def errorOccurred(conn: io.nats.client.Connection, error: String): Unit = {}
+    override def exceptionOccurred(conn: io.nats.client.Connection, exp: Exception): Unit = {}
+  }
+
+  /** Build Options with a silent error listener to suppress noisy retry logs. */
+  private def quietOptions(config: NatsConfig): Options = {
+    val builder = config.toOptionsBuilder
+    builder.errorListener(silentErrorListener)
+    builder.build()
+  }
+
   /** Try to connect to NATS, retrying with exponential backoff until successful or timeout. */
   private def testConnection(config: NatsConfig): ZIO[Any, Throwable, Unit] =
     ZIO.attemptBlocking {
-      val conn = io.nats.client.Nats.connect(config.toOptions)
+      val conn = io.nats.client.Nats.connect(quietOptions(config))
       conn.close()
     }
 
