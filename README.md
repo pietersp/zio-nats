@@ -12,6 +12,7 @@ A ZIO 2 wrapper for the [jnats](https://github.com/nats-io/nats.java) NATS clien
 - `ZStream`-based subscriptions and consumers — no callbacks in user code
 - Typed error model (`NatsError` sealed ADT)
 - Type-safe serialization with [zio-blocks Schema](https://zio.dev/zio-blocks)
+- Zero raw jnats types in user code — `import zio.nats._` is all you need
 - Cross-compiled for Scala 2.13 and Scala 3
 
 ## Installation
@@ -34,28 +35,29 @@ Requires a running NATS server (`nats-server`).
 import zio._
 import zio.nats._
 import zio.nats.config.NatsConfig
+import zio.nats.subject.Subject
 
 object Main extends ZIOAppDefault {
   val run =
     ZIO.scoped {
       for {
         nats  <- Nats.make(NatsConfig.default)
-        fiber <- nats.subscribe("greetings")
+        fiber <- nats.subscribe(Subject("greetings"))
                    .take(3)
                    .tap(msg => Console.printLine(msg.dataAsString))
                    .runDrain
                    .fork
         _     <- ZIO.sleep(100.millis)
         _     <- ZIO.foreach(1 to 3)(i =>
-                   nats.publish("greetings", s"hello $i".toNatsData)
+                   nats.publish(Subject("greetings"), s"hello $i".toNatsData)
                  )
         _     <- fiber.join
       } yield ()
-    }
+    }.mapError(e => new RuntimeException(e.getMessage))
 }
 ```
 
-> `toNatsData` is a string extension provided by `import zio.nats._`.  
+> `toNatsData` is a string extension provided by `import zio.nats._`.
 > `Nats.make` returns a managed connection — it is closed automatically when the `Scope` ends.
 
 ## Core concepts
@@ -65,7 +67,7 @@ object Main extends ZIOAppDefault {
 ```
 NatsConfig
     └── Nats.live              ← core connection (pub/sub/request-reply)
-            ├── JetStream.live              ← JetStream publishing
+            ├── JetStream.live              ← JetStream publishing + consumer access
             ├── JetStreamManagement.live    ← stream + consumer admin
             ├── KeyValueManagement.live     ← KV bucket admin
             └── ObjectStoreManagement.live  ← Object Store admin
@@ -89,14 +91,16 @@ val appLayer =
 ### Publish
 
 ```scala
+import zio.nats.subject.Subject
+
 // Plain bytes
-nats.publish("events.user", bytes)
+nats.publish(Subject("events.user"), bytes)
 
 // UTF-8 string (via toNatsData extension)
-nats.publish("events.user", "payload".toNatsData)
+nats.publish(Subject("events.user"), "payload".toNatsData)
 
 // With headers
-nats.publish("events.user", bytes, Map("Content-Type" -> List("application/json")))
+nats.publish(Subject("events.user"), bytes, Map("Content-Type" -> List("application/json")))
 ```
 
 ### Subscribe
@@ -104,7 +108,7 @@ nats.publish("events.user", bytes, Map("Content-Type" -> List("application/json"
 `subscribe` returns a `ZStream`. The underlying jnats `Dispatcher` is created when the stream is consumed and closed automatically when the stream is interrupted.
 
 ```scala
-nats.subscribe("events.>")
+nats.subscribe(Subject("events.>"))
   .tap(msg => ZIO.debug(s"${msg.subject}: ${msg.dataAsString}"))
   .runDrain
 ```
@@ -114,14 +118,14 @@ nats.subscribe("events.>")
 Messages are load-balanced across all subscribers in the same queue group:
 
 ```scala
-nats.subscribe("work.queue", "workers")
+nats.subscribe(Subject("work.queue"), Subject("workers"))
 ```
 
 ### Request-Reply
 
 ```scala
 val reply: IO[NatsError, NatsMessage] =
-  nats.request("rpc.add", payload, timeout = 5.seconds)
+  nats.request(Subject("rpc.add"), payload, timeout = 5.seconds)
 ```
 
 ## Type-Safe Serialization (zio-blocks)
@@ -159,7 +163,7 @@ object Order {
 nats.publish(Subject("users"), Person("Alice", 30))
 
 // With headers
-nats.publish(Subject("orders"), Order("ord-123", 99.99), 
+nats.publish(Subject("orders"), Order("ord-123", 99.99),
   headers = Map("Content-Type" -> List("application/json")))
 ```
 
@@ -167,32 +171,18 @@ nats.publish(Subject("orders"), Order("ord-123", 99.99),
 
 ```scala
 // Subscribe and deserialize to typed data
-nats.subscribeAs[Person](Subject("users")).runForeach { person =>
+Nats.subscribeAs[Person](Subject("users")).runForeach { person =>
   ZIO.debug(s"Got: ${person.name}")
 }
 
 // With queue group
-nats.subscribeAs[Order](Subject("orders"), Subject("processors")).runDrain
-```
-
-### Subject Type
-
-Use `Subject` for type-safe subjects:
-
-```scala
-import zio.nats.subject.Subject
-
-val users = Subject("users")
-nats.publish(users, Person("Bob", 25))
+Nats.subscribeAs[Order](Subject("orders"), Subject("processors")).runDrain
 ```
 
 ### JetStream Type-Safe Publish
 
 ```scala
-val js: ZLayer[JetStream, NatsError, JetStream] = Nats.live >>> JetStream.live
-
-JetStream.publish(Subject("events"), Event("click", timestamp))
-  .provide(js)
+js.publish(Subject("events"), Event("click", timestamp))
 ```
 
 ### Configuration
@@ -208,20 +198,34 @@ NatsConfig(
 
 ## JetStream
 
+Requires JetStream-enabled NATS: `nats-server -js` or `docker run -p 4222:4222 nats -js`.
+
 ### Publishing
 
 ```scala
 val layer = ZLayer.succeed(NatsConfig.default) >>> Nats.live >>> JetStream.live
 
 val publish =
-  JetStream.publish("orders.new", order.toNatsData)
-    .map(ack => println(s"seq=${ack.getSeqno}"))
-    .provide(layer)
+  for {
+    js  <- ZIO.service[JetStream]
+    ack <- js.publish(Subject("orders.new"), order.toNatsData)
+    _   <- Console.printLine(s"seq=${ack.seqno}")
+  } yield ()
+```
+
+Publish with duplicate detection via message ID:
+
+```scala
+val ack = js.publish(
+  Subject("orders.new"),
+  order.toNatsData,
+  PublishOptions(messageId = Some("order-42"))
+)
 ```
 
 ### Management
 
-Create streams and consumers using `JetStreamManagement`:
+Create streams and consumers using `JetStreamManagement`. All config types are plain Scala case classes — no builders required:
 
 ```scala
 val layer =
@@ -231,44 +235,49 @@ val layer =
 
 val setup = for {
   _ <- JetStreamManagement.addStream(
-         StreamConfiguration.builder()
-           .name("ORDERS")
-           .subjects("orders.>")
-           .storageType(StorageType.Memory)
-           .build()
+         StreamConfig(
+           name        = "ORDERS",
+           subjects    = List("orders.>"),
+           storageType = StorageType.Memory
+         )
        )
   _ <- JetStreamManagement.addOrUpdateConsumer(
          "ORDERS",
-         ConsumerConfiguration.builder()
-           .durable("processor")
-           .ackPolicy(AckPolicy.Explicit)
-           .build()
+         ConsumerConfig.durable("processor").copy(
+           filterSubject = Some("orders.>"),
+           ackPolicy     = AckPolicy.Explicit
+         )
        )
 } yield ()
 ```
 
 ### Consuming
 
-Get a `JConsumerContext` from `JetStream.consumerContext`, then use `JetStreamConsumer`:
+Get a `Consumer` handle from `JetStream.consumer`, then use its methods directly:
 
 ```scala
-// Indefinite push-style consume
-JetStreamConsumer.consume(consumerCtx)
-  .mapZIO(msg => process(msg) *> msg.ack)
-  .runDrain
+for {
+  js       <- ZIO.service[JetStream]
+  consumer <- js.consumer("ORDERS", "processor")
 
-// Bounded fetch (completes after N messages or timeout)
-JetStreamConsumer.fetch(consumerCtx, FetchConsumeOptions.builder().maxMessages(10).build())
-  .mapZIO(msg => process(msg) *> msg.ack)
-  .runDrain
+  // Bounded fetch (completes after N messages or timeout)
+  _ <- consumer.fetch(FetchOptions(maxMessages = 10, expiresIn = 5.seconds))
+         .mapZIO(msg => process(msg) *> msg.ack)
+         .runDrain
 
-// Pull-based iterate (retries on empty polls)
-JetStreamConsumer.iterate(consumerCtx)
-  .mapZIO(msg => process(msg) *> msg.ack)
-  .runDrain
+  // Indefinite push-style consume
+  _ <- consumer.consume()
+         .mapZIO(msg => process(msg) *> msg.ack)
+         .runDrain
 
-// Single next message (returns None if no message within timeout)
-JetStreamConsumer.next(consumerCtx, timeout = 5.seconds)
+  // Pull-based iterate (retries on empty polls)
+  _ <- consumer.iterate()
+         .mapZIO(msg => process(msg) *> msg.ack)
+         .runDrain
+
+  // Single next message (returns None if no message within timeout)
+  msg <- consumer.next(5.seconds)
+} yield ()
 ```
 
 #### Ack methods on `NatsMessage`
@@ -291,7 +300,7 @@ val layer = ZLayer.succeed(NatsConfig.default) >>> Nats.live >+> KeyValueManagem
 
 val createBucket =
   KeyValueManagement.create(
-    KeyValueConfiguration.builder().name("config").build()
+    KeyValueConfig(name = "config", storageType = StorageType.Memory)
   ).provide(layer)
 ```
 
@@ -305,12 +314,12 @@ val kv: ZIO[Nats, NatsError, KeyValue] = KeyValue.bucket("config")
 kv.put("feature.flag", "true")
 kv.put("payload", bytes)
 
-// Get
+// Get — returns our KeyValueEntry with .key, .value, .revision, .operation, .valueAsString
 kv.get("feature.flag")          // IO[NatsError, Option[KeyValueEntry]]
 
 // Compare-and-swap
-kv.create("lock", bytes)                   // create-only (fails if key exists)
-kv.update("lock", newBytes, expectedRevision = 3)  // update only if revision matches
+kv.create("lock", bytes)                          // create-only (fails if key exists)
+kv.update("lock", newBytes, expectedRevision = 3) // update only if revision matches
 
 // Delete / purge
 kv.delete("stale-key")  // soft delete — history preserved
@@ -325,6 +334,8 @@ kv.watch("feature.>")   // ZStream[Any, NatsError, KeyValueEntry]
 kv.watchAll             // watch entire bucket
 ```
 
+`KeyValueEntry` fields: `.key`, `.value: Chunk[Byte]`, `.revision: Long`, `.operation: KeyValueOperation`, `.bucketName`, `.valueAsString` (UTF-8 decode helper).
+
 ## Object Store
 
 ```scala
@@ -333,19 +344,21 @@ val layer = ZLayer.succeed(NatsConfig.default) >>> Nats.live >+> ObjectStoreMana
 
 val createBucket =
   ObjectStoreManagement.create(
-    ObjectStoreConfiguration.builder().name("assets").build()
+    ObjectStoreConfig(name = "assets", storageType = StorageType.Memory)
   ).provide(layer)
 
 // Obtain a bucket handle (requires Nats in the environment)
 val os: ZIO[Nats, NatsError, ObjectStore] = ObjectStore.bucket("assets")
 
-os.put("logo.png", imageBytes)   // IO[NatsError, ObjectInfo]
+os.put("logo.png", imageBytes)   // IO[NatsError, ObjectSummary]
 os.get("logo.png")               // IO[NatsError, Chunk[Byte]]
-os.getInfo("logo.png")           // metadata only
+os.getInfo("logo.png")           // IO[NatsError, ObjectSummary]
 os.delete("old-asset")           // soft delete
-os.list                          // IO[NatsError, List[ObjectInfo]]
-os.watch                         // ZStream[Any, NatsError, ObjectInfo]
+os.list                          // IO[NatsError, List[ObjectSummary]]
+os.watch                         // ZStream[Any, NatsError, ObjectSummary]
 ```
+
+`ObjectSummary` fields: `.name`, `.size: Long`, `.chunks: Long`, `.description: Option[String]`, `.isDeleted: Boolean`.
 
 ## Connection Events
 
@@ -353,16 +366,19 @@ Wire up `NatsConnectionEvents` before connecting — the customizer must be appl
 
 ```scala
 ZIO.scoped {
-  for {
-    (events, customizer) <- NatsConnectionEvents.make
-    _    <- events
-              .collect { case NatsEvent.Disconnected(url) => url }
-              .tap(url => ZIO.logWarning(s"Disconnected from $url"))
-              .runDrain
-              .fork
-    nats <- Nats.make(NatsConfig.default.copy(optionsCustomizer = customizer))
-    // ...
-  } yield ()
+  NatsConnectionEvents.make.flatMap { case (events, customizer) =>
+    val logEvents = events
+      .collect { case NatsEvent.Disconnected(url) => url }
+      .tap(url => ZIO.logWarning(s"Disconnected from $url"))
+      .runDrain
+      .fork
+
+    val natsLayer =
+      ZLayer.succeed(NatsConfig.default.copy(optionsCustomizer = customizer)) >>>
+      Nats.live
+
+    logEvents *> program.provide(natsLayer)
+  }
 }
 ```
 
@@ -386,12 +402,12 @@ All operations return `IO[NatsError, A]`. `NatsError` is a sealed trait with exh
 ```scala
 import zio.nats.NatsError._
 
-nats.publish("subject", bytes).catchAll {
-  case ConnectionClosed(msg)                          => ZIO.logError(s"Connection closed: $msg")
-  case Timeout(msg)                                   => ZIO.logWarning(s"Timed out: $msg")
-  case JetStreamApiError(msg, code, apiCode, _)       => ZIO.logError(s"JetStream API $code/$apiCode: $msg")
-  case KeyNotFound(key)                               => ZIO.logInfo(s"Key $key not found")
-  case other                                          => ZIO.logError(other.message)
+nats.publish(Subject("subject"), bytes).catchAll {
+  case ConnectionClosed(msg)                    => ZIO.logError(s"Connection closed: $msg")
+  case Timeout(msg)                             => ZIO.logWarning(s"Timed out: $msg")
+  case JetStreamApiError(msg, code, apiCode, _) => ZIO.logError(s"JetStream API $code/$apiCode: $msg")
+  case KeyNotFound(key)                         => ZIO.logInfo(s"Key $key not found")
+  case other                                    => ZIO.logError(other.message)
 }
 ```
 
@@ -421,9 +437,9 @@ object MySpec extends ZIOSpecDefault {
     test("publishes and receives") {
       for {
         nats  <- ZIO.service[Nats]
-        fiber <- nats.subscribe("t").take(1).runCollect.fork
+        fiber <- nats.subscribe(Subject("t")).take(1).runCollect.fork
         _     <- ZIO.sleep(200.millis)
-        _     <- nats.publish("t", "hi".toNatsData)
+        _     <- nats.publish(Subject("t"), "hi".toNatsData)
         msgs  <- fiber.join
       } yield assertTrue(msgs.head.dataAsString == "hi")
     }
@@ -434,7 +450,7 @@ object MySpec extends ZIOSpecDefault {
 > **Podman / WSL users:** Set `DOCKER_HOST=unix:///tmp/podman/podman-machine-default-api.sock`
 > and `TESTCONTAINERS_RYUK_DISABLED=true` in your test environment.
 
-For JetStream tests use the same `NatsTestLayers.nats` — the container is started with `--js` so all JetStream, KV, and Object Store APIs are available.
+The testcontainer is started with `--js` so JetStream, KV, and Object Store APIs are all available in tests.
 
 ## NatsConfig reference
 
@@ -479,11 +495,14 @@ program.provide(Nats.default)
 
 ## Examples
 
-See [`examples/`](examples/) for two runnable apps (require a local NATS server):
+See [`examples/`](examples/) for two runnable apps. Both require a running NATS server; `RealisticApp` additionally requires JetStream (`docker run -p 4222:4222 nats -js`).
 
 | File | What it shows |
 |------|---------------|
 | [`QuickStartApp`](examples/src/main/scala/QuickStartApp.scala) | Connect, publish, subscribe, receive 3 messages |
 | [`RealisticApp`](examples/src/main/scala/RealisticApp.scala) | JetStream + KV + connection events, graceful shutdown |
 
-Run with: `sbt "zioNatsExamples/run"`
+```
+sbt "zioNatsExamples/runMain QuickStartApp"
+sbt "zioNatsExamples/runMain RealisticApp"
+```
