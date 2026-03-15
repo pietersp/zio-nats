@@ -24,7 +24,7 @@ inThisBuild(
 )
 
 lazy val root = (project in file("."))
-  .aggregate(zioNats, zioNatsTestkit, zioNatsTest)
+  .aggregate(zioNats, zioNatsTestkit, zioNatsTest, zioNatsExamples)
   .settings(
     name               := "zio-nats-root",
     publish / skip     := true,
@@ -77,4 +77,11 @@ lazy val zioNatsTest = (project in file("zio-nats-test"))
         "TESTCONTAINERS_HOST_OVERRIDE" -> "localhost"
       )
     }
+  )
+
+lazy val zioNatsExamples = (project in file("examples"))
+  .dependsOn(zioNats)
+  .settings(
+    name           := "zio-nats-examples",
+    publish / skip := true
   )
