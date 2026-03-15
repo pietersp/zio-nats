@@ -58,5 +58,20 @@ lazy val zioNatsTest = (project in file("zio-nats-test"))
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio-test"     % zioVersion % Test,
       "dev.zio" %% "zio-test-sbt" % zioVersion % Test
-    )
+    ),
+    // Podman/Docker socket configuration for testcontainers.
+    // Forking is required so env vars are passed to the test JVM.
+    Test / fork := true,
+    Test / envVars ++= {
+      val podmanSocket = "/tmp/podman/podman-machine-default-api.sock"
+      val dockerSocket = "/var/run/docker.sock"
+      val socketPath =
+        if (java.nio.file.Files.exists(java.nio.file.Paths.get(podmanSocket))) podmanSocket
+        else dockerSocket
+      Map(
+        "DOCKER_HOST"                  -> s"unix://$socketPath",
+        "TESTCONTAINERS_RYUK_DISABLED" -> "true",
+        "TESTCONTAINERS_HOST_OVERRIDE" -> "localhost"
+      )
+    }
   )
