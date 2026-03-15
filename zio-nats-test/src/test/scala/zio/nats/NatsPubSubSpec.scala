@@ -59,7 +59,7 @@ object NatsPubSubSpec extends ZIOSpecDefault {
                    .tap { msg =>
                      msg.replyTo match {
                        case Some(reply) =>
-                         nats.publish(Subject(reply), Chunk.fromArray("pong".getBytes))
+                         nats.publish(reply, Chunk.fromArray("pong".getBytes))
                        case None => ZIO.unit
                      }
                    }

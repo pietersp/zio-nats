@@ -1,7 +1,7 @@
 package zio.nats
 
 import io.nats.client.{ObjectStore => JObjectStore, ObjectStoreManagement => JObjectStoreManagement}
-import io.nats.client.api.{ObjectStoreWatcher => JObjectStoreWatcher, ObjectInfo => JObjectInfo, ObjectMeta, ObjectStoreStatus}
+import io.nats.client.api.{ObjectStoreWatcher => JObjectStoreWatcher, ObjectInfo => JObjectInfo, ObjectMeta}
 import zio._
 import zio.stream._
 import zio.nats.configuration.ObjectStoreConfig
@@ -35,7 +35,7 @@ trait ObjectStore {
   def list: IO[NatsError, List[ObjectSummary]]
 
   /** Bucket status and configuration. */
-  def getStatus: IO[NatsError, ObjectStoreStatus]
+  def getStatus: IO[NatsError, ObjectStoreBucketStatus]
 
   /** Stream changes to objects in this bucket. Never completes unless interrupted. */
   def watch: ZStream[Any, NatsError, ObjectSummary]
@@ -43,10 +43,10 @@ trait ObjectStore {
 
 /** Service for managing Object Store buckets. */
 trait ObjectStoreManagement {
-  def create(config: ObjectStoreConfig): IO[NatsError, ObjectStoreStatus]
+  def create(config: ObjectStoreConfig): IO[NatsError, ObjectStoreBucketStatus]
   def delete(bucketName: String): IO[NatsError, Unit]
   def getBucketNames: IO[NatsError, List[String]]
-  def getStatus(bucketName: String): IO[NatsError, ObjectStoreStatus]
+  def getStatus(bucketName: String): IO[NatsError, ObjectStoreBucketStatus]
 }
 
 object ObjectStore {
@@ -65,8 +65,9 @@ object ObjectStore {
 
 object ObjectStoreManagement {
 
-  def create(config: ObjectStoreConfig): ZIO[ObjectStoreManagement, NatsError, ObjectStoreStatus] =
+  def create(config: ObjectStoreConfig): ZIO[ObjectStoreManagement, NatsError, ObjectStoreBucketStatus] =
     ZIO.serviceWithZIO[ObjectStoreManagement](_.create(config))
+
 
   def delete(bucketName: String): ZIO[ObjectStoreManagement, NatsError, Unit] =
     ZIO.serviceWithZIO[ObjectStoreManagement](_.delete(bucketName))
@@ -122,8 +123,9 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
       .mapError(NatsError.fromThrowable)
       .map(_.map(ObjectSummary.fromJava))
 
-  override def getStatus: IO[NatsError, ObjectStoreStatus] =
+  override def getStatus: IO[NatsError, ObjectStoreBucketStatus] =
     ZIO.attemptBlocking(os.getStatus).mapError(NatsError.fromThrowable)
+      .map(ObjectStoreBucketStatus.fromJava)
 
   override def watch: ZStream[Any, NatsError, ObjectSummary] =
     ZStream.unwrapScoped {
@@ -146,8 +148,9 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
 
 private[nats] final class ObjectStoreManagementLive(osm: JObjectStoreManagement) extends ObjectStoreManagement {
 
-  override def create(config: ObjectStoreConfig): IO[NatsError, ObjectStoreStatus] =
+  override def create(config: ObjectStoreConfig): IO[NatsError, ObjectStoreBucketStatus] =
     ZIO.attemptBlocking(osm.create(config.toJava)).mapError(NatsError.fromThrowable)
+      .map(ObjectStoreBucketStatus.fromJava)
 
   override def delete(bucketName: String): IO[NatsError, Unit] =
     ZIO.attemptBlocking(osm.delete(bucketName)).mapError(NatsError.fromThrowable)
@@ -155,6 +158,7 @@ private[nats] final class ObjectStoreManagementLive(osm: JObjectStoreManagement)
   override def getBucketNames: IO[NatsError, List[String]] =
     ZIO.attemptBlocking(osm.getBucketNames().asScala.toList).mapError(NatsError.fromThrowable)
 
-  override def getStatus(bucketName: String): IO[NatsError, ObjectStoreStatus] =
+  override def getStatus(bucketName: String): IO[NatsError, ObjectStoreBucketStatus] =
     ZIO.attemptBlocking(osm.getStatus(bucketName)).mapError(NatsError.fromThrowable)
+      .map(ObjectStoreBucketStatus.fromJava)
 }

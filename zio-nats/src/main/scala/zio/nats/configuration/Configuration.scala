@@ -102,7 +102,7 @@ case class ConsumerConfig(
   startSeq: Long = 0,
   startTime: Option[java.time.ZonedDateTime] = None,
   ackPolicy: AckPolicy = AckPolicy.Explicit,
-  ackWait: Duration = zio.Duration.fromMillis(30 * 1000),
+  ackWait: Duration = zio.Duration.fromSeconds(30),
   maxDeliver: Long = -1,
   maxAckPending: Long = -1,
   idleHeartbeat: Duration = zio.Duration.Zero,

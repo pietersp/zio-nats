@@ -1,13 +1,16 @@
 package zio.nats
 
 import io.nats.client.api.{
-  PublishAck    => JPublishAck,
-  StreamInfo    => JStreamInfo,
-  ConsumerInfo  => JConsumerInfo,
-  PurgeResponse => JPurgeResponse,
-  KeyValueEntry => JKeyValueEntry,
+  PublishAck       => JPublishAck,
+  StreamInfo       => JStreamInfo,
+  ConsumerInfo     => JConsumerInfo,
+  PurgeResponse    => JPurgeResponse,
+  KeyValueEntry    => JKeyValueEntry,
   KeyValueOperation,
-  ObjectInfo    => JObjectInfo
+  KeyValueStatus   => JKeyValueStatus,
+  ObjectInfo       => JObjectInfo,
+  ObjectStoreStatus => JObjectStoreStatus,
+  StorageType
 }
 import io.nats.client.{
   PublishOptions     => JPublishOptions,
@@ -44,6 +47,8 @@ final case class PublishOptions(
     messageId.foreach(b.messageId)
     expectedStream.foreach(b.expectedStream)
     expectedLastMsgId.foreach(b.expectedLastMsgId)
+    expectedLastSeqno.foreach(b.expectedLastSequence(_))
+    expectedLastSubjectSeqno.foreach(b.expectedLastSubjectSequence(_))
     b.build()
   }
 }
@@ -71,12 +76,17 @@ object FetchOptions {
 }
 
 final case class ConsumeOptions(
-  maxMessages:   Int      = 512,
-  maxBytes:      Long     = -1,
-  expiresIn:     Duration = 30.seconds,
-  idleHeartbeat: Duration = 15.seconds
+  batchSize:  Int      = 512,
+  batchBytes: Long     = -1,
+  expiresIn:  Duration = 30.seconds
 ) {
-  private[nats] def toJava: JConsumeOptions = JConsumeOptions.builder().build()
+  private[nats] def toJava: JConsumeOptions = {
+    val b = JConsumeOptions.builder()
+      .expiresIn(expiresIn.toMillis)
+    if (batchBytes > 0) b.batchBytes(batchBytes)
+    else b.batchSize(batchSize)
+    b.build()
+  }
 }
 
 object ConsumeOptions {
@@ -110,20 +120,20 @@ private[nats] object StreamSummary {
 }
 
 final case class ConsumerSummary(
-  name:           String,
-  streamName:     String,
-  numPending:     Long,
-  numAckPending:  Long,
-  numRedelivered: Long
+  name:          String,
+  streamName:    String,
+  numPending:    Long,
+  numAckPending: Long,
+  redelivered:   Long
 )
 
 private[nats] object ConsumerSummary {
   def fromJava(info: JConsumerInfo): ConsumerSummary = ConsumerSummary(
-    name           = info.getName,
-    streamName     = info.getStreamName,
-    numPending     = info.getNumPending,
-    numAckPending  = info.getNumAckPending,
-    numRedelivered = info.getRedelivered
+    name          = info.getName,
+    streamName    = info.getStreamName,
+    numPending    = info.getNumPending,
+    numAckPending = info.getNumAckPending,
+    redelivered   = info.getRedelivered
   )
 }
 
@@ -176,5 +186,63 @@ private[nats] object ObjectSummary {
     chunks      = info.getChunks,
     description = Option(info.getDescription),
     isDeleted   = info.isDeleted
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Key-Value bucket status
+// ---------------------------------------------------------------------------
+
+final case class KeyValueBucketStatus(
+  bucketName:       String,
+  description:      Option[String],
+  entryCount:       Long,
+  byteCount:        Long,
+  maxHistoryPerKey: Long,
+  maxBucketSize:    Long,
+  storageType:      StorageType,
+  replicas:         Int,
+  isCompressed:     Boolean
+)
+
+private[nats] object KeyValueBucketStatus {
+  def fromJava(s: JKeyValueStatus): KeyValueBucketStatus = KeyValueBucketStatus(
+    bucketName       = s.getBucketName,
+    description      = Option(s.getDescription),
+    entryCount       = s.getEntryCount,
+    byteCount        = s.getByteCount,
+    maxHistoryPerKey = s.getMaxHistoryPerKey,
+    maxBucketSize    = s.getMaxBucketSize,
+    storageType      = s.getStorageType,
+    replicas         = s.getReplicas,
+    isCompressed     = s.isCompressed
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Object Store bucket status
+// ---------------------------------------------------------------------------
+
+final case class ObjectStoreBucketStatus(
+  bucketName:    String,
+  description:   Option[String],
+  size:          Long,
+  maxBucketSize: Long,
+  storageType:   StorageType,
+  replicas:      Int,
+  isSealed:      Boolean,
+  isCompressed:  Boolean
+)
+
+private[nats] object ObjectStoreBucketStatus {
+  def fromJava(s: JObjectStoreStatus): ObjectStoreBucketStatus = ObjectStoreBucketStatus(
+    bucketName    = s.getBucketName,
+    description   = Option(s.getDescription),
+    size          = s.getSize,
+    maxBucketSize = s.getMaxBucketSize,
+    storageType   = s.getStorageType,
+    replicas      = s.getReplicas,
+    isSealed      = s.isSealed,
+    isCompressed  = s.isCompressed
   )
 }

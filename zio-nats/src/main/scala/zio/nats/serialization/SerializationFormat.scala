@@ -1,5 +1,6 @@
 package zio.nats.serialization
 
+import scala.util.control.NonFatal
 import zio.Chunk
 import zio.blocks.schema._
 import zio.blocks.schema.json._
@@ -19,7 +20,7 @@ private object JsonFormatImpl extends SerializationFormat {
       val codec = Schema[T].derive(JsonFormat)
       Right(Chunk.fromArray(codec.encode(value)))
     } catch {
-      case e: Throwable => Left(e)
+      case NonFatal(e) => Left(e)
     }
   }
 
@@ -31,7 +32,7 @@ private object JsonFormatImpl extends SerializationFormat {
         case Left(e)  => Left(new Exception(e.toString))
       }
     } catch {
-      case e: Throwable => Left(e)
+      case NonFatal(e) => Left(e)
     }
   }
 }

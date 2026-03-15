@@ -35,9 +35,9 @@ object NatsTestLayers {
       NatsConfig(servers = List(c.clientUrl))
     )
 
-  /** Retry schedule: up to 20 attempts with exponential backoff, max 10 seconds total. */
+  /** Retry schedule: exponential backoff, capped at 10 seconds total. */
   private val retrySchedule: Schedule[Any, Any, Any] =
-    Schedule.exponential(100.millis).zipRight(Schedule.upTo(10.seconds))
+    Schedule.exponential(100.millis) && Schedule.upTo(10.seconds)
 
   /** A silent error listener that suppresses noisy connection logs during retry. */
   private val silentErrorListener: ErrorListener = new ErrorListener {
@@ -64,12 +64,10 @@ object NatsTestLayers {
     * Composes: container -> config -> wait for connection -> Nats.live
     */
   val nats: ZLayer[Any, Throwable, Nats] =
-    container >>> config >>> ZLayer.fromFunction { (cfg: NatsConfig) =>
-      zio.Unsafe.unsafe { implicit u =>
-        zio.Runtime.default.unsafe
-          .run(testConnection(cfg).retry(retrySchedule))
-          .getOrThrow()
-        cfg
-      }
-    } >>> Nats.live.mapError(e => new RuntimeException(e.message, e))
+    container >>> config >>>
+      ZLayer.fromZIO(
+        ZIO.service[NatsConfig].flatMap(cfg =>
+          testConnection(cfg).retry(retrySchedule).as(cfg)
+        )
+      ) >>> Nats.live.mapError(e => new RuntimeException(e.message, e))
 }

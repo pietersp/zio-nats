@@ -3,6 +3,7 @@ package zio.nats
 import io.nats.client.{Message => JMessage}
 import io.nats.client.impl.{Headers => JHeaders, NatsMessage => JNatsMessage}
 import zio._
+import zio.nats.subject.Subject
 
 /** Immutable wrapper around a received NATS message.
   *
@@ -12,7 +13,7 @@ import zio._
 final case class NatsMessage(
   subject: String,
   data: Chunk[Byte],
-  replyTo: Option[String],
+  replyTo: Option[Subject],
   headers: Map[String, List[String]],
   private[nats] val underlying: JMessage
 ) {
@@ -69,7 +70,7 @@ object NatsMessage {
     NatsMessage(
       subject    = msg.getSubject,
       data       = Chunk.fromArray(Option(msg.getData).getOrElse(Array.emptyByteArray)),
-      replyTo    = Option(msg.getReplyTo),
+      replyTo    = Option(msg.getReplyTo).map(Subject(_)),
       headers    = headers,
       underlying = msg
     )

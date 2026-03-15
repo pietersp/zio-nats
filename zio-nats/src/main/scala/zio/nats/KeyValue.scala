@@ -1,7 +1,7 @@
 package zio.nats
 
 import io.nats.client.{KeyValue => JKeyValue, KeyValueManagement => JKeyValueManagement}
-import io.nats.client.api.{KeyValueWatcher => JKeyValueWatcher, KeyValueEntry => JKeyValueEntry, KeyValueStatus}
+import io.nats.client.api.{KeyValueWatcher => JKeyValueWatcher, KeyValueEntry => JKeyValueEntry}
 import zio._
 import zio.stream._
 import zio.nats.configuration.KeyValueConfig
@@ -41,16 +41,16 @@ trait KeyValue {
   // --- Enumeration ---
   def keys: IO[NatsError, List[String]]
   def history(key: String): IO[NatsError, List[KeyValueEntry]]
-  def getStatus: IO[NatsError, KeyValueStatus]
+  def getStatus: IO[NatsError, KeyValueBucketStatus]
 }
 
 /** Service for managing Key-Value buckets. */
 trait KeyValueManagement {
-  def create(config: KeyValueConfig): IO[NatsError, KeyValueStatus]
-  def update(config: KeyValueConfig): IO[NatsError, KeyValueStatus]
+  def create(config: KeyValueConfig): IO[NatsError, KeyValueBucketStatus]
+  def update(config: KeyValueConfig): IO[NatsError, KeyValueBucketStatus]
   def delete(bucketName: String): IO[NatsError, Unit]
   def getBucketNames: IO[NatsError, List[String]]
-  def getStatus(bucketName: String): IO[NatsError, KeyValueStatus]
+  def getStatus(bucketName: String): IO[NatsError, KeyValueBucketStatus]
 }
 
 object KeyValue {
@@ -69,8 +69,9 @@ object KeyValue {
 
 object KeyValueManagement {
 
-  def create(config: KeyValueConfig): ZIO[KeyValueManagement, NatsError, KeyValueStatus] =
+  def create(config: KeyValueConfig): ZIO[KeyValueManagement, NatsError, KeyValueBucketStatus] =
     ZIO.serviceWithZIO[KeyValueManagement](_.create(config))
+
 
   def delete(bucketName: String): ZIO[KeyValueManagement, NatsError, Unit] =
     ZIO.serviceWithZIO[KeyValueManagement](_.delete(bucketName))
@@ -154,17 +155,20 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
       .mapError(NatsError.fromThrowable)
       .map(_.map(KeyValueEntry.fromJava))
 
-  override def getStatus: IO[NatsError, KeyValueStatus] =
+  override def getStatus: IO[NatsError, KeyValueBucketStatus] =
     ZIO.attemptBlocking(kv.getStatus).mapError(NatsError.fromThrowable)
+      .map(KeyValueBucketStatus.fromJava)
 }
 
 private[nats] final class KeyValueManagementLive(kvm: JKeyValueManagement) extends KeyValueManagement {
 
-  override def create(config: KeyValueConfig): IO[NatsError, KeyValueStatus] =
+  override def create(config: KeyValueConfig): IO[NatsError, KeyValueBucketStatus] =
     ZIO.attemptBlocking(kvm.create(config.toJava)).mapError(NatsError.fromThrowable)
+      .map(KeyValueBucketStatus.fromJava)
 
-  override def update(config: KeyValueConfig): IO[NatsError, KeyValueStatus] =
+  override def update(config: KeyValueConfig): IO[NatsError, KeyValueBucketStatus] =
     ZIO.attemptBlocking(kvm.update(config.toJava)).mapError(NatsError.fromThrowable)
+      .map(KeyValueBucketStatus.fromJava)
 
   override def delete(bucketName: String): IO[NatsError, Unit] =
     ZIO.attemptBlocking(kvm.delete(bucketName)).mapError(NatsError.fromThrowable)
@@ -172,6 +176,7 @@ private[nats] final class KeyValueManagementLive(kvm: JKeyValueManagement) exten
   override def getBucketNames: IO[NatsError, List[String]] =
     ZIO.attemptBlocking(kvm.getBucketNames().asScala.toList).mapError(NatsError.fromThrowable)
 
-  override def getStatus(bucketName: String): IO[NatsError, KeyValueStatus] =
+  override def getStatus(bucketName: String): IO[NatsError, KeyValueBucketStatus] =
     ZIO.attemptBlocking(kvm.getStatus(bucketName)).mapError(NatsError.fromThrowable)
+      .map(KeyValueBucketStatus.fromJava)
 }
