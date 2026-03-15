@@ -16,13 +16,18 @@ import zio.nats.config.NatsConfig
   */
 object NatsTestLayers {
 
-  /** ZLayer that starts a NATS Docker container and provides it as a service. */
+  /** ZLayer that starts a NATS Docker container and provides it as a service.
+    *
+    * A short sleep after start() ensures the port binding is ready on Podman/WSL
+    * before we attempt to connect (Podman has slight latency vs Docker for port publishing).
+    */
   val container: ZLayer[Any, Throwable, NatsContainer] =
     ZLayer.scoped {
       ZIO.acquireRelease(
         ZIO.attemptBlocking {
           val c = NatsContainer()
           c.start()
+          Thread.sleep(500) // allow port binding to settle on Podman/WSL
           c
         }
       )(c => ZIO.attemptBlocking(c.stop()).ignoreLogged)

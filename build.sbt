@@ -61,7 +61,9 @@ lazy val zioNatsTest = (project in file("zio-nats-test"))
     ),
     // Podman/Docker socket configuration for testcontainers.
     // Forking is required so env vars are passed to the test JVM.
-    Test / fork := true,
+    // parallelExecution = false ensures containers don't race each other.
+    Test / fork               := true,
+    Test / parallelExecution  := false,
     Test / envVars ++= {
       val podmanSocket = "/tmp/podman/podman-machine-default-api.sock"
       val dockerSocket = "/var/run/docker.sock"

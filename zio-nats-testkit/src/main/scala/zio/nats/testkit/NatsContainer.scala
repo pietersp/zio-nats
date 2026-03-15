@@ -35,7 +35,10 @@ object NatsContainer {
     val container = new org.testcontainers.containers.GenericContainer(imageName)
     container.withExposedPorts(ClientPort, MonitoringPort)
     container.withCommand(command)
-    container.waitingFor(Wait.forLogMessage(".*Server is ready.*", 1))
+    container.waitingFor(
+      Wait.forLogMessage(".*Server is ready.*", 1)
+        .withStartupTimeout(java.time.Duration.ofSeconds(60))
+    )
     new NatsContainer(container)
   }
 }
