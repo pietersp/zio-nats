@@ -34,30 +34,16 @@ object NatsTestLayers {
       NatsConfig(servers = List(c.clientUrl))
     )
 
+  /** Retry schedule: up to 20 attempts with exponential backoff, max 10 seconds total. */
+  private val retrySchedule: Schedule[Any, Any, Any] =
+    Schedule.exponential(100.millis).zipRight(Schedule.upTo(10.seconds))
+
   /** Try to connect to NATS, retrying with exponential backoff until successful or timeout. */
-  private def awaitNatsConnection(config: NatsConfig, timeout: Duration): ZIO[Any, Throwable, Unit] = {
-    val maxAttempts = 20
-    val baseDelay = 100.millis
-
-    def attempt(n: Int): ZIO[Any, Throwable, Unit] = {
-      if (n >= maxAttempts) {
-        ZIO.fail(new RuntimeException(s"NATS server not reachable after ${timeout} (${maxAttempts} attempts)"))
-      } else {
-        ZIO.attemptBlocking {
-          val conn = io.nats.client.Nats.connect(config.toOptions)
-          conn.close()
-        }.catchAll { _ =>
-          if (n < maxAttempts - 1) {
-            ZIO.sleep(baseDelay * (n + 1)).flatMap(_ => attempt(n + 1))
-          } else {
-            ZIO.fail(new RuntimeException(s"NATS server not reachable after ${timeout}"))
-          }
-        }
-      }
+  private def testConnection(config: NatsConfig): ZIO[Any, Throwable, Unit] =
+    ZIO.attemptBlocking {
+      val conn = io.nats.client.Nats.connect(config.toOptions)
+      conn.close()
     }
-
-    attempt(0)
-  }
 
   /** Full Nats service layer backed by a testcontainer with connection verification.
     *
@@ -67,7 +53,7 @@ object NatsTestLayers {
     container >>> config >>> ZLayer.fromFunction { (cfg: NatsConfig) =>
       zio.Unsafe.unsafe { implicit u =>
         zio.Runtime.default.unsafe
-          .run(awaitNatsConnection(cfg, 10.seconds))
+          .run(testConnection(cfg).retry(retrySchedule))
           .getOrThrow()
         cfg
       }
