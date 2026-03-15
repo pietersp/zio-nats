@@ -4,7 +4,10 @@ import io.nats.client.{Connection => JConnection}
 import io.nats.client.api.ServerInfo
 import zio._
 import zio.stream._
+import zio.blocks.schema.Schema
 import zio.nats.config.NatsConfig
+import zio.nats.serialization.SerializationFormat
+import zio.nats.subject.Subject
 
 /** Core NATS service: publish, subscribe, request-reply.
   *
@@ -13,55 +16,75 @@ import zio.nats.config.NatsConfig
   */
 trait Nats {
 
-  /** Publish a message (fire-and-forget into the client outbound buffer). */
-  def publish(subject: String, data: Chunk[Byte]): IO[NatsError, Unit]
+  // --- Raw publish (using Subject type) ---
 
-  /** Publish with NATS headers. */
+  /** Publish raw bytes (fire-and-forget into the client outbound buffer). */
+  def publish(subject: Subject, data: Chunk[Byte]): IO[NatsError, Unit]
+
+  /** Publish raw bytes with NATS headers. */
   def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     headers: Map[String, List[String]]
   ): IO[NatsError, Unit]
 
-  /** Publish with an explicit reply-to subject (for manual request/reply). */
+  /** Publish raw bytes with an explicit reply-to subject (for manual request/reply). */
   def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
-    replyTo: String
+    replyTo: Subject
   ): IO[NatsError, Unit]
 
-  /** Publish with headers and explicit reply-to. */
+  /** Publish raw bytes with headers and explicit reply-to. */
   def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     headers: Map[String, List[String]],
-    replyTo: String
+    replyTo: Subject
   ): IO[NatsError, Unit]
 
-  /** Send a request and await a single reply within the given timeout. */
+  // --- Type-safe publish (serializes T to bytes using Schema) ---
+
+  /** Publish a value of type T, serialized using the configured format. */
+  def publish[T: Schema](subject: Subject, data: T): ZIO[Nats & NatsConfig, NatsError, Unit]
+
+  /** Publish a value with NATS headers. */
+  def publish[T: Schema](
+    subject: Subject,
+    data: T,
+    headers: Map[String, List[String]]
+  ): ZIO[Nats & NatsConfig, NatsError, Unit]
+
+  // --- Request/Reply ---
+
+  /** Send a request with raw bytes and await a single reply within the given timeout. */
   def request(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     timeout: Duration = 2.seconds
   ): IO[NatsError, NatsMessage]
 
-  /** Request with headers. */
+  /** Request with raw bytes and headers. */
   def request(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     headers: Map[String, List[String]],
     timeout: Duration
   ): IO[NatsError, NatsMessage]
 
-  /** Subscribe to a subject, returning a ZStream of messages.
+  // --- Subscribe ---
+
+  /** Subscribe to a subject, returning a ZStream of raw messages.
     *
     * The underlying jnats Dispatcher is created when the stream is consumed
     * and closed automatically when the stream is interrupted or finishes.
     */
-  def subscribe(subject: String): ZStream[Any, NatsError, NatsMessage]
+  def subscribe(subject: Subject): ZStream[Any, NatsError, NatsMessage]
 
   /** Subscribe to a subject with a queue group for load-balanced delivery. */
-  def subscribe(subject: String, queue: String): ZStream[Any, NatsError, NatsMessage]
+  def subscribe(subject: Subject, queue: Subject): ZStream[Any, NatsError, NatsMessage]
+
+  // --- Utility methods ---
 
   /** Flush the outbound buffer to the server. */
   def flush(timeout: Duration = 1.second): IO[NatsError, Unit]
@@ -83,30 +106,40 @@ object Nats {
 
   // --- Accessor methods for use in ZIO environment ---
 
-  def publish(subject: String, data: Chunk[Byte]): ZIO[Nats, NatsError, Unit] =
+  def publish(subject: Subject, data: Chunk[Byte]): ZIO[Nats, NatsError, Unit] =
     ZIO.serviceWithZIO[Nats](_.publish(subject, data))
 
   def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     headers: Map[String, List[String]]
   ): ZIO[Nats, NatsError, Unit] =
     ZIO.serviceWithZIO[Nats](_.publish(subject, data, headers))
 
-  def publish(subject: String, data: Chunk[Byte], replyTo: String): ZIO[Nats, NatsError, Unit] =
+  def publish(subject: Subject, data: Chunk[Byte], replyTo: Subject): ZIO[Nats, NatsError, Unit] =
     ZIO.serviceWithZIO[Nats](_.publish(subject, data, replyTo))
 
+  def publish[T: Schema](subject: Subject, data: T): ZIO[Nats & NatsConfig, NatsError, Unit] =
+    ZIO.serviceWithZIO[Nats](_.publish(subject, data))
+
+  def publish[T: Schema](
+    subject: Subject,
+    data: T,
+    headers: Map[String, List[String]]
+  ): ZIO[Nats & NatsConfig, NatsError, Unit] =
+    ZIO.serviceWithZIO[Nats](_.publish(subject, data, headers))
+
   def request(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     timeout: Duration = 2.seconds
   ): ZIO[Nats, NatsError, NatsMessage] =
     ZIO.serviceWithZIO[Nats](_.request(subject, data, timeout))
 
-  def subscribe(subject: String): ZStream[Nats, NatsError, NatsMessage] =
+  def subscribe(subject: Subject): ZStream[Nats, NatsError, NatsMessage] =
     ZStream.serviceWithStream[Nats](_.subscribe(subject))
 
-  def subscribe(subject: String, queue: String): ZStream[Nats, NatsError, NatsMessage] =
+  def subscribe(subject: Subject, queue: Subject): ZStream[Nats, NatsError, NatsMessage] =
     ZStream.serviceWithStream[Nats](_.subscribe(subject, queue))
 
   def flush(timeout: Duration = 1.second): ZIO[Nats, NatsError, Unit] =
@@ -138,6 +171,30 @@ object Nats {
   /** Convenience layer: connect to localhost:4222 with defaults. */
   val default: ZLayer[Any, NatsError, Nats] =
     ZLayer.succeed(NatsConfig.default) >>> live
+
+  // --- Type-safe extension methods ---
+
+  def subscribeAs[T: Schema](subject: Subject): ZStream[Nats & NatsConfig, NatsError, T] =
+    for {
+      nats <- ZStream.service[Nats]
+      config <- ZStream.service[NatsConfig]
+      msg <- nats.subscribe(subject)
+      decoded <- ZStream.fromZIO(
+        ZIO.fromEither(config.format.decode[T](msg.data))
+          .mapError(e => NatsError.SerializationError(e.getMessage, e))
+      )
+    } yield decoded
+
+  def subscribeAs[T: Schema](subject: Subject, queue: Subject): ZStream[Nats & NatsConfig, NatsError, T] =
+    for {
+      nats <- ZStream.service[Nats]
+      config <- ZStream.service[NatsConfig]
+      msg <- nats.subscribe(subject, queue)
+      decoded <- ZStream.fromZIO(
+        ZIO.fromEither(config.format.decode[T](msg.data))
+          .mapError(e => NatsError.SerializationError(e.getMessage, e))
+      )
+    } yield decoded
 }
 
 // ---------------------------------------------------------------------------
@@ -146,63 +203,83 @@ object Nats {
 
 private[nats] final class NatsLive(conn: JConnection) extends Nats {
 
-  override def publish(subject: String, data: Chunk[Byte]): IO[NatsError, Unit] =
-    ZIO.attempt(conn.publish(subject, data.toArray))
+  override def publish(subject: Subject, data: Chunk[Byte]): IO[NatsError, Unit] =
+    ZIO.attempt(conn.publish(subject.value, data.toArray))
       .mapError(NatsError.fromThrowable)
 
   override def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     headers: Map[String, List[String]]
   ): IO[NatsError, Unit] = {
-    val msg = NatsMessage.toJava(subject, data, headers = headers)
+    val msg = NatsMessage.toJava(subject.value, data, headers = headers)
     ZIO.attempt(conn.publish(msg)).mapError(NatsError.fromThrowable)
   }
 
   override def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
-    replyTo: String
+    replyTo: Subject
   ): IO[NatsError, Unit] =
-    ZIO.attempt(conn.publish(subject, replyTo, data.toArray))
+    ZIO.attempt(conn.publish(subject.value, replyTo.value, data.toArray))
       .mapError(NatsError.fromThrowable)
 
   override def publish(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     headers: Map[String, List[String]],
-    replyTo: String
+    replyTo: Subject
   ): IO[NatsError, Unit] = {
-    val msg = NatsMessage.toJava(subject, data, replyTo = Some(replyTo), headers = headers)
+    val msg = NatsMessage.toJava(subject.value, data, replyTo = Some(replyTo.value), headers = headers)
     ZIO.attempt(conn.publish(msg)).mapError(NatsError.fromThrowable)
   }
 
+  override def publish[T: Schema](subject: Subject, data: T): ZIO[Nats & NatsConfig, NatsError, Unit] =
+    ZIO.serviceWithZIO[Nats] { nats =>
+      ZIO.serviceWithZIO[NatsConfig] { config =>
+        val bytes = config.format.encode(data).left.map(e => NatsError.SerializationError(e.getMessage, e))
+        ZIO.fromEither(bytes).flatMap(b => nats.publish(subject, b))
+      }
+    }
+
+  override def publish[T: Schema](
+    subject: Subject,
+    data: T,
+    headers: Map[String, List[String]]
+  ): ZIO[Nats & NatsConfig, NatsError, Unit] =
+    ZIO.serviceWithZIO[Nats] { nats =>
+      ZIO.serviceWithZIO[NatsConfig] { config =>
+        val bytes = config.format.encode(data).left.map(e => NatsError.SerializationError(e.getMessage, e))
+        ZIO.fromEither(bytes).flatMap(b => nats.publish(subject, b, headers))
+      }
+    }
+
   override def request(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     timeout: Duration
   ): IO[NatsError, NatsMessage] =
     ZIO.fromCompletionStage(
-      conn.requestWithTimeout(subject, data.toArray, timeout.asJava)
+      conn.requestWithTimeout(subject.value, data.toArray, timeout.asJava)
     ).mapBoth(NatsError.fromThrowable, NatsMessage.fromJava)
 
   override def request(
-    subject: String,
+    subject: Subject,
     data: Chunk[Byte],
     headers: Map[String, List[String]],
     timeout: Duration
   ): IO[NatsError, NatsMessage] = {
-    val msg = NatsMessage.toJava(subject, data, headers = headers)
+    val msg = NatsMessage.toJava(subject.value, data, headers = headers)
     ZIO.fromCompletionStage(
       conn.requestWithTimeout(msg, timeout.asJava)
     ).mapBoth(NatsError.fromThrowable, NatsMessage.fromJava)
   }
 
-  override def subscribe(subject: String): ZStream[Any, NatsError, NatsMessage] =
-    subscribeInternal(subject, None)
+  override def subscribe(subject: Subject): ZStream[Any, NatsError, NatsMessage] =
+    subscribeInternal(subject.value, None)
 
-  override def subscribe(subject: String, queue: String): ZStream[Any, NatsError, NatsMessage] =
-    subscribeInternal(subject, Some(queue))
+  override def subscribe(subject: Subject, queue: Subject): ZStream[Any, NatsError, NatsMessage] =
+    subscribeInternal(subject.value, Some(queue.value))
 
   /** Internal: Dispatcher + Queue -> ZStream pattern.
     *
@@ -234,8 +311,8 @@ private[nats] final class NatsLive(conn: JConnection) extends Nats {
                    case None    => d.subscribe(subject)
                  }
                  d
-               }.mapError(NatsError.fromThrowable)
-             )(d => ZIO.attempt(conn.closeDispatcher(d)).ignoreLogged)
+                }.mapError(NatsError.fromThrowable)
+              )(d => ZIO.attempt(conn.closeDispatcher(d)).ignoreLogged)
       } yield ZStream.fromQueue(msgQueue)
     }
 
@@ -256,4 +333,3 @@ private[nats] final class NatsLive(conn: JConnection) extends Nats {
 
   override def underlying: JConnection = conn
 }
-

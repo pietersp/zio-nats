@@ -42,6 +42,9 @@ object NatsError {
   final case class SubscriptionFailed(message: String, cause: Throwable)
       extends NatsError { initCause(cause) }
 
+  final case class SerializationError(message: String, cause: Throwable)
+      extends NatsError { initCause(cause) }
+
   // --- JetStream errors ---
 
   sealed trait JetStreamError extends NatsError

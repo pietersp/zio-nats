@@ -1,7 +1,8 @@
-val scala213 = "2.13.16"
-val scala3   = "3.3.5"
+val scala213 = "2.13.18"
+val scala3   = "3.8.1"
 
 val zioVersion            = "2.1.16"
+val zioBlocksVersion      = "0.0.29"
 val jnatsVersion          = "2.25.2"
 val testcontainersVersion = "0.41.8"
 
@@ -35,9 +36,10 @@ lazy val zioNats = (project in file("zio-nats"))
   .settings(
     name := "zio-nats",
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio"         % zioVersion,
-      "dev.zio" %% "zio-streams" % zioVersion,
-      "io.nats"  % "jnats"       % jnatsVersion
+      "dev.zio" %% "zio"                    % zioVersion,
+      "dev.zio" %% "zio-streams"            % zioVersion,
+      "dev.zio" %% "zio-blocks-schema"      % zioBlocksVersion,
+      "io.nats"  % "jnats"                 % jnatsVersion
     )
   )
 

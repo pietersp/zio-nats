@@ -29,7 +29,7 @@ object KeyValueSpec extends ZIOSpecDefault {
       } yield assertTrue(
         rev == 1L,
         entry.isDefined,
-        new String(entry.get.getValue) == "hello",
+        entry.get.getValue.sameElements("hello".getBytes),
         // After delete, entry exists with DELETE operation marker
         after.forall(_.getOperation == KeyValueOperation.DELETE)
       )
@@ -81,7 +81,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         entry   <- received.await
         _       <- fiber.interrupt
         _       <- kvm.delete("kv-watch")
-      } yield assertTrue(new String(entry.getValue) == "watched")
+      } yield assertTrue(entry.getValue.sameElements("watched".getBytes))
     },
 
     test("list keys in bucket") {

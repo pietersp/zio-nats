@@ -28,7 +28,7 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         _       <- osm.delete("os-basic")
       } yield assertTrue(
         info.getObjectName == "my-object",
-        new String(data.toArray) == "hello-object",
+        data.toArray.sameElements("hello-object".getBytes),
         objInfo.getObjectName == "my-object",
         objInfo.getSize == 12L
       )
