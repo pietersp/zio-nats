@@ -40,7 +40,7 @@ object TypedMessagingApp extends ZIOAppDefault {
       // Subscribe and automatically deserialize to Order
       orderFiber <- Nats.subscribeAs[Order](Subject("demo.orders"))
                       .take(2)
-                      .tap(order => Console.printLine(s"  order: ${order.id} — $$${order.amount} (user: ${order.userId})").orDie)
+                      .tap(order => Console.printLine(s"  order: ${order.id} - $$${order.amount} (user: ${order.userId})").orDie)
                       .runDrain
                       .fork
 
