@@ -1,6 +1,7 @@
 import zio._
 import zio.nats._
 import zio.nats.config.NatsConfig
+import zio.nats.subject.Subject
 import io.nats.client.api.{
   AckPolicy,
   ConsumerConfiguration,

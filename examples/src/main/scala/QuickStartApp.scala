@@ -1,6 +1,7 @@
 import zio._
 import zio.nats._
 import zio.nats.config.NatsConfig
+import zio.nats.subject.Subject
 
 /** Minimal zio-nats quick-start.
   *
@@ -17,7 +18,7 @@ object QuickStartApp extends ZIOAppDefault {
         nats <- Nats.make(NatsConfig.default)
 
         // Subscribe in the background; take the first 3 messages
-        fiber <- nats.subscribe("greetings")
+        fiber <- nats.subscribe(Subject("greetings"))
                    .take(3)
                    .tap(msg => Console.printLine(s"Received: ${msg.dataAsString}"))
                    .runDrain
@@ -28,7 +29,7 @@ object QuickStartApp extends ZIOAppDefault {
 
         // Publish 3 messages
         _ <- ZIO.foreach(1 to 3)(i =>
-               nats.publish("greetings", s"Hello #$i".toNatsData)
+               nats.publish(Subject("greetings"), s"Hello #$i".toNatsData)
              )
 
         // Wait for the subscriber fiber to finish
