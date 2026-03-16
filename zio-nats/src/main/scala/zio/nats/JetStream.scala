@@ -6,6 +6,7 @@ import io.nats.client.{PublishOptions => JPublishOptions, ConsumerContext => JCo
 import zio._
 import zio.blocks.schema.Schema
 import zio.nats.config.NatsConfig
+import zio.nats.serialization.NatsSerializer
 import zio.nats.subject.Subject
 
 /** JetStream publishing service. */
@@ -123,7 +124,7 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
 
   override def publish[T: Schema](subject: Subject, data: T): ZIO[NatsConfig, NatsError, PublishAck] =
     ZIO.serviceWithZIO[NatsConfig] { config =>
-      val bytes = config.format.encode(data).left.map(e => NatsError.SerializationError(e.getMessage, e))
+      val bytes = NatsSerializer.encode(data, config.format).left.map(e => NatsError.SerializationError(e.getMessage, e))
       ZIO.fromEither(bytes).flatMap { b =>
         ZIO.attemptBlocking(js.publish(subject.value, b.toArray))
           .mapError(NatsError.fromThrowable)

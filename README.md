@@ -187,13 +187,26 @@ js.publish(Subject("events"), Event("click", timestamp))
 
 ### Configuration
 
-The serialization format is configurable via `NatsConfig`:
+The `format` field in `NatsConfig` accepts any [zio-blocks](https://zio.dev/zio-blocks) `Format` directly. The default is `JsonFormat`. Add the corresponding zio-blocks artifact for the format you need:
 
 ```scala
-NatsConfig(
-  servers = List("nats://localhost:4222"),
-  format = SerializationFormat.json  // default
-)
+// build.sbt — pick one (or more)
+libraryDependencies += "dev.zio" %% "zio-blocks-schema"          % "0.0.29" // JSON (included by default)
+libraryDependencies += "dev.zio" %% "zio-blocks-schema-avro"     % "0.0.29"
+libraryDependencies += "dev.zio" %% "zio-blocks-schema-toon"     % "0.0.29"
+libraryDependencies += "dev.zio" %% "zio-blocks-schema-msgpack"  % "0.0.29"
+libraryDependencies += "dev.zio" %% "zio-blocks-schema-thrift"   % "0.0.29"
+libraryDependencies += "dev.zio" %% "zio-blocks-schema-bson"     % "0.0.29"
+```
+
+```scala
+import zio.blocks.schema.json.JsonFormat       // default, already on classpath
+import zio.blocks.schema.avro.AvroFormat       // after adding zio-blocks-schema-avro
+import zio.blocks.schema.toon.ToonFormat       // after adding zio-blocks-schema-toon
+
+NatsConfig.default                             // uses JsonFormat
+NatsConfig.default.copy(format = AvroFormat)   // switch to Avro
+NatsConfig.default.copy(format = ToonFormat)   // switch to Toon
 ```
 
 ## JetStream
@@ -473,8 +486,8 @@ NatsConfig(
   password             = None,
   credentialPath       = None,
   authHandler          = None,
-  // Serialization format (default: JSON)
-  format               = SerializationFormat.json,
+  // Serialization format — any zio-blocks Format (default: JsonFormat)
+  format               = JsonFormat,
   // Escape hatch for any Options.Builder field not covered above:
   optionsCustomizer    = identity
 )

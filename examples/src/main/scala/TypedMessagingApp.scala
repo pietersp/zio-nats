@@ -1,7 +1,8 @@
-import zio._
-import zio.nats._
+import zio.*
+import zio.nats.*
 import zio.nats.config.NatsConfig
 import zio.blocks.schema.Schema
+import zio.blocks.schema.json.JsonFormat
 
 // ---------------------------------------------------------------------------
 // Domain model — derive a Schema for automatic JSON serialization
@@ -62,10 +63,16 @@ object TypedMessagingApp extends ZIOAppDefault {
       _ <- Console.printLine("Done.").orDie
     } yield ()
 
+  // JsonFormat is the default. To use Avro, Toon, MessagePack, etc. add the
+  // corresponding zio-blocks artifact and swap the format here:
+  //   libraryDependencies += "dev.zio" %% "zio-blocks-schema-avro" % "0.0.29"
+  //   val config = NatsConfig.default.copy(format = AvroFormat)
+  private val config = NatsConfig.default.copy(format = JsonFormat)
+
   val run: ZIO[Any, Throwable, Unit] =
     program
       .provide(
-        ZLayer.succeed(NatsConfig.default),
+        ZLayer.succeed(config),
         Nats.live
       )
       .mapError(e => new RuntimeException(e.getMessage))

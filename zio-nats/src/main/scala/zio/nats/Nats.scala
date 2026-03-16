@@ -6,7 +6,7 @@ import zio._
 import zio.stream._
 import zio.blocks.schema.Schema
 import zio.nats.config.NatsConfig
-import zio.nats.serialization.SerializationFormat
+import zio.nats.serialization.NatsSerializer
 import zio.nats.subject.Subject
 
 /** Core NATS service: publish, subscribe, request-reply.
@@ -182,7 +182,7 @@ object Nats {
 
   private def decodeMessage[T: Schema](msg: NatsMessage): ZIO[NatsConfig, NatsError, T] =
     ZIO.serviceWithZIO[NatsConfig] { config =>
-      ZIO.fromEither(config.format.decode[T](msg.data))
+      ZIO.fromEither(NatsSerializer.decode[T](msg.data, config.format))
         .mapError(e => NatsError.SerializationError(e.getMessage, e))
     }
 }
@@ -226,7 +226,7 @@ private[nats] final class NatsLive(conn: JConnection) extends Nats {
 
   override def publish[T: Schema](subject: Subject, data: T): ZIO[NatsConfig, NatsError, Unit] =
     ZIO.serviceWithZIO[NatsConfig] { config =>
-      ZIO.fromEither(config.format.encode(data).left.map(e => NatsError.SerializationError(e.getMessage, e)))
+      ZIO.fromEither(NatsSerializer.encode(data, config.format).left.map(e => NatsError.SerializationError(e.getMessage, e)))
         .flatMap(b => publish(subject, b))
     }
 
@@ -236,7 +236,7 @@ private[nats] final class NatsLive(conn: JConnection) extends Nats {
     headers: Map[String, List[String]]
   ): ZIO[NatsConfig, NatsError, Unit] =
     ZIO.serviceWithZIO[NatsConfig] { config =>
-      ZIO.fromEither(config.format.encode(data).left.map(e => NatsError.SerializationError(e.getMessage, e)))
+      ZIO.fromEither(NatsSerializer.encode(data, config.format).left.map(e => NatsError.SerializationError(e.getMessage, e)))
         .flatMap(b => publish(subject, b, headers))
     }
 
