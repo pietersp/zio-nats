@@ -82,16 +82,19 @@ object Headers {
 // ---------------------------------------------------------------------------
 
 /**
- * Identifies a named NATS queue group for load-balanced subscriptions.
+ * An opaque type alias for NATS queue group names.
  *
  * When multiple subscribers share the same [[QueueGroup]], each published
  * message is delivered to exactly one subscriber in the group.
- *
- * @param value
- *   The queue group name.
  */
-final case class QueueGroup(value: String) {
-  override def toString: String = value
+opaque type QueueGroup = String
+
+object QueueGroup {
+
+  /** Create a [[QueueGroup]] from a raw string. */
+  def apply(value: String): QueueGroup = value
+
+  extension (q: QueueGroup) def value: String = q
 }
 
 // ---------------------------------------------------------------------------
