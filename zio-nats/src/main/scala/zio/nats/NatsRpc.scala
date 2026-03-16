@@ -1,7 +1,6 @@
 package zio.nats
 
 import zio._
-import zio.nats.subject.Subject
 import zio.stream.ZStream
 
 /**

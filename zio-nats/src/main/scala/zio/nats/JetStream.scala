@@ -2,7 +2,6 @@ package zio.nats
 
 import io.nats.client.{ConsumerContext as JConsumerContext, JetStream as JJetStream, StreamContext as JStreamContext}
 import zio.*
-import zio.nats.subject.Subject
 
 /** JetStream publishing service. */
 trait JetStream {

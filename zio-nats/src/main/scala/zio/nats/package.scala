@@ -82,9 +82,6 @@ package object nats {
     val PURGE: KeyValueOperation  = io.nats.client.api.KeyValueOperation.PURGE
   }
 
-  // --- Subject re-export (import zio.nats._ is all you need) ---
-  type Subject = subject.Subject
-  val Subject = subject.Subject
 
   // --- Config class re-exports (users don't need zio.nats.configuration._) ---
   type StreamConfig = configuration.StreamConfig

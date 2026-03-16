@@ -3,7 +3,6 @@ package zio.nats
 import io.nats.client.{Connection => JConnection}
 import zio._
 import zio.nats.config.NatsConfig
-import zio.nats.subject.Subject
 import zio.stream._
 
 /**

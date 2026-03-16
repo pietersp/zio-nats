@@ -3,7 +3,6 @@ package zio.nats
 import io.nats.client.{Message => JMessage}
 import io.nats.client.impl.{Headers => JHeaders, NatsMessage => JNatsMessage}
 import zio._
-import zio.nats.subject.Subject
 
 import scala.jdk.CollectionConverters._
 
