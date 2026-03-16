@@ -20,8 +20,7 @@ import zio.stream._
  * {{{
  * // Install a default codec for all Schema-annotated types:
  * val codecs = NatsCodec.fromFormat(JsonFormat)
- * import codecs.derived          // Scala 3
- * // import codecs._             // Scala 2.13
+ * import codecs.derived 
  *
  * // Override per type:
  * implicit val auditCodec: NatsCodec[AuditEvent] =
