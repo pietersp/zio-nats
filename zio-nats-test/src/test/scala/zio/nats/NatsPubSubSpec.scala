@@ -1,7 +1,6 @@
 package zio.nats
 
 import zio.*
-import zio.nats.subject.Subject
 import zio.nats.testkit.NatsTestLayers
 import zio.test.*
 import zio.test.TestAspect.*
@@ -10,21 +9,23 @@ object NatsPubSubSpec extends ZIOSpecDefault {
 
   def spec: Spec[Any, Throwable] = suite("Nats Pub/Sub")(
     test("publish and subscribe to a subject") {
+      val subject = Subject("test.pubsub")
+
       for {
         nats     <- ZIO.service[Nats]
         received <- Promise.make[Nothing, NatsMessage]
         fiber    <- nats
-                   .subscribeRaw(Subject("test.pubsub"))
+                   .subscribeRaw(subject)
                    .tap(msg => received.succeed(msg))
                    .take(1)
                    .runDrain
                    .fork
         _   <- ZIO.sleep(500.millis)
-        _   <- nats.publish(Subject("test.pubsub"), Chunk.fromArray("hello".getBytes))
+        _   <- nats.publish(subject, Chunk.fromArray("hello".getBytes))
         msg <- received.await
         _   <- fiber.interrupt
       } yield assertTrue(
-        msg.subject == Subject("test.pubsub"),
+        msg.subject == subject,
         msg.dataAsString == "hello"
       )
     },
@@ -54,10 +55,11 @@ object NatsPubSubSpec extends ZIOSpecDefault {
     },
 
     test("request-reply pattern") {
+      val subject = Subject("test.request")
       for {
         nats  <- ZIO.service[Nats]
         fiber <- nats
-                   .subscribeRaw(Subject("test.request"))
+                   .subscribeRaw(subject)
                    .tap { msg =>
                      msg.replyTo match {
                        case Some(reply) =>
@@ -69,30 +71,31 @@ object NatsPubSubSpec extends ZIOSpecDefault {
                    .runDrain
                    .fork
         _     <- ZIO.sleep(500.millis)
-        reply <- nats.request(Subject("test.request"), Chunk.fromArray("ping".getBytes), 5.seconds)
+        reply <- nats.request(subject, Chunk.fromArray("ping".getBytes), 5.seconds)
         _     <- fiber.interrupt
       } yield assertTrue(reply.dataAsString == "pong")
     },
 
     test("queue group delivers to exactly one subscriber") {
+      val subject = Subject("test.queue")
       for {
         nats    <- ZIO.service[Nats]
         counter <- Ref.make(0)
         latch   <- Promise.make[Nothing, Unit]
         fiber1  <- nats
-                    .subscribe(Subject("test.queue"), QueueGroup("group1"))
+                    .subscribe(subject, QueueGroup("group1"))
                     .tap(_ => counter.update(_ + 1) *> latch.succeed(()))
                     .take(1)
                     .runDrain
                     .fork
         fiber2 <- nats
-                    .subscribe(Subject("test.queue"), QueueGroup("group1"))
+                    .subscribe(subject, QueueGroup("group1"))
                     .tap(_ => counter.update(_ + 1) *> latch.succeed(()))
                     .take(1)
                     .runDrain
                     .fork
         _     <- ZIO.sleep(500.millis)
-        _     <- nats.publish(Subject("test.queue"), Chunk.fromArray("queued".getBytes))
+        _     <- nats.publish(subject, Chunk.fromArray("queued".getBytes))
         _     <- latch.await
         _     <- ZIO.sleep(200.millis)
         count <- counter.get

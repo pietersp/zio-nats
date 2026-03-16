@@ -1,7 +1,6 @@
 package zio.nats
 
 import zio.*
-import zio.nats.subject.Subject
 import zio.nats.testkit.NatsTestLayers
 import zio.test.*
 import zio.test.TestAspect.*
