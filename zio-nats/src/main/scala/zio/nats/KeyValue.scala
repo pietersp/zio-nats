@@ -126,26 +126,20 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
     watchInternal(None)
 
   private def watchInternal(key: Option[String]): ZStream[Any, NatsError, KeyValueEntry] =
-    ZStream.unwrapScoped {
-      for {
-        queue <- ZIO.acquireRelease(Queue.unbounded[KeyValueEntry])(_.shutdown)
-        watcher = new JKeyValueWatcher {
-          override def watch(entry: JKeyValueEntry): Unit =
-            zio.Unsafe.unsafe { implicit u =>
-              zio.Runtime.default.unsafe.run(queue.offer(KeyValueEntry.fromJava(entry)))
-                .getOrThrowFiberFailure()
-            }
-          override def endOfData(): Unit = ()
-        }
-        _ <- ZIO.acquireRelease(
-               ZIO.attemptBlocking {
-                 key match {
-                   case Some(k) => kv.watch(k, watcher)
-                   case None    => kv.watchAll(watcher)
-                 }
-               }.mapError(NatsError.fromThrowable)
-             )(sub => ZIO.attemptBlocking(sub.unsubscribe()).ignoreLogged)
-      } yield ZStream.fromQueue(queue)
+    ZStream.asyncScoped[Any, NatsError, KeyValueEntry] { emit =>
+      ZIO.acquireRelease(
+        ZIO.attemptBlocking {
+          val watcher = new JKeyValueWatcher {
+            override def watch(entry: JKeyValueEntry): Unit =
+              emit(ZIO.succeed(Chunk.single(KeyValueEntry.fromJava(entry))))
+            override def endOfData(): Unit = ()
+          }
+          key match {
+            case Some(k) => kv.watch(k, watcher)
+            case None    => kv.watchAll(watcher)
+          }
+        }.mapError(NatsError.fromThrowable)
+      )(sub => ZIO.attemptBlocking(sub.unsubscribe()).ignoreLogged)
     }
 
   override def keys: IO[NatsError, List[String]] =

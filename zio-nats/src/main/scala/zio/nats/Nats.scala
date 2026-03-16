@@ -277,29 +277,20 @@ private[nats] final class NatsLive(conn: JConnection) extends Nats {
     subject: String,
     queue: Option[String]
   ): ZStream[Any, NatsError, NatsMessage] =
-    ZStream.unwrapScoped {
-      for {
-        msgQueue <- ZIO.acquireRelease(
-                      Queue.unbounded[NatsMessage]
-                    )(_.shutdown)
-        _ <- ZIO.acquireRelease(
-               ZIO.attempt {
-                 val handler: io.nats.client.MessageHandler = { msg =>
-                   zio.Unsafe.unsafe { implicit u =>
-                     zio.Runtime.default.unsafe
-                       .run(msgQueue.offer(NatsMessage.fromJava(msg)))
-                       .getOrThrowFiberFailure()
-                   }
-                 }
-                 val d = conn.createDispatcher(handler)
-                 queue match {
-                   case Some(q) => d.subscribe(subject, q)
-                   case None    => d.subscribe(subject)
-                 }
-                 d
-                }.mapError(NatsError.fromThrowable)
-              )(d => ZIO.attempt(conn.closeDispatcher(d)).ignoreLogged)
-      } yield ZStream.fromQueue(msgQueue)
+    ZStream.asyncScoped[Any, NatsError, NatsMessage] { emit =>
+      ZIO.acquireRelease(
+        ZIO.attempt {
+          val handler: io.nats.client.MessageHandler = { msg =>
+            emit(ZIO.succeed(Chunk.single(NatsMessage.fromJava(msg))))
+          }
+          val d = conn.createDispatcher(handler)
+          queue match {
+            case Some(q) => d.subscribe(subject, q)
+            case None    => d.subscribe(subject)
+          }
+          d
+        }.mapError(NatsError.fromThrowable)
+      )(d => ZIO.attempt(conn.closeDispatcher(d)).ignoreLogged)
     }
 
   override def flush(timeout: Duration): IO[NatsError, Unit] =

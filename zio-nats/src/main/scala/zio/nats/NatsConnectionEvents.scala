@@ -4,6 +4,8 @@ import io.nats.client.{ConnectionListener, ErrorListener, Options, Connection as
 import zio.*
 import zio.stream.*
 
+import java.util.concurrent.LinkedBlockingQueue
+
 /** ADT for NATS connection lifecycle events. */
 sealed trait NatsEvent
 object NatsEvent {
@@ -43,37 +45,35 @@ object NatsConnectionEvents {
     */
   def make: ZIO[Scope, Nothing, (ZStream[Any, Nothing, NatsEvent], Options.Builder => Options.Builder)] =
     for {
+      jQueue <- ZIO.succeed(new LinkedBlockingQueue[NatsEvent]())
       hub    <- Hub.unbounded[NatsEvent]
+      _      <- ZIO.acquireRelease(
+                  ZStream.repeatZIO(ZIO.attemptBlocking(jQueue.take()).orDie)
+                    .runForeach(hub.publish)
+                    .fork
+                )(_.interrupt)
       stream  = ZStream.fromHub(hub)
       customizer = (builder: Options.Builder) => {
+        def offer(event: NatsEvent): Unit = jQueue.put(event)
         builder
           .connectionListener((conn: JConnection, eventType: ConnectionListener.Events) => {
             val url = Option(conn.getConnectedUrl).getOrElse("unknown")
             val event = eventType match {
-              case ConnectionListener.Events.CONNECTED => NatsEvent.Connected(url)
-              case ConnectionListener.Events.DISCONNECTED => NatsEvent.Disconnected(url)
-              case ConnectionListener.Events.RECONNECTED => NatsEvent.Reconnected(url)
-              case ConnectionListener.Events.CLOSED => NatsEvent.Closed
-              case ConnectionListener.Events.LAME_DUCK => NatsEvent.LameDuckMode
-              case ConnectionListener.Events.RESUBSCRIBED => NatsEvent.Reconnected(url)
+              case ConnectionListener.Events.CONNECTED          => NatsEvent.Connected(url)
+              case ConnectionListener.Events.DISCONNECTED       => NatsEvent.Disconnected(url)
+              case ConnectionListener.Events.RECONNECTED        => NatsEvent.Reconnected(url)
+              case ConnectionListener.Events.CLOSED             => NatsEvent.Closed
+              case ConnectionListener.Events.LAME_DUCK          => NatsEvent.LameDuckMode
+              case ConnectionListener.Events.RESUBSCRIBED       => NatsEvent.Reconnected(url)
               case ConnectionListener.Events.DISCOVERED_SERVERS => NatsEvent.ServersDiscovered(url)
             }
-            zio.Unsafe.unsafe { implicit u =>
-              zio.Runtime.default.unsafe.run(hub.publish(event))
-                .getOrThrowFiberFailure()
-            }
+            offer(event)
           })
           .errorListener(new ErrorListener {
             override def errorOccurred(conn: JConnection, error: String): Unit =
-              zio.Unsafe.unsafe { implicit u =>
-                zio.Runtime.default.unsafe.run(hub.publish(NatsEvent.Error(error)))
-                  .getOrThrowFiberFailure()
-              }
+              offer(NatsEvent.Error(error))
             override def exceptionOccurred(conn: JConnection, exp: Exception): Unit =
-              zio.Unsafe.unsafe { implicit u =>
-                zio.Runtime.default.unsafe.run(hub.publish(NatsEvent.ExceptionOccurred(exp)))
-                  .getOrThrowFiberFailure()
-              }
+              offer(NatsEvent.ExceptionOccurred(exp))
           })
       }
     } yield (stream, customizer)

@@ -114,21 +114,17 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
     ZIO.attemptBlocking(os.getStatus).mapBoth(NatsError.fromThrowable, ObjectStoreBucketStatus.fromJava)
 
   override def watch: ZStream[Any, NatsError, ObjectSummary] =
-    ZStream.unwrapScoped {
-      for {
-        queue <- ZIO.acquireRelease(Queue.unbounded[ObjectSummary])(_.shutdown)
-        watcher = new JObjectStoreWatcher {
-          override def watch(info: JObjectInfo): Unit =
-            zio.Unsafe.unsafe { implicit u =>
-              zio.Runtime.default.unsafe.run(queue.offer(ObjectSummary.fromJava(info)))
-                .getOrThrowFiberFailure()
-            }
-          override def endOfData(): Unit = ()
-        }
-        _ <- ZIO.acquireRelease(
-               ZIO.attemptBlocking(os.watch(watcher)).mapError(NatsError.fromThrowable)
-             )(sub => ZIO.attemptBlocking(sub.unsubscribe()).ignoreLogged)
-      } yield ZStream.fromQueue(queue)
+    ZStream.asyncScoped[Any, NatsError, ObjectSummary] { emit =>
+      ZIO.acquireRelease(
+        ZIO.attemptBlocking {
+          val watcher = new JObjectStoreWatcher {
+            override def watch(info: JObjectInfo): Unit =
+              emit(ZIO.succeed(Chunk.single(ObjectSummary.fromJava(info))))
+            override def endOfData(): Unit = ()
+          }
+          os.watch(watcher)
+        }.mapError(NatsError.fromThrowable)
+      )(sub => ZIO.attemptBlocking(sub.unsubscribe()).ignoreLogged)
     }
 }
 
