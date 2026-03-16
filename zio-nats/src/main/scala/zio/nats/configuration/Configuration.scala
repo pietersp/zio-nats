@@ -1,21 +1,9 @@
 package zio.nats.configuration
 
-import io.nats.client.api.{
-  StreamConfiguration => JStreamConfiguration,
-  ConsumerConfiguration => JConsumerConfiguration,
-  KeyValueConfiguration => JKeyValueConfiguration,
-  ObjectStoreConfiguration => JObjectStoreConfiguration,
-  StorageType,
-  AckPolicy,
-  DeliverPolicy,
-  ReplayPolicy,
-  CompressionOption,
-  Mirror,
-  Source,
-  External
-}
+import io.nats.client.api.{AckPolicy, CompressionOption, DeliverPolicy, External, Mirror, ReplayPolicy, Source, StorageType, ConsumerConfiguration as JConsumerConfiguration, KeyValueConfiguration as JKeyValueConfiguration, ObjectStoreConfiguration as JObjectStoreConfiguration, StreamConfiguration as JStreamConfiguration}
 import zio.Duration
-import scala.jdk.CollectionConverters._
+
+import scala.jdk.CollectionConverters.*
 
 case class StreamConfig(
   name: String,
@@ -166,7 +154,7 @@ case class KeyValueConfig(
 }
 
 object KeyValueConfig {
-  def apply(name: String): KeyValueConfig = KeyValueConfig(name = name)
+  def apply(name: String): KeyValueConfig = new KeyValueConfig(name = name)
 
   def toJava(config: KeyValueConfig): JKeyValueConfiguration = {
     val builder = JKeyValueConfiguration.builder()
@@ -194,7 +182,7 @@ case class ObjectStoreConfig(
 }
 
 object ObjectStoreConfig {
-  def apply(name: String): ObjectStoreConfig = ObjectStoreConfig(name = name)
+  def apply(name: String): ObjectStoreConfig = new ObjectStoreConfig(name = name)
 
   def toJava(config: ObjectStoreConfig): JObjectStoreConfiguration = {
     val builder = JObjectStoreConfiguration.builder()

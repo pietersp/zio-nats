@@ -1,9 +1,8 @@
 package zio.nats
 
-import io.nats.client.{ConsumerContext => JConsumerContext}
-import io.nats.client.{FetchConsumeOptions, ConsumeOptions}
-import zio._
-import zio.stream._
+import io.nats.client.{ConsumeOptions, FetchConsumeOptions, ConsumerContext as JConsumerContext}
+import zio.*
+import zio.stream.*
 
 /** Provides ZStream-based consumption from JetStream consumers.
   *

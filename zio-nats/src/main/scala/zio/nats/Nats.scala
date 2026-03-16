@@ -1,13 +1,13 @@
 package zio.nats
 
-import io.nats.client.{Connection => JConnection}
+import io.nats.client.Connection as JConnection
 import io.nats.client.api.ServerInfo
-import zio._
-import zio.stream._
+import zio.*
 import zio.blocks.schema.Schema
 import zio.nats.config.NatsConfig
 import zio.nats.serialization.NatsSerializer
 import zio.nats.subject.Subject
+import zio.stream.*
 
 /** Core NATS service: publish, subscribe, request-reply.
   *

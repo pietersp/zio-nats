@@ -1,9 +1,9 @@
 package zio.nats
 
-import zio._
-import zio.test._
-import zio.test.TestAspect._
+import zio.*
 import zio.nats.testkit.NatsTestLayers
+import zio.test.*
+import zio.test.TestAspect.*
 
 object KeyValueSpec extends ZIOSpecDefault {
 

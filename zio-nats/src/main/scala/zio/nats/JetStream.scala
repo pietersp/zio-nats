@@ -1,9 +1,7 @@
 package zio.nats
 
-import io.nats.client.{JetStream => JJetStream}
-import io.nats.client.api.{PublishAck => JPublishAck}
-import io.nats.client.{PublishOptions => JPublishOptions, ConsumerContext => JConsumerContext, StreamContext => JStreamContext}
-import zio._
+import io.nats.client.{ConsumerContext as JConsumerContext, JetStream as JJetStream, StreamContext as JStreamContext}
+import zio.*
 import zio.blocks.schema.Schema
 import zio.nats.config.NatsConfig
 import zio.nats.serialization.NatsSerializer

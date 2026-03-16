@@ -1,12 +1,13 @@
 package zio.nats
 
-import io.nats.client.{ObjectStore => JObjectStore, ObjectStoreManagement => JObjectStoreManagement}
-import io.nats.client.api.{ObjectStoreWatcher => JObjectStoreWatcher, ObjectInfo => JObjectInfo, ObjectMeta}
-import zio._
-import zio.stream._
+import io.nats.client.api.{ObjectMeta, ObjectInfo as JObjectInfo, ObjectStoreWatcher as JObjectStoreWatcher}
+import io.nats.client.{ObjectStore as JObjectStore, ObjectStoreManagement as JObjectStoreManagement}
+import zio.*
 import zio.nats.configuration.ObjectStoreConfig
-import scala.jdk.CollectionConverters._
+import zio.stream.*
+
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import scala.jdk.CollectionConverters.*
 
 /** Service for object store operations on a single NATS OS bucket. */
 trait ObjectStore {
@@ -57,9 +58,7 @@ object ObjectStore {
     */
   def bucket(bucketName: String): ZIO[Nats, NatsError, ObjectStore] =
     ZIO.serviceWithZIO[Nats] { nats =>
-      ZIO.attempt(nats.underlying.objectStore(bucketName))
-        .mapError(NatsError.fromThrowable)
-        .map(new ObjectStoreLive(_))
+      ZIO.attempt(nats.underlying.objectStore(bucketName)).mapBoth(NatsError.fromThrowable, new ObjectStoreLive(_))
     }
 }
 
@@ -87,14 +86,10 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
   override def bucketName: String = os.getBucketName
 
   override def put(objectName: String, data: Chunk[Byte]): IO[NatsError, ObjectSummary] =
-    ZIO.attemptBlocking(os.put(objectName, data.toArray))
-      .mapError(NatsError.fromThrowable)
-      .map(ObjectSummary.fromJava)
+    ZIO.attemptBlocking(os.put(objectName, data.toArray)).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
 
   override def put(meta: ObjectMeta, data: Chunk[Byte]): IO[NatsError, ObjectSummary] =
-    ZIO.attemptBlocking(os.put(meta, new ByteArrayInputStream(data.toArray)))
-      .mapError(NatsError.fromThrowable)
-      .map(ObjectSummary.fromJava)
+    ZIO.attemptBlocking(os.put(meta, new ByteArrayInputStream(data.toArray))).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
 
   override def get(objectName: String): IO[NatsError, Chunk[Byte]] =
     ZIO.attemptBlocking {
@@ -104,28 +99,19 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
     }.mapError(NatsError.fromThrowable)
 
   override def getInfo(objectName: String): IO[NatsError, ObjectSummary] =
-    ZIO.attemptBlocking(os.getInfo(objectName))
-      .mapError(NatsError.fromThrowable)
-      .map(ObjectSummary.fromJava)
+    ZIO.attemptBlocking(os.getInfo(objectName)).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
 
   override def delete(objectName: String): IO[NatsError, ObjectSummary] =
-    ZIO.attemptBlocking(os.delete(objectName))
-      .mapError(NatsError.fromThrowable)
-      .map(ObjectSummary.fromJava)
+    ZIO.attemptBlocking(os.delete(objectName)).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
 
   override def updateMeta(objectName: String, meta: ObjectMeta): IO[NatsError, ObjectSummary] =
-    ZIO.attemptBlocking(os.updateMeta(objectName, meta))
-      .mapError(NatsError.fromThrowable)
-      .map(ObjectSummary.fromJava)
+    ZIO.attemptBlocking(os.updateMeta(objectName, meta)).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
 
   override def list: IO[NatsError, List[ObjectSummary]] =
-    ZIO.attemptBlocking(os.getList().asScala.toList)
-      .mapError(NatsError.fromThrowable)
-      .map(_.map(ObjectSummary.fromJava))
+    ZIO.attemptBlocking(os.getList.asScala.toList).mapBoth(NatsError.fromThrowable, _.map(ObjectSummary.fromJava))
 
   override def getStatus: IO[NatsError, ObjectStoreBucketStatus] =
-    ZIO.attemptBlocking(os.getStatus).mapError(NatsError.fromThrowable)
-      .map(ObjectStoreBucketStatus.fromJava)
+    ZIO.attemptBlocking(os.getStatus).mapBoth(NatsError.fromThrowable, ObjectStoreBucketStatus.fromJava)
 
   override def watch: ZStream[Any, NatsError, ObjectSummary] =
     ZStream.unwrapScoped {

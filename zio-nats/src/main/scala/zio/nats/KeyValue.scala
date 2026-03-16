@@ -1,11 +1,12 @@
 package zio.nats
 
-import io.nats.client.{KeyValue => JKeyValue, KeyValueManagement => JKeyValueManagement}
-import io.nats.client.api.{KeyValueWatcher => JKeyValueWatcher, KeyValueEntry => JKeyValueEntry}
-import zio._
-import zio.stream._
+import io.nats.client.api.{KeyValueEntry as JKeyValueEntry, KeyValueWatcher as JKeyValueWatcher}
+import io.nats.client.{KeyValue as JKeyValue, KeyValueManagement as JKeyValueManagement}
+import zio.*
 import zio.nats.configuration.KeyValueConfig
-import scala.jdk.CollectionConverters._
+import zio.stream.*
+
+import scala.jdk.CollectionConverters.*
 
 /** Service for key-value operations on a single NATS KV bucket. */
 trait KeyValue {
@@ -174,7 +175,7 @@ private[nats] final class KeyValueManagementLive(kvm: JKeyValueManagement) exten
     ZIO.attemptBlocking(kvm.delete(bucketName)).mapError(NatsError.fromThrowable)
 
   override def getBucketNames: IO[NatsError, List[String]] =
-    ZIO.attemptBlocking(kvm.getBucketNames().asScala.toList).mapError(NatsError.fromThrowable)
+    ZIO.attemptBlocking(kvm.getBucketNames.asScala.toList).mapError(NatsError.fromThrowable)
 
   override def getStatus(bucketName: String): IO[NatsError, KeyValueBucketStatus] =
     ZIO.attemptBlocking(kvm.getStatus(bucketName)).mapError(NatsError.fromThrowable)

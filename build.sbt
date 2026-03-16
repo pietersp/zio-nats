@@ -1,15 +1,15 @@
 val scala213 = "2.13.18"
 val scala3   = "3.3.7"
 
-val zioVersion            = "2.1.16"
+val zioVersion            = "2.1.24"
 val zioBlocksVersion      = "0.0.29"
 val jnatsVersion          = "2.25.2"
-val testcontainersVersion = "0.41.8"
+val testcontainersVersion = "0.44.1"
 
 inThisBuild(
   List(
     organization       := "dev.zio",
-    homepage           := Some(url("https://github.com/your-org/zio-nats")),
+    homepage           := Some(url("https://github.com/pietersp/zio-nats")),
     licenses           := List("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
     scalaVersion       := scala213,
     crossScalaVersions := Seq(scala213, scala3),

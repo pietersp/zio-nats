@@ -1,24 +1,10 @@
 package zio.nats
 
-import io.nats.client.api.{
-  PublishAck       => JPublishAck,
-  StreamInfo       => JStreamInfo,
-  ConsumerInfo     => JConsumerInfo,
-  PurgeResponse    => JPurgeResponse,
-  KeyValueEntry    => JKeyValueEntry,
-  KeyValueOperation,
-  KeyValueStatus   => JKeyValueStatus,
-  ObjectInfo       => JObjectInfo,
-  ObjectStoreStatus => JObjectStoreStatus,
-  StorageType
-}
-import io.nats.client.{
-  PublishOptions     => JPublishOptions,
-  FetchConsumeOptions,
-  ConsumeOptions     => JConsumeOptions
-}
-import zio._
-import scala.jdk.CollectionConverters._
+import io.nats.client.api.{KeyValueOperation, StorageType, ConsumerInfo as JConsumerInfo, KeyValueEntry as JKeyValueEntry, KeyValueStatus as JKeyValueStatus, ObjectInfo as JObjectInfo, ObjectStoreStatus as JObjectStoreStatus, PublishAck as JPublishAck, PurgeResponse as JPurgeResponse, StreamInfo as JStreamInfo}
+import io.nats.client.{FetchConsumeOptions, ConsumeOptions as JConsumeOptions, PublishOptions as JPublishOptions}
+import zio.*
+
+import scala.jdk.CollectionConverters.*
 
 // ---------------------------------------------------------------------------
 // JetStream publish types

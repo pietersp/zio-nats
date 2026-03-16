@@ -5,7 +5,7 @@ import org.testcontainers.containers.wait.strategy.Wait
 
 /** A testcontainers definition for a NATS server with JetStream support. */
 final case class NatsContainer(
-  override val underlyingUnsafeContainer: org.testcontainers.containers.GenericContainer[_]
+  override val underlyingUnsafeContainer: org.testcontainers.containers.GenericContainer[?]
 ) extends GenericContainer(underlyingUnsafeContainer) {
 
   /** NATS client URL for this container. */
@@ -18,9 +18,9 @@ final case class NatsContainer(
 }
 
 object NatsContainer {
-  val ClientPort: Int      = 4222
-  val MonitoringPort: Int  = 8222
-  val DefaultImage: String = "nats:latest"
+  private val ClientPort: Int      = 4222
+  private val MonitoringPort: Int  = 8222
+  private val DefaultImage: String = "nats:latest"
 
   /** Create a NatsContainer with JetStream enabled by default.
     *

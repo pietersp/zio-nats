@@ -295,14 +295,14 @@ for {
 
 #### Ack methods on `NatsMessage`
 
-| Method | Effect |
-|--------|--------|
-| `msg.ack` | Acknowledge successful processing |
-| `msg.ackSync(timeout)` | Ack and wait for server confirmation |
-| `msg.nak` | Request redelivery immediately |
-| `msg.nakWithDelay(d)` | Request redelivery after delay |
-| `msg.term` | Terminate — do not redeliver |
-| `msg.inProgress` | Extend ack deadline (work-in-progress signal) |
+| Method                 | Effect                                        |
+|------------------------|-----------------------------------------------|
+| `msg.ack`              | Acknowledge successful processing             |
+| `msg.ackSync(timeout)` | Ack and wait for server confirmation          |
+| `msg.nak`              | Request redelivery immediately                |
+| `msg.nakWithDelay(d)`  | Request redelivery after delay                |
+| `msg.term`             | Terminate — do not redeliver                  |
+| `msg.inProgress`       | Extend ack deadline (work-in-progress signal) |
 
 ## Key-Value store
 
@@ -397,16 +397,16 @@ ZIO.scoped {
 
 Event ADT:
 
-| Event | When |
-|-------|------|
-| `Connected(url)` | Initial connection established |
-| `Disconnected(url)` | Connection lost |
-| `Reconnected(url)` | Reconnection successful |
-| `ServersDiscovered(url)` | New cluster route discovered |
-| `Closed` | Connection permanently closed |
-| `LameDuckMode` | Server entering lame-duck shutdown |
-| `Error(message)` | Non-fatal error string from server |
-| `ExceptionOccurred(ex)` | Exception from the client |
+| Event                    | When                               |
+|--------------------------|------------------------------------|
+| `Connected(url)`         | Initial connection established     |
+| `Disconnected(url)`      | Connection lost                    |
+| `Reconnected(url)`       | Reconnection successful            |
+| `ServersDiscovered(url)` | New cluster route discovered       |
+| `Closed`                 | Connection permanently closed      |
+| `LameDuckMode`           | Server entering lame-duck shutdown |
+| `Error(message)`         | Non-fatal error string from server |
+| `ExceptionOccurred(ex)`  | Exception from the client          |
 
 ## Error handling
 
@@ -510,10 +510,10 @@ program.provide(Nats.default)
 
 See [`examples/`](examples/) for two runnable apps. Both require a running NATS server; `RealisticApp` additionally requires JetStream (`docker run -p 4222:4222 nats -js`).
 
-| File | What it shows |
-|------|---------------|
-| [`QuickStartApp`](examples/src/main/scala/QuickStartApp.scala) | Connect, publish, subscribe, receive 3 messages |
-| [`RealisticApp`](examples/src/main/scala/RealisticApp.scala) | JetStream + KV + connection events, graceful shutdown |
+| File                                                           | What it shows                                         |
+|----------------------------------------------------------------|-------------------------------------------------------|
+| [`QuickStartApp`](examples/src/main/scala/QuickStartApp.scala) | Connect, publish, subscribe, receive 3 messages       |
+| [`RealisticApp`](examples/src/main/scala/RealisticApp.scala)   | JetStream + KV + connection events, graceful shutdown |
 
 ```
 sbt "zioNatsExamples/runMain QuickStartApp"

@@ -1,10 +1,11 @@
 package zio.nats
 
-import io.nats.client.{JetStreamManagement => JJetStreamManagement, PurgeOptions}
-import io.nats.client.api._
-import zio._
-import zio.nats.configuration.{StreamConfig, ConsumerConfig}
-import scala.jdk.CollectionConverters._
+import io.nats.client.api.*
+import io.nats.client.{PurgeOptions, JetStreamManagement as JJetStreamManagement}
+import zio.*
+import zio.nats.configuration.{ConsumerConfig, StreamConfig}
+
+import scala.jdk.CollectionConverters.*
 
 /** Service for managing JetStream streams and consumers (admin operations). */
 trait JetStreamManagement {
@@ -138,5 +139,5 @@ private[nats] final class JetStreamManagementLive(jsm: JJetStreamManagement) ext
     ZIO.attemptBlocking(jsm.deleteMessage(streamName, seq)).mapError(NatsError.fromThrowable)
 
   override def getAccountStatistics: IO[NatsError, AccountStatistics] =
-    ZIO.attemptBlocking(jsm.getAccountStatistics()).mapError(NatsError.fromThrowable)
+    ZIO.attemptBlocking(jsm.getAccountStatistics).mapError(NatsError.fromThrowable)
 }

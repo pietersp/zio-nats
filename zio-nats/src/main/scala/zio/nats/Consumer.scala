@@ -1,8 +1,9 @@
 package zio.nats
 
-import io.nats.client.{ConsumerContext => JConsumerContext}
-import zio._
-import zio.stream._
+
+import io.nats.client.ConsumerContext as JConsumerContext
+import zio.*
+import zio.stream.*
 
 /** High-level consumer handle returned by [[JetStream.consumer]]. */
 trait Consumer {

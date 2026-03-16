@@ -56,9 +56,9 @@ New `zioNatsExamples` sub-project:
 
 ## Files to create/modify
 
-| File | Action |
-|------|--------|
-| `README.md` | Create |
-| `examples/src/main/scala/QuickStartApp.scala` | Create |
-| `examples/src/main/scala/RealisticApp.scala` | Create |
-| `build.sbt` | Edit (add `zioNatsExamples` project, add to `root.aggregate`) |
+| File                                          | Action                                                        |
+|-----------------------------------------------|---------------------------------------------------------------|
+| `README.md`                                   | Create                                                        |
+| `examples/src/main/scala/QuickStartApp.scala` | Create                                                        |
+| `examples/src/main/scala/RealisticApp.scala`  | Create                                                        |
+| `build.sbt`                                   | Edit (add `zioNatsExamples` project, add to `root.aggregate`) |

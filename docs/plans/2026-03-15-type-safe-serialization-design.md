@@ -202,16 +202,16 @@ case class NatsConfig(
 
 ## Components
 
-| Component | Responsibility |
-|-----------|----------------|
-| `SerializationFormat` | Trait for encode/decode |
-| `JsonFormat` | JSON implementation |
-| `MessagePackFormat` | MessagePack implementation |
-| `Nats.publish[T: Schema]` | Type-safe publish |
-| `Nats.subscribe[T: Schema]` | Type-safe subscribe |
-| `Nats.request[T: Schema, R: Schema]` | Type-safe request/reply |
-| `JetStream.publish[T: Schema]` | Type-safe JetStream publish |
-| `JetStream.subscribe[T: Schema]` | Type-safe JetStream subscribe |
+| Component                            | Responsibility                |
+|--------------------------------------|-------------------------------|
+| `SerializationFormat`                | Trait for encode/decode       |
+| `JsonFormat`                         | JSON implementation           |
+| `MessagePackFormat`                  | MessagePack implementation    |
+| `Nats.publish[T: Schema]`            | Type-safe publish             |
+| `Nats.subscribe[T: Schema]`          | Type-safe subscribe           |
+| `Nats.request[T: Schema, R: Schema]` | Type-safe request/reply       |
+| `JetStream.publish[T: Schema]`       | Type-safe JetStream publish   |
+| `JetStream.subscribe[T: Schema]`     | Type-safe JetStream subscribe |
 
 ## Error Handling
 

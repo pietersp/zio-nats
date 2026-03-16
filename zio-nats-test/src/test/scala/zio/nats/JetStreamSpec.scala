@@ -1,10 +1,10 @@
 package zio.nats
 
-import zio._
-import zio.test._
-import zio.test.TestAspect._
-import zio.nats.testkit.NatsTestLayers
+import zio.*
 import zio.nats.subject.Subject
+import zio.nats.testkit.NatsTestLayers
+import zio.test.*
+import zio.test.TestAspect.*
 
 object JetStreamSpec extends ZIOSpecDefault {
 

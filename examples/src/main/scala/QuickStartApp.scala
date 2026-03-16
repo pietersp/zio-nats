@@ -1,5 +1,5 @@
-import zio._
-import zio.nats._
+import zio.*
+import zio.nats.*
 import zio.nats.config.NatsConfig
 
 /** Minimal zio-nats quick-start.
@@ -27,9 +27,9 @@ object QuickStartApp extends ZIOAppDefault {
         _ <- ZIO.sleep(200.millis)
 
         // Publish 3 messages
-        _ <- ZIO.foreach(1 to 3)(i =>
-               nats.publish(Subject("greetings"), s"Hello #$i".toNatsData)
-             )
+        _ <- ZIO.foreachDiscard(1 to 3) { i =>
+            nats.publish(Subject("greetings"), s"Hello #$i".toNatsData)
+        }
 
         // Wait for the subscriber fiber to finish
         _ <- fiber.join

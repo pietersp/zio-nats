@@ -1,11 +1,10 @@
 package zio.nats.serialization
 
-import zio._
-import zio.test._
-import zio.test.Assertion._
-import zio.blocks.schema._
+import zio.*
+import zio.blocks.schema.*
 import zio.blocks.schema.json.JsonFormat
-import zio.Chunk
+import zio.test.*
+import zio.test.Assertion.*
 
 case class Person(name: String, age: Int)
 object Person {
@@ -19,7 +18,7 @@ object SerializationFormatSpec extends ZIOSpecDefault {
       for {
         encoded <- ZIO.fromEither(NatsSerializer.encode(person, JsonFormat))
         decoded <- ZIO.fromEither(NatsSerializer.decode[Person](encoded, JsonFormat))
-      } yield assert(decoded)(equalTo(person))
+      } yield assertTrue(decoded == person)
     }
   )
 }

@@ -1,8 +1,8 @@
 package zio.nats.testkit
 
 import io.nats.client.{ErrorListener, Options}
-import zio._
-import zio.nats._
+import zio.*
+import zio.nats.*
 import zio.nats.config.NatsConfig
 
 /** Pre-built ZLayers for integration testing against a real NATS server.

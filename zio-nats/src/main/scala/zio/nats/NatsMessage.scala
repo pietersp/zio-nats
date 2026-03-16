@@ -1,8 +1,8 @@
 package zio.nats
 
-import io.nats.client.{Message => JMessage}
-import io.nats.client.impl.{Headers => JHeaders, NatsMessage => JNatsMessage}
-import zio._
+import io.nats.client.Message as JMessage
+import io.nats.client.impl.{Headers as JHeaders, NatsMessage as JNatsMessage}
+import zio.*
 import zio.nats.subject.Subject
 
 /** Immutable wrapper around a received NATS message.
@@ -59,7 +59,7 @@ object NatsMessage {
 
   /** Convert a jnats Message to an immutable NatsMessage. */
   private[nats] def fromJava(msg: JMessage): NatsMessage = {
-    import scala.jdk.CollectionConverters._
+    import scala.jdk.CollectionConverters.*
     val headers: Map[String, List[String]] =
       if (msg.hasHeaders && msg.getHeaders != null) {
         msg.getHeaders.keySet().asScala.map { key =>
@@ -83,7 +83,7 @@ object NatsMessage {
     replyTo: Option[String] = None,
     headers: Map[String, List[String]] = Map.empty
   ): JMessage = {
-    import scala.jdk.CollectionConverters._
+    import scala.jdk.CollectionConverters.*
     val builder = JNatsMessage.builder()
       .subject(subject)
       .data(data.toArray)

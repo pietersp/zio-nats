@@ -1,5 +1,5 @@
-import zio._
-import zio.nats._
+import zio.*
+import zio.nats.*
 import zio.nats.config.NatsConfig
 
 /** Realistic zio-nats example.
@@ -48,9 +48,9 @@ object RealisticApp extends ZIOAppDefault {
       _  <- kv.put("processed", "0")
 
       // --- Publish 5 orders via JetStream ---
-      _ <- ZIO.foreach(1 to 5)(i =>
-             js.publish(Subject("orders.new"), s"order-$i".toNatsData)
-           )
+      _ <- ZIO.foreachDiscard(1 to 5) { i =>
+          js.publish(Subject("orders.new"), s"order-$i".toNatsData)
+      }
       _ <- Console.printLine("Published 5 orders").orDie
 
       // --- Consume the orders as a ZStream, ack each one ---
