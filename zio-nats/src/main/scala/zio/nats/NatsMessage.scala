@@ -5,11 +5,12 @@ import io.nats.client.impl.{Headers as JHeaders, NatsMessage as JNatsMessage}
 import zio.*
 import zio.nats.subject.Subject
 
-/** Immutable wrapper around a received NATS message.
-  *
-  * Data is eagerly copied to decouple from the connection lifecycle.
-  * The underlying jnats Message is retained only for JetStream ack operations.
-  */
+/**
+ * Immutable wrapper around a received NATS message.
+ *
+ * Data is eagerly copied to decouple from the connection lifecycle. The
+ * underlying jnats Message is retained only for JetStream ack operations.
+ */
 final case class NatsMessage(
   subject: String,
   data: Chunk[Byte],
@@ -31,7 +32,8 @@ final case class NatsMessage(
 
   /** Synchronous ack — waits for server confirmation (JetStream). */
   def ackSync(timeout: Duration): IO[NatsError, Unit] =
-    ZIO.attemptBlocking(underlying.ackSync(timeout.asJava))
+    ZIO
+      .attemptBlocking(underlying.ackSync(timeout.asJava))
       .unit
       .mapError(NatsError.fromThrowable)
 
@@ -62,16 +64,20 @@ object NatsMessage {
     import scala.jdk.CollectionConverters.*
     val headers: Map[String, List[String]] =
       if (msg.hasHeaders && msg.getHeaders != null) {
-        msg.getHeaders.keySet().asScala.map { key =>
-          key -> msg.getHeaders.get(key).asScala.toList
-        }.toMap
+        msg.getHeaders
+          .keySet()
+          .asScala
+          .map { key =>
+            key -> msg.getHeaders.get(key).asScala.toList
+          }
+          .toMap
       } else Map.empty
 
     NatsMessage(
-      subject    = msg.getSubject,
-      data       = Chunk.fromArray(Option(msg.getData).getOrElse(Array.emptyByteArray)),
-      replyTo    = Option(msg.getReplyTo).map(Subject(_)),
-      headers    = headers,
+      subject = msg.getSubject,
+      data = Chunk.fromArray(Option(msg.getData).getOrElse(Array.emptyByteArray)),
+      replyTo = Option(msg.getReplyTo).map(Subject(_)),
+      headers = headers,
       underlying = msg
     )
   }
@@ -84,7 +90,8 @@ object NatsMessage {
     headers: Map[String, List[String]] = Map.empty
   ): JMessage = {
     import scala.jdk.CollectionConverters.*
-    val builder = JNatsMessage.builder()
+    val builder = JNatsMessage
+      .builder()
       .subject(subject)
       .data(data.toArray)
 

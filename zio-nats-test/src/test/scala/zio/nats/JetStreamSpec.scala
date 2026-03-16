@@ -16,9 +16,7 @@ object JetStreamSpec extends ZIOSpecDefault {
     jsm.addStream(StreamConfig(name = name, subjects = subjects.toList, storageType = StorageType.Memory))
 
   def spec: Spec[Any, Throwable] = suite("JetStream")(
-
     suite("Management")(
-
       test("create, list, and delete a stream") {
         for {
           jsm    <- ZIO.service[JetStreamManagement]
@@ -51,7 +49,6 @@ object JetStreamSpec extends ZIOSpecDefault {
     ),
 
     suite("Publishing")(
-
       test("publish and receive a server ack") {
         for {
           jsm <- ZIO.service[JetStreamManagement]
@@ -96,36 +93,36 @@ object JetStreamSpec extends ZIOSpecDefault {
     ),
 
     suite("Consuming (Simplified API)")(
-
       test("fetch a batch of messages") {
         for {
-          jsm      <- ZIO.service[JetStreamManagement]
-          js       <- ZIO.service[JetStream]
-          _        <- createStream(jsm, "fetch-stream", "fetch.>")
-          _        <- jsm.addOrUpdateConsumer(
-                        "fetch-stream",
-                        ConsumerConfig.durable("fetch-cons").copy(filterSubject = Some("fetch.>"))
-                      )
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "fetch-stream", "fetch.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "fetch-stream",
+                 ConsumerConfig.durable("fetch-cons").copy(filterSubject = Some("fetch.>"))
+               )
           _        <- js.publish(Subject("fetch.1"), Chunk.fromArray("a".getBytes))
           _        <- js.publish(Subject("fetch.2"), Chunk.fromArray("b".getBytes))
           _        <- js.publish(Subject("fetch.3"), Chunk.fromArray("c".getBytes))
           consumer <- js.consumer("fetch-stream", "fetch-cons")
-          msgs     <- consumer.fetch(FetchOptions(maxMessages = 3, expiresIn = 5.seconds))
-                        .tap(_.ack)
-                        .runCollect
-          _        <- jsm.deleteStream("fetch-stream")
+          msgs     <- consumer
+                    .fetch(FetchOptions(maxMessages = 3, expiresIn = 5.seconds))
+                    .tap(_.ack)
+                    .runCollect
+          _ <- jsm.deleteStream("fetch-stream")
         } yield assertTrue(msgs.size == 3)
       },
 
       test("next() returns a single message") {
         for {
-          jsm      <- ZIO.service[JetStreamManagement]
-          js       <- ZIO.service[JetStream]
-          _        <- createStream(jsm, "next-stream", "next.>")
-          _        <- jsm.addOrUpdateConsumer(
-                        "next-stream",
-                        ConsumerConfig.durable("next-cons").copy(filterSubject = Some("next.>"))
-                      )
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "next-stream", "next.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "next-stream",
+                 ConsumerConfig.durable("next-cons").copy(filterSubject = Some("next.>"))
+               )
           _        <- js.publish(Subject("next.test"), Chunk.fromArray("single".getBytes))
           consumer <- js.consumer("next-stream", "next-cons")
           msg      <- consumer.next(5.seconds)
@@ -139,25 +136,25 @@ object JetStreamSpec extends ZIOSpecDefault {
 
       test("consume stream delivers messages via callback") {
         for {
-          jsm      <- ZIO.service[JetStreamManagement]
-          js       <- ZIO.service[JetStream]
-          _        <- createStream(jsm, "consume-stream", "consume.>")
-          _        <- jsm.addOrUpdateConsumer(
-                        "consume-stream",
-                        ConsumerConfig.durable("consume-cons").copy(filterSubject = Some("consume.>"))
-                      )
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "consume-stream", "consume.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "consume-stream",
+                 ConsumerConfig.durable("consume-cons").copy(filterSubject = Some("consume.>"))
+               )
           _        <- js.publish(Subject("consume.1"), Chunk.fromArray("x".getBytes))
           _        <- js.publish(Subject("consume.2"), Chunk.fromArray("y".getBytes))
           consumer <- js.consumer("consume-stream", "consume-cons")
-          msgs     <- consumer.consume()
-                        .tap(_.ack)
-                        .take(2)
-                        .runCollect
-          _        <- jsm.deleteStream("consume-stream")
+          msgs     <- consumer
+                    .consume()
+                    .tap(_.ack)
+                    .take(2)
+                    .runCollect
+          _ <- jsm.deleteStream("consume-stream")
         } yield assertTrue(msgs.size == 2)
       }
     )
-
   ).provideShared(
     NatsTestLayers.nats,
     JetStreamManagement.live,

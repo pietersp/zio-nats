@@ -4,22 +4,26 @@ import io.nats.client.{ConsumeOptions, FetchConsumeOptions, ConsumerContext as J
 import zio.*
 import zio.stream.*
 
-/** Provides ZStream-based consumption from JetStream consumers.
-  *
-  * Uses the simplified consumer API (available since jnats 2.16.14).
-  * All resources (FetchConsumer, IterableConsumer, MessageConsumer) are
-  * automatically closed when the ZStream is interrupted or finishes.
-  */
+/**
+ * Provides ZStream-based consumption from JetStream consumers.
+ *
+ * Uses the simplified consumer API (available since jnats 2.16.14). All
+ * resources (FetchConsumer, IterableConsumer, MessageConsumer) are
+ * automatically closed when the ZStream is interrupted or finishes.
+ */
 private[nats] object JetStreamConsumer {
 
-  /** Consume messages indefinitely via callback, as a ZStream.
-    *
-    * Messages are delivered to the stream in the order they arrive.
-    * Each message should be ack'd or nak'd explicitly.
-    *
-    * @param consumerCtx  a JConsumerContext from JetStream.consumerContext
-    * @param options       optional ConsumeOptions (batch size, heartbeat interval, etc.)
-    */
+  /**
+   * Consume messages indefinitely via callback, as a ZStream.
+   *
+   * Messages are delivered to the stream in the order they arrive. Each message
+   * should be ack'd or nak'd explicitly.
+   *
+   * @param consumerCtx
+   *   a JConsumerContext from JetStream.consumerContext
+   * @param options
+   *   optional ConsumeOptions (batch size, heartbeat interval, etc.)
+   */
   def consume(
     consumerCtx: JConsumerContext,
     options: Option[ConsumeOptions] = None
@@ -38,14 +42,17 @@ private[nats] object JetStreamConsumer {
       )(mc => ZIO.attemptBlocking(mc.close()).ignoreLogged)
     }
 
-  /** Fetch a bounded batch of messages as a ZStream.
-    *
-    * The stream completes after the batch is fulfilled or the expiry time elapses.
-    * Each message should be explicitly ack'd.
-    *
-    * @param consumerCtx  a JConsumerContext
-    * @param options       FetchConsumeOptions (maxMessages, maxBytes, expiresIn)
-    */
+  /**
+   * Fetch a bounded batch of messages as a ZStream.
+   *
+   * The stream completes after the batch is fulfilled or the expiry time
+   * elapses. Each message should be explicitly ack'd.
+   *
+   * @param consumerCtx
+   *   a JConsumerContext
+   * @param options
+   *   FetchConsumeOptions (maxMessages, maxBytes, expiresIn)
+   */
   def fetch(
     consumerCtx: JConsumerContext,
     options: FetchConsumeOptions
@@ -53,11 +60,13 @@ private[nats] object JetStreamConsumer {
     ZStream.unwrapScoped {
       for {
         fc <- ZIO.acquireRelease(
-                ZIO.attemptBlocking(consumerCtx.fetch(options))
+                ZIO
+                  .attemptBlocking(consumerCtx.fetch(options))
                   .mapError(NatsError.fromThrowable)
               )(fc => ZIO.attemptBlocking(fc.close()).ignoreLogged)
       } yield ZStream.repeatZIOOption {
-        ZIO.attemptBlocking(Option(fc.nextMessage()))
+        ZIO
+          .attemptBlocking(Option(fc.nextMessage()))
           .mapError(e => Some(NatsError.fromThrowable(e)))
           .flatMap {
             case Some(msg) => ZIO.succeed(NatsMessage.fromJava(msg))
@@ -66,14 +75,18 @@ private[nats] object JetStreamConsumer {
       }
     }
 
-  /** Iterate over messages as a long-running pull-based ZStream.
-    *
-    * Pulls are managed automatically. Messages are delivered one-at-a-time.
-    *
-    * @param consumerCtx  a JConsumerContext
-    * @param options       optional ConsumeOptions
-    * @param pollTimeout   how long each nextMessage() call waits before retrying
-    */
+  /**
+   * Iterate over messages as a long-running pull-based ZStream.
+   *
+   * Pulls are managed automatically. Messages are delivered one-at-a-time.
+   *
+   * @param consumerCtx
+   *   a JConsumerContext
+   * @param options
+   *   optional ConsumeOptions
+   * @param pollTimeout
+   *   how long each nextMessage() call waits before retrying
+   */
   def iterate(
     consumerCtx: JConsumerContext,
     options: Option[ConsumeOptions] = None,
@@ -90,7 +103,8 @@ private[nats] object JetStreamConsumer {
                 }.mapError(NatsError.fromThrowable)
               )(ic => ZIO.attemptBlocking(ic.close()).ignoreLogged)
       } yield ZStream.repeatZIOOption {
-        ZIO.attemptBlocking(Option(ic.nextMessage(pollTimeout.asJava)))
+        ZIO
+          .attemptBlocking(Option(ic.nextMessage(pollTimeout.asJava)))
           .mapError(e => Some(NatsError.fromThrowable(e)))
           .flatMap {
             case Some(msg) => ZIO.succeed(NatsMessage.fromJava(msg))
@@ -99,15 +113,16 @@ private[nats] object JetStreamConsumer {
       }
     }
 
-  /** Fetch a single next message from the consumer (blocks up to timeout).
-    *
-    * Returns None if no message is available within the timeout.
-    */
+  /**
+   * Fetch a single next message from the consumer (blocks up to timeout).
+   *
+   * Returns None if no message is available within the timeout.
+   */
   def next(
     consumerCtx: JConsumerContext,
     timeout: Duration = 5.seconds
   ): IO[NatsError, Option[NatsMessage]] =
-    ZIO.attemptBlocking(Option(consumerCtx.next(timeout.asJava)))
-      .mapError(NatsError.fromThrowable)
-      .map(_.map(NatsMessage.fromJava))
+    ZIO
+      .attemptBlocking(Option(consumerCtx.next(timeout.asJava)))
+      .mapBoth(NatsError.fromThrowable, _.map(NatsMessage.fromJava))
 }

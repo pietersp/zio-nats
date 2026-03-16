@@ -10,7 +10,7 @@ inThisBuild(
   List(
     organization       := "dev.zio",
     homepage           := Some(url("https://github.com/pietersp/zio-nats")),
-    licenses           := List("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
+    licenses           := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),
     scalaVersion       := scala213,
     crossScalaVersions := Seq(scala213, scala3),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
@@ -74,7 +74,7 @@ lazy val zioNatsTest = (project in file("zio-nats-test"))
     Test / envVars ++= {
       val podmanSocket = "/tmp/podman/podman-machine-default-api.sock"
       val dockerSocket = "/var/run/docker.sock"
-      val socketPath =
+      val socketPath   =
         if (java.nio.file.Files.exists(java.nio.file.Paths.get(podmanSocket))) podmanSocket
         else dockerSocket
       Map(

@@ -2,19 +2,20 @@ import zio.*
 import zio.nats.*
 import zio.nats.config.NatsConfig
 
-/** Realistic zio-nats example.
-  *
-  * Demonstrates idiomatic ZIO service + ZLayer composition:
-  *   - NatsConnectionEvents wired before connect
-  *   - JetStreamManagement to create a stream and durable consumer
-  *   - JetStream to publish messages
-  *   - Consumer.fetch to consume as a ZStream, ack each message
-  *   - KeyValueManagement + KeyValue.bucket for state tracking
-  *
-  * Requires JetStream-enabled NATS: nats-server -js
-  *
-  * Run with: sbt "zioNatsExamples/run"
-  */
+/**
+ * Realistic zio-nats example.
+ *
+ * Demonstrates idiomatic ZIO service + ZLayer composition:
+ *   - NatsConnectionEvents wired before connect
+ *   - JetStreamManagement to create a stream and durable consumer
+ *   - JetStream to publish messages
+ *   - Consumer.fetch to consume as a ZStream, ack each message
+ *   - KeyValueManagement + KeyValue.bucket for state tracking
+ *
+ * Requires JetStream-enabled NATS: nats-server -js
+ *
+ * Run with: sbt "zioNatsExamples/run"
+ */
 object RealisticApp extends ZIOAppDefault {
 
   // ---------------------------------------------------------------------------
@@ -35,10 +36,12 @@ object RealisticApp extends ZIOAppDefault {
       // --- Create a durable pull consumer ---
       _ <- jsm.addOrUpdateConsumer(
              "ORDERS",
-             ConsumerConfig.durable("order-processor").copy(
-               filterSubject = Some("orders.>"),
-               ackPolicy     = AckPolicy.Explicit
-             )
+             ConsumerConfig
+               .durable("order-processor")
+               .copy(
+                 filterSubject = Some("orders.>"),
+                 ackPolicy = AckPolicy.Explicit
+               )
            )
 
       // --- Create a KV bucket to track state ---
@@ -49,13 +52,13 @@ object RealisticApp extends ZIOAppDefault {
 
       // --- Publish 5 orders via JetStream ---
       _ <- ZIO.foreachDiscard(1 to 5) { i =>
-          js.publish(Subject("orders.new"), s"order-$i".toNatsData)
-      }
+             js.publish(Subject("orders.new"), s"order-$i".toNatsData)
+           }
       _ <- Console.printLine("Published 5 orders").orDie
 
       // --- Consume the orders as a ZStream, ack each one ---
-      consumer  <- js.consumer("ORDERS", "order-processor")
-      _ <- consumer
+      consumer <- js.consumer("ORDERS", "order-processor")
+      _        <- consumer
              .fetch(FetchOptions(maxMessages = 5, expiresIn = 5.seconds))
              .mapZIO { msg =>
                for {
@@ -70,9 +73,11 @@ object RealisticApp extends ZIOAppDefault {
 
       // --- Report final count from KV ---
       finalEntry <- kv.get("processed")
-      _ <- Console.printLine(
-             s"Done. Processed: ${finalEntry.map(_.valueAsString).getOrElse("0")} orders"
-           ).orDie
+      _          <- Console
+             .printLine(
+               s"Done. Processed: ${finalEntry.map(_.valueAsString).getOrElse("0")} orders"
+             )
+             .orDie
     } yield ()
 
   // ---------------------------------------------------------------------------
@@ -84,9 +89,9 @@ object RealisticApp extends ZIOAppDefault {
 
   val appLayer: ZLayer[Any, NatsError, Nats & JetStream & JetStreamManagement & KeyValueManagement] =
     natsLayer >+>
-    JetStream.live >+>
-    JetStreamManagement.live >+>
-    KeyValueManagement.live
+      JetStream.live >+>
+      JetStreamManagement.live >+>
+      KeyValueManagement.live
 
   // ---------------------------------------------------------------------------
   // Entry point — wire connection events before connecting
@@ -107,10 +112,10 @@ object RealisticApp extends ZIOAppDefault {
 
         val layer =
           ZLayer.succeed(customConfig) >>>
-          Nats.live >+>
-          JetStream.live >+>
-          JetStreamManagement.live >+>
-          KeyValueManagement.live
+            Nats.live >+>
+            JetStream.live >+>
+            JetStreamManagement.live >+>
+            KeyValueManagement.live
 
         logEvents *> program.provide(layer)
       }

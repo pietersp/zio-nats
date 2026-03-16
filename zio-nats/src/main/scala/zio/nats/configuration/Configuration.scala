@@ -1,6 +1,19 @@
 package zio.nats.configuration
 
-import io.nats.client.api.{AckPolicy, CompressionOption, DeliverPolicy, External, Mirror, ReplayPolicy, Source, StorageType, ConsumerConfiguration as JConsumerConfiguration, KeyValueConfiguration as JKeyValueConfiguration, ObjectStoreConfiguration as JObjectStoreConfiguration, StreamConfiguration as JStreamConfiguration}
+import io.nats.client.api.{
+  AckPolicy,
+  CompressionOption,
+  DeliverPolicy,
+  External,
+  Mirror,
+  ReplayPolicy,
+  Source,
+  StorageType,
+  ConsumerConfiguration as JConsumerConfiguration,
+  KeyValueConfiguration as JKeyValueConfiguration,
+  ObjectStoreConfiguration as JObjectStoreConfiguration,
+  StreamConfiguration as JStreamConfiguration
+}
 import zio.Duration
 
 import scala.jdk.CollectionConverters.*
@@ -44,7 +57,8 @@ object StreamConfig {
     StreamConfig(name = name, subjects = subjects.toList)
 
   def toJava(config: StreamConfig): JStreamConfiguration = {
-    val builder = JStreamConfiguration.builder()
+    val builder = JStreamConfiguration
+      .builder()
       .name(config.name)
       .storageType(config.storageType)
       .discardPolicy(config.discardPolicy)
@@ -110,7 +124,8 @@ object ConsumerConfig {
   def durable(name: String): ConsumerConfig = ConsumerConfig(durableName = Some(name))
 
   def toJava(config: ConsumerConfig): JConsumerConfiguration = {
-    val builder = JConsumerConfiguration.builder()
+    val builder = JConsumerConfiguration
+      .builder()
       .deliverPolicy(config.deliverPolicy)
       .ackPolicy(config.ackPolicy)
       .replayPolicy(config.replayPolicy)
@@ -157,7 +172,8 @@ object KeyValueConfig {
   def apply(name: String): KeyValueConfig = new KeyValueConfig(name = name)
 
   def toJava(config: KeyValueConfig): JKeyValueConfiguration = {
-    val builder = JKeyValueConfiguration.builder()
+    val builder = JKeyValueConfiguration
+      .builder()
       .name(config.name)
       .storageType(config.storageType)
       .compression(config.compression)
@@ -185,7 +201,8 @@ object ObjectStoreConfig {
   def apply(name: String): ObjectStoreConfig = new ObjectStoreConfig(name = name)
 
   def toJava(config: ObjectStoreConfig): JObjectStoreConfiguration = {
-    val builder = JObjectStoreConfiguration.builder()
+    val builder = JObjectStoreConfiguration
+      .builder()
       .name(config.name)
       .storageType(config.storageType)
 

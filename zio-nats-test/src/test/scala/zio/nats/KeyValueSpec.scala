@@ -8,7 +8,6 @@ import zio.test.TestAspect.*
 object KeyValueSpec extends ZIOSpecDefault {
 
   def spec: Spec[Any, Throwable] = suite("Key-Value Store")(
-
     test("create bucket, put, get, and delete key") {
       for {
         kvm   <- ZIO.service[KeyValueManagement]
@@ -52,16 +51,16 @@ object KeyValueSpec extends ZIOSpecDefault {
         kv       <- KeyValue.bucket("kv-watch")
         received <- Promise.make[Nothing, KeyValueEntry]
         fiber    <- kv.watch("watch-key")
-                      .filter(_.operation == KeyValueOperation.PUT)
-                      .tap(e => received.succeed(e))
-                      .take(1)
-                      .runDrain
-                      .fork
-        _        <- ZIO.sleep(300.millis)
-        _        <- kv.put("watch-key", "watched")
-        entry    <- received.await
-        _        <- fiber.interrupt
-        _        <- kvm.delete("kv-watch")
+                   .filter(_.operation == KeyValueOperation.PUT)
+                   .tap(e => received.succeed(e))
+                   .take(1)
+                   .runDrain
+                   .fork
+        _     <- ZIO.sleep(300.millis)
+        _     <- kv.put("watch-key", "watched")
+        entry <- received.await
+        _     <- fiber.interrupt
+        _     <- kvm.delete("kv-watch")
       } yield assertTrue(entry.value.toArray.sameElements("watched".getBytes))
     },
 
@@ -80,10 +79,10 @@ object KeyValueSpec extends ZIOSpecDefault {
 
     test("history tracks revisions") {
       for {
-        kvm  <- ZIO.service[KeyValueManagement]
-        _    <- kvm.create(
-                  KeyValueConfig(name = "kv-hist", storageType = StorageType.Memory, maxHistoryPerKey = 10)
-                )
+        kvm <- ZIO.service[KeyValueManagement]
+        _   <- kvm.create(
+               KeyValueConfig(name = "kv-hist", storageType = StorageType.Memory, maxHistoryPerKey = 10)
+             )
         kv   <- KeyValue.bucket("kv-hist")
         _    <- kv.put("h", "v1")
         _    <- kv.put("h", "v2")
@@ -92,7 +91,6 @@ object KeyValueSpec extends ZIOSpecDefault {
         _    <- kvm.delete("kv-hist")
       } yield assertTrue(hist.size == 3)
     }
-
   ).provideShared(
     NatsTestLayers.nats,
     KeyValueManagement.live

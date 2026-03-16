@@ -3,13 +3,16 @@ package zio.nats
 import io.nats.client.JetStreamApiException
 import java.io.IOException
 
-/** Sealed error hierarchy for all NATS operations.
-  *
-  * Design:
-  * - Wraps jnats exceptions in typed case classes for exhaustive pattern matching
-  * - Extends NoStackTrace for performance (the cause carries the real stack trace)
-  * - Sub-sealed traits group errors by domain (JetStream, KV, ObjectStore)
-  */
+/**
+ * Sealed error hierarchy for all NATS operations.
+ *
+ * Design:
+ *   - Wraps jnats exceptions in typed case classes for exhaustive pattern
+ *     matching
+ *   - Extends NoStackTrace for performance (the cause carries the real stack
+ *     trace)
+ *   - Sub-sealed traits group errors by domain (JetStream, KV, ObjectStore)
+ */
 sealed trait NatsError extends Exception with scala.util.control.NoStackTrace {
   def message: String
   override def getMessage: String = message
@@ -19,31 +22,23 @@ object NatsError {
 
   // --- Connection errors ---
 
-  final case class ConnectionFailed(message: String, cause: IOException)
-      extends NatsError { initCause(cause) }
+  final case class ConnectionFailed(message: String, cause: IOException) extends NatsError { initCause(cause) }
 
-  final case class ConnectionClosed(message: String)
-      extends NatsError
+  final case class ConnectionClosed(message: String) extends NatsError
 
-  final case class AuthenticationFailed(message: String, cause: IOException)
-      extends NatsError { initCause(cause) }
+  final case class AuthenticationFailed(message: String, cause: IOException) extends NatsError { initCause(cause) }
 
-  final case class Timeout(message: String)
-      extends NatsError
+  final case class Timeout(message: String) extends NatsError
 
   // --- Core messaging errors ---
 
-  final case class PublishFailed(message: String, cause: Throwable)
-      extends NatsError { initCause(cause) }
+  final case class PublishFailed(message: String, cause: Throwable) extends NatsError { initCause(cause) }
 
-  final case class RequestFailed(message: String, cause: Throwable)
-      extends NatsError { initCause(cause) }
+  final case class RequestFailed(message: String, cause: Throwable) extends NatsError { initCause(cause) }
 
-  final case class SubscriptionFailed(message: String, cause: Throwable)
-      extends NatsError { initCause(cause) }
+  final case class SubscriptionFailed(message: String, cause: Throwable) extends NatsError { initCause(cause) }
 
-  final case class SerializationError(message: String, cause: Throwable)
-      extends NatsError { initCause(cause) }
+  final case class SerializationError(message: String, cause: Throwable) extends NatsError { initCause(cause) }
 
   // --- JetStream errors ---
 
@@ -56,21 +51,17 @@ object NatsError {
     cause: JetStreamApiException
   ) extends JetStreamError { initCause(cause) }
 
-  final case class JetStreamPublishFailed(message: String, cause: Throwable)
-      extends JetStreamError { initCause(cause) }
+  final case class JetStreamPublishFailed(message: String, cause: Throwable) extends JetStreamError { initCause(cause) }
 
-  final case class JetStreamConsumeFailed(message: String, cause: Throwable)
-      extends JetStreamError { initCause(cause) }
+  final case class JetStreamConsumeFailed(message: String, cause: Throwable) extends JetStreamError { initCause(cause) }
 
   // --- Key-Value errors ---
 
   sealed trait KeyValueError extends NatsError
 
-  final case class KeyValueOperationFailed(message: String, cause: Throwable)
-      extends KeyValueError { initCause(cause) }
+  final case class KeyValueOperationFailed(message: String, cause: Throwable) extends KeyValueError { initCause(cause) }
 
-  final case class KeyNotFound(key: String)
-      extends KeyValueError {
+  final case class KeyNotFound(key: String) extends KeyValueError {
     val message: String = s"Key not found: $key"
   }
 
@@ -78,13 +69,13 @@ object NatsError {
 
   sealed trait ObjectStoreError extends NatsError
 
-  final case class ObjectStoreOperationFailed(message: String, cause: Throwable)
-      extends ObjectStoreError { initCause(cause) }
+  final case class ObjectStoreOperationFailed(message: String, cause: Throwable) extends ObjectStoreError {
+    initCause(cause)
+  }
 
   // --- General fallback ---
 
-  final case class GeneralError(message: String, cause: Throwable)
-      extends NatsError { initCause(cause) }
+  final case class GeneralError(message: String, cause: Throwable) extends NatsError { initCause(cause) }
 
   // --- Converter from raw Throwable ---
 

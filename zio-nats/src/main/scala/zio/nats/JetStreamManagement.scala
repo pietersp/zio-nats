@@ -57,8 +57,9 @@ object JetStreamManagement {
     ZLayer {
       for {
         nats <- ZIO.service[Nats]
-        jsm  <- ZIO.attempt(nats.underlying.jetStreamManagement())
-                  .mapError(NatsError.fromThrowable)
+        jsm  <- ZIO
+                 .attempt(nats.underlying.jetStreamManagement())
+                 .mapError(NatsError.fromThrowable)
       } yield new JetStreamManagementLive(jsm)
     }
 }
@@ -66,27 +67,27 @@ object JetStreamManagement {
 private[nats] final class JetStreamManagementLive(jsm: JJetStreamManagement) extends JetStreamManagement {
 
   override def addStream(config: StreamConfig): IO[NatsError, StreamSummary] =
-    ZIO.attemptBlocking(jsm.addStream(config.toJava))
-      .mapError(NatsError.fromThrowable)
-      .map(StreamSummary.fromJava)
+    ZIO
+      .attemptBlocking(jsm.addStream(config.toJava))
+      .mapBoth(NatsError.fromThrowable, StreamSummary.fromJava)
 
   override def updateStream(config: StreamConfig): IO[NatsError, StreamSummary] =
-    ZIO.attemptBlocking(jsm.updateStream(config.toJava))
-      .mapError(NatsError.fromThrowable)
-      .map(StreamSummary.fromJava)
+    ZIO
+      .attemptBlocking(jsm.updateStream(config.toJava))
+      .mapBoth(NatsError.fromThrowable, StreamSummary.fromJava)
 
   override def deleteStream(streamName: String): IO[NatsError, Boolean] =
     ZIO.attemptBlocking(jsm.deleteStream(streamName)).mapError(NatsError.fromThrowable)
 
   override def getStreamInfo(streamName: String): IO[NatsError, StreamSummary] =
-    ZIO.attemptBlocking(jsm.getStreamInfo(streamName))
-      .mapError(NatsError.fromThrowable)
-      .map(StreamSummary.fromJava)
+    ZIO
+      .attemptBlocking(jsm.getStreamInfo(streamName))
+      .mapBoth(NatsError.fromThrowable, StreamSummary.fromJava)
 
   override def purgeStream(streamName: String): IO[NatsError, PurgeSummary] =
-    ZIO.attemptBlocking(jsm.purgeStream(streamName))
-      .mapError(NatsError.fromThrowable)
-      .map(PurgeSummary.fromJava)
+    ZIO
+      .attemptBlocking(jsm.purgeStream(streamName))
+      .mapBoth(NatsError.fromThrowable, PurgeSummary.fromJava)
 
   override def purgeStream(
     streamName: String,
@@ -95,42 +96,42 @@ private[nats] final class JetStreamManagementLive(jsm: JJetStreamManagement) ext
   ): IO[NatsError, PurgeSummary] = {
     val builder = PurgeOptions.builder().subject(subject)
     keepLast.foreach(k => builder.keep(k))
-    ZIO.attemptBlocking(jsm.purgeStream(streamName, builder.build()))
-      .mapError(NatsError.fromThrowable)
-      .map(PurgeSummary.fromJava)
+    ZIO
+      .attemptBlocking(jsm.purgeStream(streamName, builder.build()))
+      .mapBoth(NatsError.fromThrowable, PurgeSummary.fromJava)
   }
 
   override def getStreamNames: IO[NatsError, List[String]] =
     ZIO.attemptBlocking(jsm.getStreamNames().asScala.toList).mapError(NatsError.fromThrowable)
 
   override def getStreams: IO[NatsError, List[StreamSummary]] =
-    ZIO.attemptBlocking(jsm.getStreams().asScala.toList)
-      .mapError(NatsError.fromThrowable)
-      .map(_.map(StreamSummary.fromJava))
+    ZIO
+      .attemptBlocking(jsm.getStreams().asScala.toList)
+      .mapBoth(NatsError.fromThrowable, _.map(StreamSummary.fromJava))
 
   override def addOrUpdateConsumer(
     streamName: String,
     config: ConsumerConfig
   ): IO[NatsError, ConsumerSummary] =
-    ZIO.attemptBlocking(jsm.addOrUpdateConsumer(streamName, config.toJava))
-      .mapError(NatsError.fromThrowable)
-      .map(ConsumerSummary.fromJava)
+    ZIO
+      .attemptBlocking(jsm.addOrUpdateConsumer(streamName, config.toJava))
+      .mapBoth(NatsError.fromThrowable, ConsumerSummary.fromJava)
 
   override def deleteConsumer(streamName: String, consumerName: String): IO[NatsError, Boolean] =
     ZIO.attemptBlocking(jsm.deleteConsumer(streamName, consumerName)).mapError(NatsError.fromThrowable)
 
   override def getConsumerInfo(streamName: String, consumerName: String): IO[NatsError, ConsumerSummary] =
-    ZIO.attemptBlocking(jsm.getConsumerInfo(streamName, consumerName))
-      .mapError(NatsError.fromThrowable)
-      .map(ConsumerSummary.fromJava)
+    ZIO
+      .attemptBlocking(jsm.getConsumerInfo(streamName, consumerName))
+      .mapBoth(NatsError.fromThrowable, ConsumerSummary.fromJava)
 
   override def getConsumerNames(streamName: String): IO[NatsError, List[String]] =
     ZIO.attemptBlocking(jsm.getConsumerNames(streamName).asScala.toList).mapError(NatsError.fromThrowable)
 
   override def getConsumers(streamName: String): IO[NatsError, List[ConsumerSummary]] =
-    ZIO.attemptBlocking(jsm.getConsumers(streamName).asScala.toList)
-      .mapError(NatsError.fromThrowable)
-      .map(_.map(ConsumerSummary.fromJava))
+    ZIO
+      .attemptBlocking(jsm.getConsumers(streamName).asScala.toList)
+      .mapBoth(NatsError.fromThrowable, _.map(ConsumerSummary.fromJava))
 
   override def getMessage(streamName: String, seq: Long): IO[NatsError, MessageInfo] =
     ZIO.attemptBlocking(jsm.getMessage(streamName, seq)).mapError(NatsError.fromThrowable)

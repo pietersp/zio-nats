@@ -22,20 +22,28 @@ trait KeyValue {
   def put(key: String, value: String): IO[NatsError, Long]
 
   // --- Conditional writes ---
-  /** Put if the key does not exist (returns revision or fails with JetStreamApiError). */
+  /**
+   * Put if the key does not exist (returns revision or fails with
+   * JetStreamApiError).
+   */
   def create(key: String, value: Chunk[Byte]): IO[NatsError, Long]
-  /** Compare-and-swap: update only if current revision matches expectedRevision. */
+
+  /**
+   * Compare-and-swap: update only if current revision matches expectedRevision.
+   */
   def update(key: String, value: Chunk[Byte], expectedRevision: Long): IO[NatsError, Long]
 
   // --- Delete / Purge ---
   /** Soft-delete: places a delete marker. History is preserved. */
   def delete(key: String): IO[NatsError, Unit]
+
   /** Hard-purge: removes all history for the key. */
   def purge(key: String): IO[NatsError, Unit]
 
   // --- Watch ---
   /** Stream changes for a specific key. Never completes unless interrupted. */
   def watch(key: String): ZStream[Any, NatsError, KeyValueEntry]
+
   /** Stream changes for all keys in the bucket. */
   def watchAll: ZStream[Any, NatsError, KeyValueEntry]
 
@@ -56,15 +64,16 @@ trait KeyValueManagement {
 
 object KeyValue {
 
-  /** Create a KeyValue service bound to a specific bucket name.
-    *
-    * The bucket must already exist. Use KeyValueManagement.create to create it.
-    */
+  /**
+   * Create a KeyValue service bound to a specific bucket name.
+   *
+   * The bucket must already exist. Use KeyValueManagement.create to create it.
+   */
   def bucket(bucketName: String): ZIO[Nats, NatsError, KeyValue] =
     ZIO.serviceWithZIO[Nats] { nats =>
-      ZIO.attempt(nats.underlying.keyValue(bucketName))
-        .mapError(NatsError.fromThrowable)
-        .map(new KeyValueLive(_))
+      ZIO
+        .attempt(nats.underlying.keyValue(bucketName))
+        .mapBoth(NatsError.fromThrowable, new KeyValueLive(_))
     }
 }
 
@@ -73,7 +82,6 @@ object KeyValueManagement {
   def create(config: KeyValueConfig): ZIO[KeyValueManagement, NatsError, KeyValueBucketStatus] =
     ZIO.serviceWithZIO[KeyValueManagement](_.create(config))
 
-
   def delete(bucketName: String): ZIO[KeyValueManagement, NatsError, Unit] =
     ZIO.serviceWithZIO[KeyValueManagement](_.delete(bucketName))
 
@@ -81,8 +89,9 @@ object KeyValueManagement {
     ZLayer {
       for {
         nats <- ZIO.service[Nats]
-        kvm  <- ZIO.attempt(nats.underlying.keyValueManagement())
-                  .mapError(NatsError.fromThrowable)
+        kvm  <- ZIO
+                 .attempt(nats.underlying.keyValueManagement())
+                 .mapError(NatsError.fromThrowable)
       } yield new KeyValueManagementLive(kvm)
     }
 }
@@ -92,14 +101,14 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
   override def bucketName: String = kv.getBucketName
 
   override def get(key: String): IO[NatsError, Option[KeyValueEntry]] =
-    ZIO.attemptBlocking(Option(kv.get(key)))
-      .mapError(NatsError.fromThrowable)
-      .map(_.map(KeyValueEntry.fromJava))
+    ZIO
+      .attemptBlocking(Option(kv.get(key)))
+      .mapBoth(NatsError.fromThrowable, _.map(KeyValueEntry.fromJava))
 
   override def get(key: String, revision: Long): IO[NatsError, Option[KeyValueEntry]] =
-    ZIO.attemptBlocking(Option(kv.get(key, revision)))
-      .mapError(NatsError.fromThrowable)
-      .map(_.map(KeyValueEntry.fromJava))
+    ZIO
+      .attemptBlocking(Option(kv.get(key, revision)))
+      .mapBoth(NatsError.fromThrowable, _.map(KeyValueEntry.fromJava))
 
   override def put(key: String, value: Chunk[Byte]): IO[NatsError, Long] =
     ZIO.attemptBlocking(kv.put(key, value.toArray)).mapError(NatsError.fromThrowable)
@@ -146,24 +155,27 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
     ZIO.attemptBlocking(kv.keys().asScala.toList).mapError(NatsError.fromThrowable)
 
   override def history(key: String): IO[NatsError, List[KeyValueEntry]] =
-    ZIO.attemptBlocking(kv.history(key).asScala.toList)
-      .mapError(NatsError.fromThrowable)
-      .map(_.map(KeyValueEntry.fromJava))
+    ZIO
+      .attemptBlocking(kv.history(key).asScala.toList)
+      .mapBoth(NatsError.fromThrowable, _.map(KeyValueEntry.fromJava))
 
   override def getStatus: IO[NatsError, KeyValueBucketStatus] =
-    ZIO.attemptBlocking(kv.getStatus).mapError(NatsError.fromThrowable)
-      .map(KeyValueBucketStatus.fromJava)
+    ZIO
+      .attemptBlocking(kv.getStatus)
+      .mapBoth(NatsError.fromThrowable, KeyValueBucketStatus.fromJava)
 }
 
 private[nats] final class KeyValueManagementLive(kvm: JKeyValueManagement) extends KeyValueManagement {
 
   override def create(config: KeyValueConfig): IO[NatsError, KeyValueBucketStatus] =
-    ZIO.attemptBlocking(kvm.create(config.toJava)).mapError(NatsError.fromThrowable)
-      .map(KeyValueBucketStatus.fromJava)
+    ZIO
+      .attemptBlocking(kvm.create(config.toJava))
+      .mapBoth(NatsError.fromThrowable, KeyValueBucketStatus.fromJava)
 
   override def update(config: KeyValueConfig): IO[NatsError, KeyValueBucketStatus] =
-    ZIO.attemptBlocking(kvm.update(config.toJava)).mapError(NatsError.fromThrowable)
-      .map(KeyValueBucketStatus.fromJava)
+    ZIO
+      .attemptBlocking(kvm.update(config.toJava))
+      .mapBoth(NatsError.fromThrowable, KeyValueBucketStatus.fromJava)
 
   override def delete(bucketName: String): IO[NatsError, Unit] =
     ZIO.attemptBlocking(kvm.delete(bucketName)).mapError(NatsError.fromThrowable)
@@ -172,6 +184,7 @@ private[nats] final class KeyValueManagementLive(kvm: JKeyValueManagement) exten
     ZIO.attemptBlocking(kvm.getBucketNames.asScala.toList).mapError(NatsError.fromThrowable)
 
   override def getStatus(bucketName: String): IO[NatsError, KeyValueBucketStatus] =
-    ZIO.attemptBlocking(kvm.getStatus(bucketName)).mapError(NatsError.fromThrowable)
-      .map(KeyValueBucketStatus.fromJava)
+    ZIO
+      .attemptBlocking(kvm.getStatus(bucketName))
+      .mapBoth(NatsError.fromThrowable, KeyValueBucketStatus.fromJava)
 }

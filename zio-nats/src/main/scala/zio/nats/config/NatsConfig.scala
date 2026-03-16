@@ -5,12 +5,13 @@ import zio.*
 import zio.blocks.schema.codec.Format
 import zio.blocks.schema.json.JsonFormat
 
-/** Configuration for a NATS connection.
-  *
-  * Provides a Scala-friendly API over io.nats.client.Options.Builder.
-  * For advanced configuration not covered by this case class, use
-  * `optionsCustomizer` to access the raw builder directly.
-  */
+/**
+ * Configuration for a NATS connection.
+ *
+ * Provides a Scala-friendly API over io.nats.client.Options.Builder. For
+ * advanced configuration not covered by this case class, use
+ * `optionsCustomizer` to access the raw builder directly.
+ */
 final case class NatsConfig(
   servers: List[String] = List("nats://localhost:4222"),
   connectionName: Option[String] = None,
@@ -35,7 +36,10 @@ final case class NatsConfig(
   /** Build jnats Options from this config. */
   private[nats] def toOptions: Options = toOptionsBuilder.build()
 
-  /** Build jnats Options.Builder from this config (allows further customization). */
+  /**
+   * Build jnats Options.Builder from this config (allows further
+   * customization).
+   */
   private[nats] def toOptionsBuilder: Options.Builder = {
     var builder = new Options.Builder()
     servers.foreach(s => builder = builder.server(s))

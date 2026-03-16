@@ -75,8 +75,9 @@ object JetStream {
     ZLayer {
       for {
         nats <- ZIO.service[Nats]
-        js   <- ZIO.attempt(nats.underlying.jetStream())
-                  .mapError(NatsError.fromThrowable)
+        js   <- ZIO
+                .attempt(nats.underlying.jetStream())
+                .mapError(NatsError.fromThrowable)
       } yield new JetStreamLive(js)
     }
 }
@@ -84,9 +85,9 @@ object JetStream {
 private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
 
   override def publish(subject: Subject, data: Chunk[Byte]): IO[NatsError, PublishAck] =
-    ZIO.attemptBlocking(js.publish(subject.value, data.toArray))
-      .mapError(NatsError.fromThrowable)
-      .map(PublishAck.fromJava)
+    ZIO
+      .attemptBlocking(js.publish(subject.value, data.toArray))
+      .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
 
   override def publish(
     subject: Subject,
@@ -94,9 +95,9 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
     headers: Map[String, List[String]]
   ): IO[NatsError, PublishAck] = {
     val msg = NatsMessage.toJava(subject.value, data, headers = headers)
-    ZIO.attemptBlocking(js.publish(msg))
-      .mapError(NatsError.fromThrowable)
-      .map(PublishAck.fromJava)
+    ZIO
+      .attemptBlocking(js.publish(msg))
+      .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
   }
 
   override def publish(
@@ -104,9 +105,9 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
     data: Chunk[Byte],
     options: PublishOptions
   ): IO[NatsError, PublishAck] =
-    ZIO.attemptBlocking(js.publish(subject.value, data.toArray, options.toJava))
-      .mapError(NatsError.fromThrowable)
-      .map(PublishAck.fromJava)
+    ZIO
+      .attemptBlocking(js.publish(subject.value, data.toArray, options.toJava))
+      .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
 
   override def publish(
     subject: Subject,
@@ -115,18 +116,19 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
     options: PublishOptions
   ): IO[NatsError, PublishAck] = {
     val msg = NatsMessage.toJava(subject.value, data, headers = headers)
-    ZIO.attemptBlocking(js.publish(msg, options.toJava))
-      .mapError(NatsError.fromThrowable)
-      .map(PublishAck.fromJava)
+    ZIO
+      .attemptBlocking(js.publish(msg, options.toJava))
+      .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
   }
 
   override def publish[T: Schema](subject: Subject, data: T): ZIO[NatsConfig, NatsError, PublishAck] =
     ZIO.serviceWithZIO[NatsConfig] { config =>
-      val bytes = NatsSerializer.encode(data, config.format).left.map(e => NatsError.SerializationError(e.getMessage, e))
+      val bytes =
+        NatsSerializer.encode(data, config.format).left.map(e => NatsError.SerializationError(e.getMessage, e))
       ZIO.fromEither(bytes).flatMap { b =>
-        ZIO.attemptBlocking(js.publish(subject.value, b.toArray))
-          .mapError(NatsError.fromThrowable)
-          .map(PublishAck.fromJava)
+        ZIO
+          .attemptBlocking(js.publish(subject.value, b.toArray))
+          .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
       }
     }
 
@@ -150,9 +152,9 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
     }.mapError(NatsError.fromThrowable)
 
   override def consumer(streamName: String, consumerName: String): IO[NatsError, Consumer] =
-    ZIO.attemptBlocking(js.getConsumerContext(streamName, consumerName))
-      .mapError(NatsError.fromThrowable)
-      .map(ctx => new ConsumerLive(streamName, consumerName, ctx))
+    ZIO
+      .attemptBlocking(js.getConsumerContext(streamName, consumerName))
+      .mapBoth(NatsError.fromThrowable, ctx => new ConsumerLive(streamName, consumerName, ctx))
 
   private[nats] def streamContext(streamName: String): IO[NatsError, JStreamContext] =
     ZIO.attemptBlocking(js.getStreamContext(streamName)).mapError(NatsError.fromThrowable)
@@ -161,6 +163,7 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
     streamName: String,
     consumerName: String
   ): IO[NatsError, JConsumerContext] =
-    ZIO.attemptBlocking(js.getConsumerContext(streamName, consumerName))
+    ZIO
+      .attemptBlocking(js.getConsumerContext(streamName, consumerName))
       .mapError(NatsError.fromThrowable)
 }

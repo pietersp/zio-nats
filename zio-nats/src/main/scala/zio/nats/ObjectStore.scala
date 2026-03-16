@@ -14,7 +14,10 @@ trait ObjectStore {
 
   def bucketName: String
 
-  /** Store raw bytes under objectName. Returns ObjectSummary with size, digest, etc. */
+  /**
+   * Store raw bytes under objectName. Returns ObjectSummary with size, digest,
+   * etc.
+   */
   def put(objectName: String, data: Chunk[Byte]): IO[NatsError, ObjectSummary]
 
   /** Store bytes with custom metadata. */
@@ -38,7 +41,10 @@ trait ObjectStore {
   /** Bucket status and configuration. */
   def getStatus: IO[NatsError, ObjectStoreBucketStatus]
 
-  /** Stream changes to objects in this bucket. Never completes unless interrupted. */
+  /**
+   * Stream changes to objects in this bucket. Never completes unless
+   * interrupted.
+   */
   def watch: ZStream[Any, NatsError, ObjectSummary]
 }
 
@@ -52,10 +58,12 @@ trait ObjectStoreManagement {
 
 object ObjectStore {
 
-  /** Create an ObjectStore service bound to a specific bucket.
-    *
-    * The bucket must already exist. Use ObjectStoreManagement.create to create it.
-    */
+  /**
+   * Create an ObjectStore service bound to a specific bucket.
+   *
+   * The bucket must already exist. Use ObjectStoreManagement.create to create
+   * it.
+   */
   def bucket(bucketName: String): ZIO[Nats, NatsError, ObjectStore] =
     ZIO.serviceWithZIO[Nats] { nats =>
       ZIO.attempt(nats.underlying.objectStore(bucketName)).mapBoth(NatsError.fromThrowable, new ObjectStoreLive(_))
@@ -67,7 +75,6 @@ object ObjectStoreManagement {
   def create(config: ObjectStoreConfig): ZIO[ObjectStoreManagement, NatsError, ObjectStoreBucketStatus] =
     ZIO.serviceWithZIO[ObjectStoreManagement](_.create(config))
 
-
   def delete(bucketName: String): ZIO[ObjectStoreManagement, NatsError, Unit] =
     ZIO.serviceWithZIO[ObjectStoreManagement](_.delete(bucketName))
 
@@ -75,8 +82,9 @@ object ObjectStoreManagement {
     ZLayer {
       for {
         nats <- ZIO.service[Nats]
-        osm  <- ZIO.attempt(nats.underlying.objectStoreManagement())
-                  .mapError(NatsError.fromThrowable)
+        osm  <- ZIO
+                 .attempt(nats.underlying.objectStoreManagement())
+                 .mapError(NatsError.fromThrowable)
       } yield new ObjectStoreManagementLive(osm)
     }
 }
@@ -89,7 +97,9 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
     ZIO.attemptBlocking(os.put(objectName, data.toArray)).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
 
   override def put(meta: ObjectMeta, data: Chunk[Byte]): IO[NatsError, ObjectSummary] =
-    ZIO.attemptBlocking(os.put(meta, new ByteArrayInputStream(data.toArray))).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
+    ZIO
+      .attemptBlocking(os.put(meta, new ByteArrayInputStream(data.toArray)))
+      .mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
 
   override def get(objectName: String): IO[NatsError, Chunk[Byte]] =
     ZIO.attemptBlocking {
@@ -131,16 +141,18 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
 private[nats] final class ObjectStoreManagementLive(osm: JObjectStoreManagement) extends ObjectStoreManagement {
 
   override def create(config: ObjectStoreConfig): IO[NatsError, ObjectStoreBucketStatus] =
-    ZIO.attemptBlocking(osm.create(config.toJava)).mapError(NatsError.fromThrowable)
-      .map(ObjectStoreBucketStatus.fromJava)
+    ZIO
+      .attemptBlocking(osm.create(config.toJava))
+      .mapBoth(NatsError.fromThrowable, ObjectStoreBucketStatus.fromJava)
 
   override def delete(bucketName: String): IO[NatsError, Unit] =
     ZIO.attemptBlocking(osm.delete(bucketName)).mapError(NatsError.fromThrowable)
 
   override def getBucketNames: IO[NatsError, List[String]] =
-    ZIO.attemptBlocking(osm.getBucketNames().asScala.toList).mapError(NatsError.fromThrowable)
+    ZIO.attemptBlocking(osm.getBucketNames.asScala.toList).mapError(NatsError.fromThrowable)
 
   override def getStatus(bucketName: String): IO[NatsError, ObjectStoreBucketStatus] =
-    ZIO.attemptBlocking(osm.getStatus(bucketName)).mapError(NatsError.fromThrowable)
-      .map(ObjectStoreBucketStatus.fromJava)
+    ZIO
+      .attemptBlocking(osm.getStatus(bucketName))
+      .mapBoth(NatsError.fromThrowable, ObjectStoreBucketStatus.fromJava)
 }

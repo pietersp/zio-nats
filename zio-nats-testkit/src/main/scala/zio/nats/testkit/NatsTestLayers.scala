@@ -5,19 +5,22 @@ import zio.*
 import zio.nats.*
 import zio.nats.config.NatsConfig
 
-/** Pre-built ZLayers for integration testing against a real NATS server.
-  *
-  * Usage:
-  * {{{
-  *   .provideShared(NatsTestLayers.nats)
-  * }}}
-  *
-  * The NATS container starts once per suite (provideShared) and is stopped
-  * automatically after all tests finish.
-  */
+/**
+ * Pre-built ZLayers for integration testing against a real NATS server.
+ *
+ * Usage:
+ * {{{
+ *   .provideShared(NatsTestLayers.nats)
+ * }}}
+ *
+ * The NATS container starts once per suite (provideShared) and is stopped
+ * automatically after all tests finish.
+ */
 object NatsTestLayers {
 
-  /** ZLayer that starts a NATS Docker container and provides it as a service. */
+  /**
+   * ZLayer that starts a NATS Docker container and provides it as a service.
+   */
   val container: ZLayer[Any, Throwable, NatsContainer] =
     ZLayer.scoped {
       ZIO.acquireRelease(
@@ -31,43 +34,48 @@ object NatsTestLayers {
 
   /** NatsConfig derived from a running container (reads the mapped port). */
   val config: ZLayer[NatsContainer, Nothing, NatsConfig] =
-    ZLayer.fromFunction((c: NatsContainer) =>
-      NatsConfig(servers = List(c.clientUrl))
-    )
+    ZLayer.fromFunction((c: NatsContainer) => NatsConfig(servers = List(c.clientUrl)))
 
   /** Retry schedule: exponential backoff, capped at 10 seconds total. */
   private val retrySchedule: Schedule[Any, Any, Any] =
     Schedule.exponential(100.millis) && Schedule.upTo(10.seconds)
 
-  /** A silent error listener that suppresses noisy connection logs during retry. */
+  /**
+   * A silent error listener that suppresses noisy connection logs during retry.
+   */
   private val silentErrorListener: ErrorListener = new ErrorListener {
-    override def errorOccurred(conn: io.nats.client.Connection, error: String): Unit = {}
+    override def errorOccurred(conn: io.nats.client.Connection, error: String): Unit      = {}
     override def exceptionOccurred(conn: io.nats.client.Connection, exp: Exception): Unit = {}
   }
 
-  /** Build Options with a silent error listener to suppress noisy retry logs. */
+  /**
+   * Build Options with a silent error listener to suppress noisy retry logs.
+   */
   private def quietOptions(config: NatsConfig): Options = {
     val builder = config.toOptionsBuilder
     builder.errorListener(silentErrorListener)
     builder.build()
   }
 
-  /** Try to connect to NATS, retrying with exponential backoff until successful or timeout. */
+  /**
+   * Try to connect to NATS, retrying with exponential backoff until successful
+   * or timeout.
+   */
   private def testConnection(config: NatsConfig): ZIO[Any, Throwable, Unit] =
     ZIO.attemptBlocking {
       val conn = io.nats.client.Nats.connect(quietOptions(config))
       conn.close()
     }
 
-  /** Full Nats service layer backed by a testcontainer with connection verification.
-    *
-    * Composes: container -> config -> wait for connection -> Nats.live
-    */
+  /**
+   * Full Nats service layer backed by a testcontainer with connection
+   * verification.
+   *
+   * Composes: container -> config -> wait for connection -> Nats.live
+   */
   val nats: ZLayer[Any, Throwable, Nats] =
     container >>> config >>>
       ZLayer.fromZIO(
-        ZIO.service[NatsConfig].flatMap(cfg =>
-          testConnection(cfg).retry(retrySchedule).as(cfg)
-        )
+        ZIO.serviceWithZIO[NatsConfig](cfg => testConnection(cfg).retry(retrySchedule).as(cfg))
       ) >>> Nats.live.mapError(e => new RuntimeException(e.message, e))
 }

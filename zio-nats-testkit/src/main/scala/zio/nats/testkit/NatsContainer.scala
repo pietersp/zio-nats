@@ -22,11 +22,14 @@ object NatsContainer {
   private val MonitoringPort: Int  = 8222
   private val DefaultImage: String = "nats:latest"
 
-  /** Create a NatsContainer with JetStream enabled by default.
-    *
-    * @param imageName  Docker image to use (default: nats:latest)
-    * @param enableJetStream  Pass the -js flag to enable JetStream
-    */
+  /**
+   * Create a NatsContainer with JetStream enabled by default.
+   *
+   * @param imageName
+   *   Docker image to use (default: nats:latest)
+   * @param enableJetStream
+   *   Pass the -js flag to enable JetStream
+   */
   def apply(
     imageName: String = DefaultImage,
     enableJetStream: Boolean = true
@@ -36,7 +39,8 @@ object NatsContainer {
     container.withExposedPorts(ClientPort, MonitoringPort)
     container.withCommand(command)
     container.waitingFor(
-      Wait.forLogMessage(".*Server is ready.*", 1)
+      Wait
+        .forLogMessage(".*Server is ready.*", 1)
         .withStartupTimeout(java.time.Duration.ofSeconds(60))
     )
     new NatsContainer(container)

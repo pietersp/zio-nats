@@ -8,7 +8,6 @@ import zio.test.TestAspect.*
 object ObjectStoreSpec extends ZIOSpecDefault {
 
   def spec: Spec[Any, Throwable] = suite("Object Store")(
-
     test("create bucket, put, get, and delete an object") {
       for {
         osm     <- ZIO.service[ObjectStoreManagement]
@@ -41,13 +40,13 @@ object ObjectStoreSpec extends ZIOSpecDefault {
 
     test("large object is chunked and reassembled correctly") {
       for {
-        osm     <- ZIO.service[ObjectStoreManagement]
-        _       <- osm.create(ObjectStoreConfig(name = "os-large", storageType = StorageType.Memory))
-        os      <- ObjectStore.bucket("os-large")
-        bigData  = Chunk.fromArray(Array.fill(128 * 1024)(42.toByte))
-        _       <- os.put("big-obj", bigData)
-        got     <- os.get("big-obj")
-        _       <- osm.delete("os-large")
+        osm    <- ZIO.service[ObjectStoreManagement]
+        _      <- osm.create(ObjectStoreConfig(name = "os-large", storageType = StorageType.Memory))
+        os     <- ObjectStore.bucket("os-large")
+        bigData = Chunk.fromArray(Array.fill(128 * 1024)(42.toByte))
+        _      <- os.put("big-obj", bigData)
+        got    <- os.get("big-obj")
+        _      <- osm.delete("os-large")
       } yield assertTrue(got == bigData)
     },
 
@@ -58,19 +57,18 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         os       <- ObjectStore.bucket("os-watch")
         received <- Promise.make[Nothing, ObjectSummary]
         fiber    <- os.watch
-                      .filter(!_.isDeleted)
-                      .tap(info => received.succeed(info))
-                      .take(1)
-                      .runDrain
-                      .fork
-        _        <- ZIO.sleep(300.millis)
-        _        <- os.put("watched-obj", Chunk.fromArray("data".getBytes))
-        info     <- received.await
-        _        <- fiber.interrupt
-        _        <- osm.delete("os-watch")
+                   .filter(!_.isDeleted)
+                   .tap(info => received.succeed(info))
+                   .take(1)
+                   .runDrain
+                   .fork
+        _    <- ZIO.sleep(300.millis)
+        _    <- os.put("watched-obj", Chunk.fromArray("data".getBytes))
+        info <- received.await
+        _    <- fiber.interrupt
+        _    <- osm.delete("os-watch")
       } yield assertTrue(info.name == "watched-obj")
     }
-
   ).provideShared(
     NatsTestLayers.nats,
     ObjectStoreManagement.live

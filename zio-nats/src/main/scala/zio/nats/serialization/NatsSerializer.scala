@@ -9,16 +9,17 @@ import java.nio.charset.StandardCharsets.UTF_8
 import scala.annotation.tailrec
 import scala.util.control.NonFatal
 
-/** Internal encode/decode bridge between zio-blocks Format and raw bytes.
-  *
-  * Dispatches on BinaryFormat (ByteBuffer) vs TextFormat (CharBuffer) — the
-  * two concrete subtypes of the sealed Format trait — and handles buffer
-  * allocation transparently. Users never see this object; they simply pass a
-  * Format value (JsonFormat, AvroFormat, etc.) in NatsConfig.
-  *
-  * The casts to BinaryCodec/TextCodec are safe: BinaryFormat[TC] constrains
-  * TC[A] <: BinaryCodec[A], and TextFormat[TC] constrains TC[A] <: TextCodec[A].
-  */
+/**
+ * Internal encode/decode bridge between zio-blocks Format and raw bytes.
+ *
+ * Dispatches on BinaryFormat (ByteBuffer) vs TextFormat (CharBuffer) — the two
+ * concrete subtypes of the sealed Format trait — and handles buffer allocation
+ * transparently. Users never see this object; they simply pass a Format value
+ * (JsonFormat, AvroFormat, etc.) in NatsConfig.
+ *
+ * The casts to BinaryCodec/TextCodec are safe: BinaryFormat[TC] constrains
+ * TC[A] <: BinaryCodec[A], and TextFormat[TC] constrains TC[A] <: TextCodec[A].
+ */
 private[nats] object NatsSerializer {
 
   def encode[T: Schema](value: T, format: Format): Either[Throwable, Chunk[Byte]] =
@@ -38,12 +39,10 @@ private[nats] object NatsSerializer {
       format match {
         case bf: BinaryFormat[_] =>
           val codec = Schema[T].deriving(bf.deriver).derive.asInstanceOf[BinaryCodec[T]]
-          codec.decode(ByteBuffer.wrap(bytes.toArray))
-            .left.map(e => new Exception(e.toString))
+          codec.decode(ByteBuffer.wrap(bytes.toArray)).left.map(e => new Exception(e.toString))
         case tf: TextFormat[_] =>
           val codec = Schema[T].deriving(tf.deriver).derive.asInstanceOf[TextCodec[T]]
-          codec.decode(UTF_8.decode(ByteBuffer.wrap(bytes.toArray)))
-            .left.map(e => new Exception(e.toString))
+          codec.decode(UTF_8.decode(ByteBuffer.wrap(bytes.toArray))).left.map(e => new Exception(e.toString))
       }
     } catch { case NonFatal(e) => Left(e) }
 
