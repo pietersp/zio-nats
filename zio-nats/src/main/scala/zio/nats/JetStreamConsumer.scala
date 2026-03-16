@@ -24,25 +24,18 @@ private[nats] object JetStreamConsumer {
     consumerCtx: JConsumerContext,
     options: Option[ConsumeOptions] = None
   ): ZStream[Any, NatsError, NatsMessage] =
-    ZStream.unwrapScoped {
-      for {
-        queue    <- ZIO.acquireRelease(Queue.unbounded[NatsMessage])(_.shutdown)
-        _        <- ZIO.acquireRelease(
-                      ZIO.attemptBlocking {
-                        val handler: io.nats.client.MessageHandler = { msg =>
-                          zio.Unsafe.unsafe { implicit u =>
-                            zio.Runtime.default.unsafe
-                              .run(queue.offer(NatsMessage.fromJava(msg)))
-                              .getOrThrowFiberFailure()
-                          }
-                        }
-                        options match {
-                          case Some(opts) => consumerCtx.consume(opts, handler)
-                          case None       => consumerCtx.consume(handler)
-                        }
-                      }.mapError(NatsError.fromThrowable)
-                    )(mc => ZIO.attemptBlocking(mc.close()).ignoreLogged)
-      } yield ZStream.fromQueue(queue)
+    ZStream.asyncScoped[Any, NatsError, NatsMessage] { emit =>
+      ZIO.acquireRelease(
+        ZIO.attemptBlocking {
+          val handler: io.nats.client.MessageHandler = { msg =>
+            emit(ZIO.succeed(Chunk.single(NatsMessage.fromJava(msg))))
+          }
+          options match {
+            case Some(opts) => consumerCtx.consume(opts, handler)
+            case None       => consumerCtx.consume(handler)
+          }
+        }.mapError(NatsError.fromThrowable)
+      )(mc => ZIO.attemptBlocking(mc.close()).ignoreLogged)
     }
 
   /** Fetch a bounded batch of messages as a ZStream.
