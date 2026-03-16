@@ -27,12 +27,12 @@ private[nats] object JetStreamConsumer {
   def consume(
     consumerCtx: JConsumerContext,
     options: Option[ConsumeOptions] = None
-  ): ZStream[Any, NatsError, NatsMessage] =
-    ZStream.asyncScoped[Any, NatsError, NatsMessage] { emit =>
+  ): ZStream[Any, NatsError, JetStreamMessage] =
+    ZStream.asyncScoped[Any, NatsError, JetStreamMessage] { emit =>
       ZIO.acquireRelease(
         ZIO.attemptBlocking {
           val handler: io.nats.client.MessageHandler = { msg =>
-            emit(ZIO.succeed(Chunk.single(NatsMessage.fromJava(msg))))
+            emit(ZIO.succeed(Chunk.single(JetStreamMessage.fromJava(msg))))
           }
           options match {
             case Some(opts) => consumerCtx.consume(opts, handler)
@@ -56,7 +56,7 @@ private[nats] object JetStreamConsumer {
   def fetch(
     consumerCtx: JConsumerContext,
     options: FetchConsumeOptions
-  ): ZStream[Any, NatsError, NatsMessage] =
+  ): ZStream[Any, NatsError, JetStreamMessage] =
     ZStream.unwrapScoped {
       for {
         fc <- ZIO.acquireRelease(
@@ -69,7 +69,7 @@ private[nats] object JetStreamConsumer {
           .attemptBlocking(Option(fc.nextMessage()))
           .mapError(e => Some(NatsError.fromThrowable(e)))
           .flatMap {
-            case Some(msg) => ZIO.succeed(NatsMessage.fromJava(msg))
+            case Some(msg) => ZIO.succeed(JetStreamMessage.fromJava(msg))
             case None      => ZIO.fail(None) // batch complete; terminates stream
           }
       }
@@ -91,7 +91,7 @@ private[nats] object JetStreamConsumer {
     consumerCtx: JConsumerContext,
     options: Option[ConsumeOptions] = None,
     pollTimeout: Duration = 5.seconds
-  ): ZStream[Any, NatsError, NatsMessage] =
+  ): ZStream[Any, NatsError, JetStreamMessage] =
     ZStream.unwrapScoped {
       for {
         ic <- ZIO.acquireRelease(
@@ -107,22 +107,17 @@ private[nats] object JetStreamConsumer {
           .attemptBlocking(Option(ic.nextMessage(pollTimeout.asJava)))
           .mapError(e => Some(NatsError.fromThrowable(e)))
           .flatMap {
-            case Some(msg) => ZIO.succeed(NatsMessage.fromJava(msg))
+            case Some(msg) => ZIO.succeed(JetStreamMessage.fromJava(msg))
             case None      => ZIO.fail(None) // poll timed out; stream will retry
           }
       }
     }
 
-  /**
-   * Fetch a single next message from the consumer (blocks up to timeout).
-   *
-   * Returns None if no message is available within the timeout.
-   */
   def next(
     consumerCtx: JConsumerContext,
     timeout: Duration = 5.seconds
-  ): IO[NatsError, Option[NatsMessage]] =
+  ): IO[NatsError, Option[JetStreamMessage]] =
     ZIO
       .attemptBlocking(Option(consumerCtx.next(timeout.asJava)))
-      .mapBoth(NatsError.fromThrowable, _.map(NatsMessage.fromJava))
+      .mapBoth(NatsError.fromThrowable, _.map(JetStreamMessage.fromJava))
 }

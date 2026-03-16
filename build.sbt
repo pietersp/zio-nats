@@ -1,5 +1,4 @@
-val scala213 = "2.13.18"
-val scala3   = "3.3.7"
+val scala3 = "3.3.7"
 
 val zioVersion            = "2.1.24"
 val zioBlocksVersion      = "0.0.29"
@@ -11,16 +10,10 @@ inThisBuild(
     organization       := "dev.zio",
     homepage           := Some(url("https://github.com/pietersp/zio-nats")),
     licenses           := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),
-    scalaVersion       := scala213,
-    crossScalaVersions := Seq(scala213, scala3),
+    scalaVersion       := scala3,
+    crossScalaVersions := Seq(scala3),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    scalacOptions ++= Seq("-deprecation", "-feature"),
-    scalacOptions ++= {
-      CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((2, _)) => Seq("-Xsource:3")
-        case _            => Seq.empty
-      }
-    }
+    scalacOptions ++= Seq("-deprecation", "-feature")
   )
 )
 
@@ -40,11 +33,7 @@ lazy val zioNats = (project in file("zio-nats"))
       "dev.zio" %% "zio-streams"       % zioVersion,
       "dev.zio" %% "zio-blocks-schema" % zioBlocksVersion,
       "io.nats"  % "jnats"             % jnatsVersion
-    ),
-    Compile / unmanagedSourceDirectories += {
-      val sv = scalaVersion.value
-      (Compile / sourceDirectory).value / s"scala-${sv.substring(0, 4)}"
-    }
+    )
   )
 
 lazy val zioNatsTestkit = (project in file("zio-nats-testkit"))

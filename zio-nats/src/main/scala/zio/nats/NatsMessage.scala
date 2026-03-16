@@ -1,95 +1,87 @@
 package zio.nats
 
-import io.nats.client.Message as JMessage
-import io.nats.client.impl.{Headers as JHeaders, NatsMessage as JNatsMessage}
-import zio.*
+import io.nats.client.{Message => JMessage}
+import io.nats.client.impl.{Headers => JHeaders, NatsMessage => JNatsMessage}
+import zio._
 import zio.nats.subject.Subject
 
+import scala.jdk.CollectionConverters._
+
 /**
- * Immutable wrapper around a received NATS message.
+ * Immutable, pure NATS message.
  *
- * Data is eagerly copied to decouple from the connection lifecycle. The
- * underlying jnats Message is retained only for JetStream ack operations.
+ * The primary message type for core pub/sub and request/reply operations.
+ * Contains no Java types and is safe to store, copy, and pattern-match.
+ *
+ * For JetStream messages that require acknowledgment, see [[JetStreamMessage]].
+ *
+ * @param subject
+ *   The subject this message was published to.
+ * @param replyTo
+ *   Optional reply-to subject (set on request-reply messages).
+ * @param headers
+ *   NATS message headers.
+ * @param payload
+ *   Raw message payload bytes.
  */
 final case class NatsMessage(
-  subject: String,
-  data: Chunk[Byte],
+  subject: Subject,
   replyTo: Option[Subject],
-  headers: Map[String, List[String]],
-  private[nats] val underlying: JMessage
+  headers: Headers,
+  payload: Chunk[Byte]
 ) {
 
-  /** UTF-8 string representation of the data payload. */
+  /**
+   * Decode the payload using the implicit [[NatsCodec]].
+   *
+   * @return
+   *   Right(value) on success, Left([[NatsDecodeError]]) on failure.
+   */
+  def decode[A](implicit codec: NatsCodec[A]): Either[NatsDecodeError, A] =
+    codec.decode(payload)
+
+  /** UTF-8 string representation of the payload. */
   def dataAsString: String =
-    new String(data.toArray, java.nio.charset.StandardCharsets.UTF_8)
+    new String(payload.toArray, java.nio.charset.StandardCharsets.UTF_8)
 
-  // --- JetStream acknowledgment methods ---
-  // Only valid for JetStream messages (underlying.isJetStream must be true).
-
-  /** Acknowledge successful processing (JetStream). */
-  def ack: IO[NatsError, Unit] =
-    ZIO.attempt(underlying.ack()).mapError(NatsError.fromThrowable)
-
-  /** Synchronous ack — waits for server confirmation (JetStream). */
-  def ackSync(timeout: Duration): IO[NatsError, Unit] =
-    ZIO
-      .attemptBlocking(underlying.ackSync(timeout.asJava))
-      .unit
-      .mapError(NatsError.fromThrowable)
-
-  /** Negative-acknowledge — request redelivery (JetStream). */
-  def nak: IO[NatsError, Unit] =
-    ZIO.attempt(underlying.nak()).mapError(NatsError.fromThrowable)
-
-  /** Negative-acknowledge with a redelivery delay (JetStream). */
-  def nakWithDelay(delay: Duration): IO[NatsError, Unit] =
-    ZIO.attempt(underlying.nakWithDelay(delay.asJava)).mapError(NatsError.fromThrowable)
-
-  /** Terminate — do not redeliver this message (JetStream). */
-  def term: IO[NatsError, Unit] =
-    ZIO.attempt(underlying.term()).mapError(NatsError.fromThrowable)
-
-  /** Signal work in progress — extends the ack deadline (JetStream). */
-  def inProgress: IO[NatsError, Unit] =
-    ZIO.attempt(underlying.inProgress()).mapError(NatsError.fromThrowable)
-
-  /** Returns true if this message came from JetStream. */
-  def isJetStream: Boolean = underlying.isJetStream
+  /** @deprecated Use [[payload]] instead. */
+  @deprecated("Use payload instead", since = "0.2.0")
+  def data: Chunk[Byte] = payload
 }
 
 object NatsMessage {
 
-  /** Convert a jnats Message to an immutable NatsMessage. */
+  /** Build a pure [[NatsMessage]] from a jnats [[JMessage]]. */
   private[nats] def fromJava(msg: JMessage): NatsMessage = {
-    import scala.jdk.CollectionConverters.*
-    val headers: Map[String, List[String]] =
+    val hdrs: Headers =
       if (msg.hasHeaders && msg.getHeaders != null) {
-        msg.getHeaders
+        val m = msg.getHeaders
           .keySet()
           .asScala
-          .map { key =>
-            key -> msg.getHeaders.get(key).asScala.toList
-          }
+          .map(key => key -> Chunk.fromIterable(msg.getHeaders.get(key).asScala))
           .toMap
-      } else Map.empty
+        Headers(m)
+      } else Headers.empty
 
     NatsMessage(
-      subject = msg.getSubject,
-      data = Chunk.fromArray(Option(msg.getData).getOrElse(Array.emptyByteArray)),
+      subject = Subject(msg.getSubject),
       replyTo = Option(msg.getReplyTo).map(Subject(_)),
-      headers = headers,
-      underlying = msg
+      headers = hdrs,
+      payload = Chunk.fromArray(Option(msg.getData).getOrElse(Array.emptyByteArray))
     )
   }
 
-  /** Build a jnats Message suitable for publishing. */
+  /**
+   * Build a jnats [[JMessage]] suitable for publishing.
+   *
+   * Used internally by [[NatsLive]] and [[JetStreamLive]].
+   */
   private[nats] def toJava(
     subject: String,
     data: Chunk[Byte],
     replyTo: Option[String] = None,
-    headers: Map[String, List[String]] = Map.empty
+    headers: Headers = Headers.empty
   ): JMessage = {
-    import scala.jdk.CollectionConverters.*
     val builder = JNatsMessage
       .builder()
       .subject(subject)
@@ -99,8 +91,8 @@ object NatsMessage {
 
     if (headers.nonEmpty) {
       val jHeaders = new JHeaders()
-      headers.foreach { case (key, values) =>
-        jHeaders.add(key, values.asJava)
+      headers.values.foreach { case (key, values) =>
+        jHeaders.add(key, values.toList.asJava)
       }
       builder.headers(jHeaders)
     }

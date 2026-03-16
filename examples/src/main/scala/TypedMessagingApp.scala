@@ -5,7 +5,7 @@ import zio.blocks.schema.Schema
 import zio.blocks.schema.json.JsonFormat
 
 // ---------------------------------------------------------------------------
-// Domain model — derive a Schema for automatic JSON serialization
+// Domain model
 // ---------------------------------------------------------------------------
 
 case class User(name: String, age: Int)
@@ -19,10 +19,10 @@ object Order {
 }
 
 /**
- * Type-safe serialization example.
+ * Type-safe serialization example using the NatsCodec typeclass.
  *
- * Demonstrates publish and subscribe with automatic JSON serialization using
- * zio-blocks Schema. No manual encoding/decoding — just pass your case class.
+ * Derives codecs from JsonFormat via the Builder pattern; no manual
+ * encoding/decoding required.
  *
  * Requires a running NATS server: nats-server
  *
@@ -30,28 +30,29 @@ object Order {
  */
 object TypedMessagingApp extends ZIOAppDefault {
 
-  val program: ZIO[Nats & NatsConfig, NatsError, Unit] =
+  // Install a default NatsCodec for all Schema-annotated types using JSON.
+  private val jsonCodecs = NatsCodec.fromFormat(JsonFormat)
+  import jsonCodecs.derived
+
+  val program: ZIO[Nats, NatsError, Unit] =
     for {
-      // Subscribe and automatically deserialize incoming JSON to User
+      // subscribe[User] is the typed overload — auto-decoded via NatsCodec[User]
       userFiber <- Nats
-                     .subscribeAs[User](Subject("demo.users"))
+                     .subscribe[User](Subject("demo.users"))
                      .take(3)
                      .tap(user => Console.printLine(s"  user:  ${user.name}, age ${user.age}").orDie)
                      .runDrain
                      .fork
 
-      // Subscribe and automatically deserialize to Order
-      orderFiber <-
-        Nats
-          .subscribeAs[Order](Subject("demo.orders"))
-          .take(2)
-          .tap(order => Console.printLine(s"  order: ${order.id} - $$${order.amount} (user: ${order.userId})").orDie)
-          .runDrain
-          .fork
+      orderFiber <- Nats
+                      .subscribe[Order](Subject("demo.orders"))
+                      .take(2)
+                      .tap(order => Console.printLine(s"  order: ${order.id} - $$${order.amount}").orDie)
+                      .runDrain
+                      .fork
 
       _ <- ZIO.sleep(200.millis)
 
-      // Publish typed values — serialized to JSON automatically
       _ <- Console.printLine("Publishing users...").orDie
       _ <- Nats.publish(Subject("demo.users"), User("Alice", 30))
       _ <- Nats.publish(Subject("demo.users"), User("Bob", 25))
@@ -63,21 +64,11 @@ object TypedMessagingApp extends ZIOAppDefault {
 
       _ <- userFiber.join
       _ <- orderFiber.join
-
       _ <- Console.printLine("Done.").orDie
     } yield ()
 
-  // JsonFormat is the default. To use Avro, Toon, MessagePack, etc. add the
-  // corresponding zio-blocks artifact and swap the format here:
-  //   libraryDependencies += "dev.zio" %% "zio-blocks-schema-avro" % "0.0.29"
-  //   val config = NatsConfig.default.copy(format = AvroFormat)
-  private val config = NatsConfig.default.copy(format = JsonFormat)
-
   val run: ZIO[Any, Throwable, Unit] =
     program
-      .provide(
-        ZLayer.succeed(config),
-        Nats.live
-      )
+      .provide(ZLayer.succeed(NatsConfig.default), Nats.live)
       .mapError(e => new RuntimeException(e.getMessage))
 }

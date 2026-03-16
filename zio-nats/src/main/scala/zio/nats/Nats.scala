@@ -1,166 +1,274 @@
 package zio.nats
 
-import io.nats.client.Connection as JConnection
-import io.nats.client.api.ServerInfo
-import zio.*
-import zio.blocks.schema.Schema
+import io.nats.client.{Connection => JConnection}
+import zio._
 import zio.nats.config.NatsConfig
-import zio.nats.serialization.NatsSerializer
 import zio.nats.subject.Subject
-import zio.stream.*
+import zio.stream._
 
 /**
- * Core NATS service: publish, subscribe, request-reply.
+ * Core NATS service: publish, subscribe, and request-reply.
  *
- * Obtain via Nats.make(config) or Nats.live ZLayer. All other services
- * (JetStream, KeyValue, ObjectStore) are obtained from this service.
+ * Obtain an instance via [[Nats.make]] or the [[Nats.live]] ZLayer. All other
+ * services (JetStream, KeyValue, ObjectStore) are derived from this service.
+ *
+ * ==Setting up codecs==
+ *
+ * Typed methods require a [[NatsCodec]] for each type parameter, resolved at
+ * compile time via Scala's implicit/given mechanism.
+ *
+ * {{{
+ * // Install a default codec for all Schema-annotated types:
+ * val codecs = NatsCodec.fromFormat(JsonFormat)
+ * import codecs.derived          // Scala 3
+ * // import codecs._             // Scala 2.13
+ *
+ * // Override per type:
+ * implicit val auditCodec: NatsCodec[AuditEvent] =
+ *   NatsCodec.fromFormat(BsonFormat).derived[AuditEvent]
+ * }}}
  */
 trait Nats {
 
-  // --- Raw publish (using Subject type) ---
-
-  /** Publish raw bytes (fire-and-forget into the client outbound buffer). */
-  def publish(subject: Subject, data: Chunk[Byte]): IO[NatsError, Unit]
-
-  /** Publish raw bytes with NATS headers. */
-  def publish(
-    subject: Subject,
-    data: Chunk[Byte],
-    headers: Map[String, List[String]]
-  ): IO[NatsError, Unit]
+  // -------------------------------------------------------------------------
+  // Raw publish
+  // -------------------------------------------------------------------------
 
   /**
-   * Publish raw bytes with an explicit reply-to subject (for manual
-   * request/reply).
+   * Publish raw bytes to `subject`.
+   *
+   * @param params
+   *   Optional [[PublishParams]] for headers and reply-to (defaults to
+   *   [[PublishParams.empty]]).
    */
   def publish(
     subject: Subject,
-    data: Chunk[Byte],
-    replyTo: Subject
+    payload: Chunk[Byte],
+    params: PublishParams = PublishParams.empty
   ): IO[NatsError, Unit]
 
-  /** Publish raw bytes with headers and explicit reply-to. */
-  def publish(
-    subject: Subject,
-    data: Chunk[Byte],
-    headers: Map[String, List[String]],
-    replyTo: Subject
-  ): IO[NatsError, Unit]
-
-  // --- Type-safe publish (serializes T to bytes using Schema) ---
-
-  /** Publish a value of type T, serialized using the configured format. */
-  def publish[T: Schema](subject: Subject, data: T): ZIO[NatsConfig, NatsError, Unit]
-
-  /** Publish a value with NATS headers. */
-  def publish[T: Schema](
-    subject: Subject,
-    data: T,
-    headers: Map[String, List[String]]
-  ): ZIO[NatsConfig, NatsError, Unit]
-
-  // --- Request/Reply ---
+  // -------------------------------------------------------------------------
+  // Typed publish
+  // -------------------------------------------------------------------------
 
   /**
-   * Send a request with raw bytes and await a single reply within the given
-   * timeout.
+   * Encode `value` with the implicit [[NatsCodec]] and publish to `subject`.
+   *
+   * Use the [[Nats]] companion accessor for a version with a default `params`:
+   * {{{
+   *   Nats.publish(subject, value)   // PublishParams.empty is used
+   * }}}
+   *
+   * @param params
+   *   [[PublishParams]] for headers and reply-to.
+   */
+  def publish[A: NatsCodec](
+    subject: Subject,
+    value: A,
+    params: PublishParams
+  ): IO[NatsError, Unit]
+
+  // -------------------------------------------------------------------------
+  // Raw request/reply
+  // -------------------------------------------------------------------------
+
+  /**
+   * Send a request with raw bytes and await a single reply within `timeout`.
+   *
+   * Uses the NATS built-in request-reply mechanism (auto-generated reply-to
+   * inbox).
    */
   def request(
     subject: Subject,
-    data: Chunk[Byte],
+    payload: Chunk[Byte],
     timeout: Duration = 2.seconds
   ): IO[NatsError, NatsMessage]
 
-  /** Request with raw bytes and headers. */
-  def request(
-    subject: Subject,
-    data: Chunk[Byte],
-    headers: Map[String, List[String]],
-    timeout: Duration
-  ): IO[NatsError, NatsMessage]
-
-  // --- Subscribe ---
+  // -------------------------------------------------------------------------
+  // Typed request/reply
+  // -------------------------------------------------------------------------
 
   /**
-   * Subscribe to a subject, returning a ZStream of raw messages.
+   * Encode `request` as `A`, send it, await the reply, then decode it as `B`.
    *
-   * The underlying jnats Dispatcher is created when the stream is consumed and
-   * closed automatically when the stream is interrupted or finishes.
+   * Use the [[Nats]] companion accessor for a version with a default `timeout`:
+   * {{{
+   *   Nats.request[A, B](subject, value)   // 2-second timeout is used
+   * }}}
+   *
+   * Decode failures are surfaced as [[NatsError.DecodingError]].
+   */
+  def request[A: NatsCodec, B: NatsCodec](
+    subject: Subject,
+    request: A,
+    timeout: Duration
+  ): IO[NatsError, B]
+
+  // -------------------------------------------------------------------------
+  // Subscribe
+  // -------------------------------------------------------------------------
+
+  /**
+   * Subscribe to `subject`, returning a [[ZStream]] of raw [[NatsMessage]]s.
+   *
+   * The underlying jnats Dispatcher is created when the stream starts and
+   * closed automatically on interruption or completion.
    */
   def subscribe(subject: Subject): ZStream[Any, NatsError, NatsMessage]
 
-  /** Subscribe to a subject with a queue group for load-balanced delivery. */
-  def subscribe(subject: Subject, queue: Subject): ZStream[Any, NatsError, NatsMessage]
+  /**
+   * Subscribe with a [[QueueGroup]] for load-balanced delivery.
+   *
+   * Within a queue group, each published message is delivered to exactly one
+   * subscriber in the group.
+   */
+  def subscribe(
+    subject: Subject,
+    queue: QueueGroup
+  ): ZStream[Any, NatsError, NatsMessage]
 
-  // --- Utility methods ---
+  /**
+   * Subscribe and automatically decode each message payload.
+   *
+   * Decode failures are converted to [[NatsError.DecodingError]] and propagated
+   * through the stream's error channel.
+   */
+  def subscribe[A: NatsCodec](subject: Subject): ZStream[Any, NatsError, A]
 
-  /** Flush the outbound buffer to the server. */
+  // -------------------------------------------------------------------------
+  // Utility
+  // -------------------------------------------------------------------------
+
+  /** Flush the outbound buffer to the server within `timeout`. */
   def flush(timeout: Duration = 1.second): IO[NatsError, Unit]
 
-  /** Gracefully drain subscriptions and close the connection. */
+  /** Gracefully drain all subscriptions and close the connection. */
   def drain(timeout: Duration = 30.seconds): IO[NatsError, Unit]
 
-  /** Current connection status. */
-  def status: UIO[JConnection.Status]
+  /** Current connection status. Never fails. */
+  def status: UIO[ConnectionStatus]
 
-  /** Server info (available after connection). */
-  def serverInfo: IO[NatsError, ServerInfo]
+  /** Server information (available after a successful connection). */
+  def serverInfo: IO[NatsError, NatsServerInfo]
 
-  /** Escape hatch: access the raw jnats Connection for advanced use. */
+  /**
+   * Escape hatch: access the raw jnats Connection for advanced or unsupported
+   * use-cases.
+   */
   def underlying: JConnection
+
+  /**
+   * Subscribe to `subject` and receive raw [[NatsMessage]]s.
+   *
+   * Unlike the overloaded `subscribe(subject)`, this method is unambiguous at
+   * every call site because it has a unique name. Prefer this over
+   * `subscribe(subject)` when holding a `Nats` instance directly.
+   *
+   * Equivalent to `subscribe(subject)` — the underlying jnats Dispatcher is
+   * created when the stream starts and closed on interruption or completion.
+   */
+  def subscribeRaw(subject: Subject): ZStream[Any, NatsError, NatsMessage]
 }
 
 object Nats {
 
-  // --- Accessor methods for use in ZIO environment ---
-
-  def publish(subject: Subject, data: Chunk[Byte]): ZIO[Nats, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats](_.publish(subject, data))
+  // -------------------------------------------------------------------------
+  // Accessor methods for use in the ZIO environment
+  // -------------------------------------------------------------------------
 
   def publish(
     subject: Subject,
-    data: Chunk[Byte],
-    headers: Map[String, List[String]]
+    payload: Chunk[Byte],
+    params: PublishParams = PublishParams.empty
   ): ZIO[Nats, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats](_.publish(subject, data, headers))
+    ZIO.serviceWithZIO[Nats](_.publish(subject, payload, params))
 
-  def publish(subject: Subject, data: Chunk[Byte], replyTo: Subject): ZIO[Nats, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats](_.publish(subject, data, replyTo))
-
-  def publish[T: Schema](subject: Subject, data: T): ZIO[Nats & NatsConfig, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats](_.publish[T](subject, data))
-
-  def publish[T: Schema](
+  /**
+   * Typed publish with explicit params (mirrors the trait method). Prefer the
+   * 2-arg overload below for the common case (no custom params).
+   */
+  def publish[A: NatsCodec](
     subject: Subject,
-    data: T,
-    headers: Map[String, List[String]]
-  ): ZIO[Nats & NatsConfig, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats](_.publish[T](subject, data, headers))
+    value: A,
+    params: PublishParams
+  ): ZIO[Nats, NatsError, Unit] =
+    ZIO.serviceWithZIO[Nats](_.publish[A](subject, value, params))
+
+  /**
+   * Typed publish — convenience overload with [[PublishParams.empty]].
+   *
+   * {{{
+   *   Nats.publish(subject, UserCreated("1"))
+   * }}}
+   */
+  def publish[A: NatsCodec](
+    subject: Subject,
+    value: A
+  ): ZIO[Nats, NatsError, Unit] =
+    ZIO.serviceWithZIO[Nats](_.publish[A](subject, value, PublishParams.empty))
 
   def request(
     subject: Subject,
-    data: Chunk[Byte],
+    payload: Chunk[Byte],
     timeout: Duration = 2.seconds
   ): ZIO[Nats, NatsError, NatsMessage] =
-    ZIO.serviceWithZIO[Nats](_.request(subject, data, timeout))
+    ZIO.serviceWithZIO[Nats](_.request(subject, payload, timeout))
 
-  def subscribe(subject: Subject): ZStream[Nats, NatsError, NatsMessage] =
-    ZStream.serviceWithStream[Nats](_.subscribe(subject))
+  /**
+   * Typed request with explicit timeout (mirrors the trait method).
+   */
+  def request[A: NatsCodec, B: NatsCodec](
+    subject: Subject,
+    request: A,
+    timeout: Duration
+  ): ZIO[Nats, NatsError, B] =
+    ZIO.serviceWithZIO[Nats](_.request[A, B](subject, request, timeout))
 
-  def subscribe(subject: Subject, queue: Subject): ZStream[Nats, NatsError, NatsMessage] =
+  /**
+   * Typed request — convenience overload with a 2-second default timeout.
+   *
+   * {{{
+   *   Nats.request[UserQuery, UserResponse](subject, query)
+   * }}}
+   */
+  def request[A: NatsCodec, B: NatsCodec](
+    subject: Subject,
+    request: A
+  ): ZIO[Nats, NatsError, B] =
+    ZIO.serviceWithZIO[Nats](_.request[A, B](subject, request, 2.seconds))
+
+  /**
+   * Subscribe to `subject` and receive raw [[NatsMessage]]s.
+   *
+   * Uses a unique name to avoid the typed/raw overload ambiguity that arises
+   * with `subscribe(subject)`. Prefer this over `subscribe(subject)` when
+   * calling through the environment accessor.
+   */
+  def subscribeRaw(subject: Subject): ZStream[Nats, NatsError, NatsMessage] =
+    ZStream.serviceWithStream[Nats](_.subscribeRaw(subject))
+
+  def subscribe(
+    subject: Subject,
+    queue: QueueGroup
+  ): ZStream[Nats, NatsError, NatsMessage] =
     ZStream.serviceWithStream[Nats](_.subscribe(subject, queue))
+
+  def subscribe[A: NatsCodec](subject: Subject): ZStream[Nats, NatsError, A] =
+    ZStream.serviceWithStream[Nats](_.subscribe[A](subject))
 
   def flush(timeout: Duration = 1.second): ZIO[Nats, NatsError, Unit] =
     ZIO.serviceWithZIO[Nats](_.flush(timeout))
 
-  def status: URIO[Nats, JConnection.Status] =
+  def status: URIO[Nats, ConnectionStatus] =
     ZIO.serviceWithZIO[Nats](_.status)
 
-  // --- Construction ---
+  // -------------------------------------------------------------------------
+  // Layer construction
+  // -------------------------------------------------------------------------
 
   /**
-   * Create a managed NATS connection. The connection is closed when the Scope
-   * ends.
+   * Create a managed NATS connection. The connection is closed when the
+   * enclosing [[Scope]] ends.
    */
   def make(config: NatsConfig): ZIO[Scope, NatsError, Nats] =
     ZIO
@@ -171,7 +279,7 @@ object Nats {
       )(conn => ZIO.attemptBlocking(conn.close()).ignoreLogged)
       .map(new NatsLive(_))
 
-  /** ZLayer that reads NatsConfig from the environment. */
+  /** ZLayer that reads [[NatsConfig]] from the environment. */
   val live: ZLayer[NatsConfig, NatsError, Nats] =
     ZLayer.scoped {
       for {
@@ -183,121 +291,91 @@ object Nats {
   /** Convenience layer: connect to localhost:4222 with defaults. */
   val default: ZLayer[Any, NatsError, Nats] =
     ZLayer.succeed(NatsConfig.default) >>> live
-
-  // --- Type-safe extension methods ---
-
-  def subscribeAs[T: Schema](subject: Subject): ZStream[Nats & NatsConfig, NatsError, T] =
-    ZStream.serviceWithStream[Nats](_.subscribe(subject)).mapZIO(decodeMessage[T])
-
-  def subscribeAs[T: Schema](subject: Subject, queue: Subject): ZStream[Nats & NatsConfig, NatsError, T] =
-    ZStream.serviceWithStream[Nats](_.subscribe(subject, queue)).mapZIO(decodeMessage[T])
-
-  private def decodeMessage[T: Schema](msg: NatsMessage): ZIO[NatsConfig, NatsError, T] =
-    ZIO.serviceWithZIO[NatsConfig] { config =>
-      ZIO
-        .fromEither(NatsSerializer.decode[T](msg.data, config.format))
-        .mapError(e => NatsError.SerializationError(e.getMessage, e))
-    }
 }
 
 // ---------------------------------------------------------------------------
-// Private implementation
+// Private live implementation
 // ---------------------------------------------------------------------------
 
 private[nats] final class NatsLive(conn: JConnection) extends Nats {
 
-  override def publish(subject: Subject, data: Chunk[Byte]): IO[NatsError, Unit] =
-    ZIO
-      .attempt(conn.publish(subject.value, data.toArray))
-      .mapError(NatsError.fromThrowable)
-
   override def publish(
     subject: Subject,
-    data: Chunk[Byte],
-    headers: Map[String, List[String]]
-  ): IO[NatsError, Unit] = {
-    val msg = NatsMessage.toJava(subject.value, data, headers = headers)
-    ZIO.attempt(conn.publish(msg)).mapError(NatsError.fromThrowable)
-  }
-
-  override def publish(
-    subject: Subject,
-    data: Chunk[Byte],
-    replyTo: Subject
+    payload: Chunk[Byte],
+    params: PublishParams
   ): IO[NatsError, Unit] =
-    ZIO
-      .attempt(conn.publish(subject.value, replyTo.value, data.toArray))
-      .mapError(NatsError.fromThrowable)
+    if (params.headers.isEmpty && params.replyTo.isEmpty)
+      ZIO.attempt(conn.publish(subject.value, payload.toArray)).mapError(NatsError.fromThrowable)
+    else {
+      val msg = NatsMessage.toJava(
+        subject = subject.value,
+        data = payload,
+        replyTo = params.replyTo.map(_.value),
+        headers = params.headers
+      )
+      ZIO.attempt(conn.publish(msg)).mapError(NatsError.fromThrowable)
+    }
 
-  override def publish(
+  override def publish[A: NatsCodec](
     subject: Subject,
-    data: Chunk[Byte],
-    headers: Map[String, List[String]],
-    replyTo: Subject
+    value: A,
+    params: PublishParams
   ): IO[NatsError, Unit] = {
-    val msg = NatsMessage.toJava(subject.value, data, replyTo = Some(replyTo.value), headers = headers)
-    ZIO.attempt(conn.publish(msg)).mapError(NatsError.fromThrowable)
+    val bytes = NatsCodec[A].encode(value)
+    publish(subject, bytes, params)
   }
-
-  override def publish[T: Schema](subject: Subject, data: T): ZIO[NatsConfig, NatsError, Unit] =
-    ZIO.serviceWithZIO[NatsConfig] { config =>
-      ZIO
-        .fromEither(
-          NatsSerializer.encode(data, config.format).left.map(e => NatsError.SerializationError(e.getMessage, e))
-        )
-        .flatMap(b => publish(subject, b))
-    }
-
-  override def publish[T: Schema](
-    subject: Subject,
-    data: T,
-    headers: Map[String, List[String]]
-  ): ZIO[NatsConfig, NatsError, Unit] =
-    ZIO.serviceWithZIO[NatsConfig] { config =>
-      ZIO
-        .fromEither(
-          NatsSerializer.encode(data, config.format).left.map(e => NatsError.SerializationError(e.getMessage, e))
-        )
-        .flatMap(b => publish(subject, b, headers))
-    }
 
   override def request(
     subject: Subject,
-    data: Chunk[Byte],
+    payload: Chunk[Byte],
     timeout: Duration
   ): IO[NatsError, NatsMessage] =
     ZIO
       .fromCompletionStage(
-        conn.requestWithTimeout(subject.value, data.toArray, timeout.asJava)
+        conn.requestWithTimeout(subject.value, payload.toArray, timeout.asJava)
       )
       .mapBoth(NatsError.fromThrowable, NatsMessage.fromJava)
 
-  override def request(
+  override def request[A: NatsCodec, B: NatsCodec](
     subject: Subject,
-    data: Chunk[Byte],
-    headers: Map[String, List[String]],
+    request: A,
     timeout: Duration
-  ): IO[NatsError, NatsMessage] = {
-    val msg = NatsMessage.toJava(subject.value, data, headers = headers)
-    ZIO
-      .fromCompletionStage(
-        conn.requestWithTimeout(msg, timeout.asJava)
-      )
-      .mapBoth(NatsError.fromThrowable, NatsMessage.fromJava)
+  ): IO[NatsError, B] = {
+    val bytes = NatsCodec[A].encode(request)
+    this
+      .request(subject, bytes, timeout)
+      .flatMap { msg =>
+        ZIO
+          .fromEither(msg.decode[B])
+          .mapError(e => NatsError.DecodingError(e.message, e))
+      }
   }
 
   override def subscribe(subject: Subject): ZStream[Any, NatsError, NatsMessage] =
     subscribeInternal(subject.value, None)
 
-  override def subscribe(subject: Subject, queue: Subject): ZStream[Any, NatsError, NatsMessage] =
+  override def subscribeRaw(subject: Subject): ZStream[Any, NatsError, NatsMessage] =
+    subscribeInternal(subject.value, None)
+
+  override def subscribe(
+    subject: Subject,
+    queue: QueueGroup
+  ): ZStream[Any, NatsError, NatsMessage] =
     subscribeInternal(subject.value, Some(queue.value))
 
+  override def subscribe[A: NatsCodec](subject: Subject): ZStream[Any, NatsError, A] =
+    subscribeInternal(subject.value, None).mapZIO { msg =>
+      ZIO
+        .fromEither(msg.decode[A])
+        .mapError(e => NatsError.DecodingError(e.message, e))
+    }
+
   /**
-   * Internal: Dispatcher + Queue -> ZStream pattern.
+   * Internal: Dispatcher → ZStream pattern.
    *
-   * The jnats Dispatcher calls MessageHandler on its own thread. We offer each
-   * message into an unbounded ZIO Queue which feeds the ZStream. Both Queue and
-   * Dispatcher are cleaned up when the stream's Scope ends.
+   * A jnats Dispatcher delivers messages on its own thread into the ZStream via
+   * the asyncScoped callback. The Dispatcher is closed when the stream's Scope
+   * ends (interruption or normal completion).
    */
   private def subscribeInternal(
     subject: String,
@@ -330,11 +408,13 @@ private[nats] final class NatsLive(conn: JConnection) extends Nats {
       .mapError(NatsError.fromThrowable)
       .unit
 
-  override def status: UIO[JConnection.Status] =
-    ZIO.succeed(conn.getStatus)
+  override def status: UIO[ConnectionStatus] =
+    ZIO.succeed(ConnectionStatus.fromJava(conn.getStatus))
 
-  override def serverInfo: IO[NatsError, ServerInfo] =
-    ZIO.attempt(conn.getServerInfo).mapError(NatsError.fromThrowable)
+  override def serverInfo: IO[NatsError, NatsServerInfo] =
+    ZIO
+      .attempt(conn.getServerInfo)
+      .mapBoth(NatsError.fromThrowable, NatsServerInfo.fromJava)
 
   override def underlying: JConnection = conn
 }

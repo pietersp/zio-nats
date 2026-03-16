@@ -2,41 +2,43 @@ package zio.nats
 
 import io.nats.client.{ConsumerContext as JConsumerContext, JetStream as JJetStream, StreamContext as JStreamContext}
 import zio.*
-import zio.blocks.schema.Schema
-import zio.nats.config.NatsConfig
-import zio.nats.serialization.NatsSerializer
 import zio.nats.subject.Subject
 
 /** JetStream publishing service. */
 trait JetStream {
 
-  /** Publish to a JetStream subject (synchronous server ack). */
+  /** Publish raw bytes to a JetStream subject (synchronous server ack). */
   def publish(subject: Subject, data: Chunk[Byte]): IO[NatsError, PublishAck]
 
-  /** Publish with NATS headers. */
+  /** Publish raw bytes with NATS [[Headers]]. */
   def publish(
     subject: Subject,
     data: Chunk[Byte],
-    headers: Map[String, List[String]]
+    headers: Headers
   ): IO[NatsError, PublishAck]
 
-  /** Publish with PublishOptions (message ID, expected-sequence, etc.). */
+  /**
+   * Publish raw bytes with [[PublishOptions]] (message ID, expected-sequence,
+   * etc.).
+   */
   def publish(
     subject: Subject,
     data: Chunk[Byte],
     options: PublishOptions
   ): IO[NatsError, PublishAck]
 
-  /** Publish with headers and options. */
+  /** Publish raw bytes with both [[Headers]] and [[PublishOptions]]. */
   def publish(
     subject: Subject,
     data: Chunk[Byte],
-    headers: Map[String, List[String]],
+    headers: Headers,
     options: PublishOptions
   ): IO[NatsError, PublishAck]
 
-  /** Publish a value of type T, serialized using the configured format. */
-  def publish[T: Schema](subject: Subject, data: T): ZIO[NatsConfig, NatsError, PublishAck]
+  /**
+   * Encode `data` using the implicit [[NatsCodec]] and publish to `subject`.
+   */
+  def publish[T: NatsCodec](subject: Subject, data: T): IO[NatsError, PublishAck]
 
   def publishAsync(subject: Subject, data: Chunk[Byte]): IO[NatsError, Task[PublishAck]]
 
@@ -46,7 +48,7 @@ trait JetStream {
     options: PublishOptions
   ): IO[NatsError, Task[PublishAck]]
 
-  /** Get a Consumer handle for a named durable consumer. */
+  /** Get a [[Consumer]] handle for a named durable consumer. */
   def consumer(streamName: String, consumerName: String): IO[NatsError, Consumer]
 }
 
@@ -55,7 +57,7 @@ object JetStream {
   def publish(subject: Subject, data: Chunk[Byte]): ZIO[JetStream, NatsError, PublishAck] =
     ZIO.serviceWithZIO[JetStream](_.publish(subject, data))
 
-  def publish[T: Schema](subject: Subject, data: T): ZIO[JetStream & NatsConfig, NatsError, PublishAck] =
+  def publish[T: NatsCodec](subject: Subject, data: T): ZIO[JetStream, NatsError, PublishAck] =
     ZIO.serviceWithZIO[JetStream](_.publish(subject, data))
 
   def publishAsync(
@@ -70,7 +72,7 @@ object JetStream {
   ): ZIO[JetStream, NatsError, Consumer] =
     ZIO.serviceWithZIO[JetStream](_.consumer(streamName, consumerName))
 
-  /** Create from a Nats connection. */
+  /** Create from a [[Nats]] connection. */
   val live: ZLayer[Nats, NatsError, JetStream] =
     ZLayer {
       for {
@@ -92,7 +94,7 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
   override def publish(
     subject: Subject,
     data: Chunk[Byte],
-    headers: Map[String, List[String]]
+    headers: Headers
   ): IO[NatsError, PublishAck] = {
     val msg = NatsMessage.toJava(subject.value, data, headers = headers)
     ZIO
@@ -112,7 +114,7 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
   override def publish(
     subject: Subject,
     data: Chunk[Byte],
-    headers: Map[String, List[String]],
+    headers: Headers,
     options: PublishOptions
   ): IO[NatsError, PublishAck] = {
     val msg = NatsMessage.toJava(subject.value, data, headers = headers)
@@ -121,16 +123,12 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
       .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
   }
 
-  override def publish[T: Schema](subject: Subject, data: T): ZIO[NatsConfig, NatsError, PublishAck] =
-    ZIO.serviceWithZIO[NatsConfig] { config =>
-      val bytes =
-        NatsSerializer.encode(data, config.format).left.map(e => NatsError.SerializationError(e.getMessage, e))
-      ZIO.fromEither(bytes).flatMap { b =>
-        ZIO
-          .attemptBlocking(js.publish(subject.value, b.toArray))
-          .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
-      }
-    }
+  override def publish[T: NatsCodec](subject: Subject, data: T): IO[NatsError, PublishAck] = {
+    val bytes = NatsCodec[T].encode(data)
+    ZIO
+      .attemptBlocking(js.publish(subject.value, bytes.toArray))
+      .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
+  }
 
   override def publishAsync(
     subject: Subject,

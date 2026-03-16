@@ -9,13 +9,13 @@ trait Consumer {
   def streamName: String
   def consumerName: String
 
-  def fetch(options: FetchOptions = FetchOptions.default): ZStream[Any, NatsError, NatsMessage]
-  def consume(options: ConsumeOptions = ConsumeOptions.default): ZStream[Any, NatsError, NatsMessage]
+  def fetch(options: FetchOptions = FetchOptions.default): ZStream[Any, NatsError, JetStreamMessage]
+  def consume(options: ConsumeOptions = ConsumeOptions.default): ZStream[Any, NatsError, JetStreamMessage]
   def iterate(
     options: ConsumeOptions = ConsumeOptions.default,
     pollTimeout: Duration = 5.seconds
-  ): ZStream[Any, NatsError, NatsMessage]
-  def next(timeout: Duration = 5.seconds): IO[NatsError, Option[NatsMessage]]
+  ): ZStream[Any, NatsError, JetStreamMessage]
+  def next(timeout: Duration = 5.seconds): IO[NatsError, Option[JetStreamMessage]]
 }
 
 private[nats] final class ConsumerLive(
@@ -24,15 +24,15 @@ private[nats] final class ConsumerLive(
   ctx: JConsumerContext
 ) extends Consumer {
 
-  def fetch(options: FetchOptions): ZStream[Any, NatsError, NatsMessage] =
+  def fetch(options: FetchOptions): ZStream[Any, NatsError, JetStreamMessage] =
     JetStreamConsumer.fetch(ctx, options.toJava)
 
-  def consume(options: ConsumeOptions): ZStream[Any, NatsError, NatsMessage] =
+  def consume(options: ConsumeOptions): ZStream[Any, NatsError, JetStreamMessage] =
     JetStreamConsumer.consume(ctx, Some(options.toJava))
 
-  def iterate(options: ConsumeOptions, pollTimeout: Duration): ZStream[Any, NatsError, NatsMessage] =
+  def iterate(options: ConsumeOptions, pollTimeout: Duration): ZStream[Any, NatsError, JetStreamMessage] =
     JetStreamConsumer.iterate(ctx, Some(options.toJava), pollTimeout)
 
-  def next(timeout: Duration): IO[NatsError, Option[NatsMessage]] =
+  def next(timeout: Duration): IO[NatsError, Option[JetStreamMessage]] =
     JetStreamConsumer.next(ctx, timeout)
 }

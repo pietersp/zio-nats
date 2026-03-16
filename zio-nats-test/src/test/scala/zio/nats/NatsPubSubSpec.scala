@@ -14,7 +14,7 @@ object NatsPubSubSpec extends ZIOSpecDefault {
         nats     <- ZIO.service[Nats]
         received <- Promise.make[Nothing, NatsMessage]
         fiber    <- nats
-                   .subscribe(Subject("test.pubsub"))
+                   .subscribeRaw(Subject("test.pubsub"))
                    .tap(msg => received.succeed(msg))
                    .take(1)
                    .runDrain
@@ -24,7 +24,7 @@ object NatsPubSubSpec extends ZIOSpecDefault {
         msg <- received.await
         _   <- fiber.interrupt
       } yield assertTrue(
-        msg.subject == "test.pubsub",
+        msg.subject == Subject("test.pubsub"),
         msg.dataAsString == "hello"
       )
     },
@@ -34,7 +34,7 @@ object NatsPubSubSpec extends ZIOSpecDefault {
         nats     <- ZIO.service[Nats]
         received <- Promise.make[Nothing, NatsMessage]
         fiber    <- nats
-                   .subscribe(Subject("test.headers"))
+                   .subscribeRaw(Subject("test.headers"))
                    .tap(msg => received.succeed(msg))
                    .take(1)
                    .runDrain
@@ -43,12 +43,12 @@ object NatsPubSubSpec extends ZIOSpecDefault {
         _ <- nats.publish(
                Subject("test.headers"),
                Chunk.fromArray("with-headers".getBytes),
-               Map("X-Custom" -> List("value1"))
+               PublishParams(headers = Headers("X-Custom" -> "value1"))
              )
         msg <- received.await
         _   <- fiber.interrupt
       } yield assertTrue(
-        msg.headers.get("X-Custom").contains(List("value1")),
+        msg.headers.get("X-Custom") == Chunk("value1"),
         msg.dataAsString == "with-headers"
       )
     },
@@ -57,7 +57,7 @@ object NatsPubSubSpec extends ZIOSpecDefault {
       for {
         nats  <- ZIO.service[Nats]
         fiber <- nats
-                   .subscribe(Subject("test.request"))
+                   .subscribeRaw(Subject("test.request"))
                    .tap { msg =>
                      msg.replyTo match {
                        case Some(reply) =>
@@ -80,13 +80,13 @@ object NatsPubSubSpec extends ZIOSpecDefault {
         counter <- Ref.make(0)
         latch   <- Promise.make[Nothing, Unit]
         fiber1  <- nats
-                    .subscribe(Subject("test.queue"), Subject("group1"))
+                    .subscribe(Subject("test.queue"), QueueGroup("group1"))
                     .tap(_ => counter.update(_ + 1) *> latch.succeed(()))
                     .take(1)
                     .runDrain
                     .fork
         fiber2 <- nats
-                    .subscribe(Subject("test.queue"), Subject("group1"))
+                    .subscribe(Subject("test.queue"), QueueGroup("group1"))
                     .tap(_ => counter.update(_ + 1) *> latch.succeed(()))
                     .take(1)
                     .runDrain
@@ -99,13 +99,8 @@ object NatsPubSubSpec extends ZIOSpecDefault {
         _     <- fiber1.interrupt
         _     <- fiber2.interrupt
       } yield assertTrue(count == 1)
-    },
-
-    test("connection status is CONNECTED") {
-      for {
-        nats   <- ZIO.service[Nats]
-        status <- nats.status
-      } yield assertTrue(status == io.nats.client.Connection.Status.CONNECTED)
     }
-  ).provideShared(NatsTestLayers.nats) @@ sequential @@ withLiveClock @@ timeout(60.seconds)
+  ).provideShared(
+    NatsTestLayers.nats
+  ) @@ sequential @@ withLiveClock @@ timeout(60.seconds)
 }

@@ -40,6 +40,14 @@ object NatsError {
 
   final case class SerializationError(message: String, cause: Throwable) extends NatsError { initCause(cause) }
 
+  /**
+   * Failure to decode a message payload into a typed value.
+   *
+   * Wraps a [[NatsDecodeError]] as a [[NatsError]] so it can be handled in the
+   * same error channel as other transport failures.
+   */
+  final case class DecodingError(message: String, cause: Throwable) extends NatsError { initCause(cause) }
+
   // --- JetStream errors ---
 
   sealed trait JetStreamError extends NatsError
