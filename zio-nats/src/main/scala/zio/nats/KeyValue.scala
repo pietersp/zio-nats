@@ -193,23 +193,9 @@ object KeyValue {
         .mapBoth(NatsError.fromThrowable, new KeyValueLive(_))
     }
 
-  def put[A: NatsCodec](key: String, value: A): ZIO[KeyValue, NatsError, Long] =
-    ZIO.serviceWithZIO[KeyValue](_.put(key, value))
-
-  def create[A: NatsCodec](key: String, value: A, ttl: Option[Duration] = None): ZIO[KeyValue, NatsError, Long] =
-    ZIO.serviceWithZIO[KeyValue](_.create(key, value, ttl))
-
-  def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): ZIO[KeyValue, NatsError, Long] =
-    ZIO.serviceWithZIO[KeyValue](_.update(key, value, expectedRevision))
 }
 
 object KeyValueManagement {
-
-  def create(config: KeyValueConfig): ZIO[KeyValueManagement, NatsError, KeyValueBucketStatus] =
-    ZIO.serviceWithZIO[KeyValueManagement](_.create(config))
-
-  def delete(bucketName: String): ZIO[KeyValueManagement, NatsError, Unit] =
-    ZIO.serviceWithZIO[KeyValueManagement](_.delete(bucketName))
 
   val live: ZLayer[Nats, NatsError, KeyValueManagement] =
     ZLayer {

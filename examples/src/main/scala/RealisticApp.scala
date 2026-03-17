@@ -96,7 +96,8 @@ object RealisticApp extends ZIOAppDefault {
 
   val run: ZIO[Any, Throwable, Unit] =
     (for {
-      fiber <- Nats.lifecycleEvents
+      nats  <- ZIO.service[Nats]
+      fiber <- nats.lifecycleEvents
                  .tap(e => Console.printLine(s"[nats-event] $e").orDie)
                  .takeUntil(_ == NatsEvent.Closed)
                  .runDrain

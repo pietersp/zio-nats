@@ -59,11 +59,6 @@ trait Nats {
    * Returns an [[Envelope]] containing both the decoded response and the raw
    * [[NatsMessage]] (so headers and other metadata remain accessible).
    *
-   * Use the [[Nats]] companion accessor for a version with a default `timeout`:
-   * {{{
-   *   Nats.request[A, B](subject, value)   // 2-second timeout is used
-   * }}}
-   *
    * Pass `Chunk[Byte]` for `A` and/or `B` to use the identity codec (raw bytes).
    *
    * Decode failures are surfaced as [[NatsError.DecodingError]].
@@ -73,6 +68,18 @@ trait Nats {
     request: A,
     timeout: Duration
   ): IO[NatsError, Envelope[B]]
+
+  /**
+   * Typed request — convenience overload with a 2-second default timeout.
+   *
+   * {{{
+   *   nats.request[UserQuery, UserResponse](subject, query)
+   * }}}
+   */
+  def request[A: NatsCodec, B: NatsCodec](
+    subject: Subject,
+    request: A
+  ): IO[NatsError, Envelope[B]] = this.request[A, B](subject, request, 2.seconds)
 
   // -------------------------------------------------------------------------
   // Subscribe
@@ -176,76 +183,6 @@ trait Nats {
 object Nats {
 
   // -------------------------------------------------------------------------
-  // Accessor methods for use in the ZIO environment
-  // -------------------------------------------------------------------------
-
-  def publish[A: NatsCodec](
-    subject: Subject,
-    value: A,
-    params: PublishParams = PublishParams.empty
-  ): ZIO[Nats, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats](_.publish[A](subject, value, params))
-
-  /**
-   * Typed request with explicit timeout (mirrors the trait method).
-   */
-  def request[A: NatsCodec, B: NatsCodec](
-    subject: Subject,
-    request: A,
-    timeout: Duration
-  ): ZIO[Nats, NatsError, Envelope[B]] =
-    ZIO.serviceWithZIO[Nats](_.request[A, B](subject, request, timeout))
-
-  /**
-   * Typed request — convenience overload with a 2-second default timeout.
-   *
-   * {{{
-   *   Nats.request[UserQuery, UserResponse](subject, query)
-   * }}}
-   */
-  def request[A: NatsCodec, B: NatsCodec](
-    subject: Subject,
-    request: A
-  ): ZIO[Nats, NatsError, Envelope[B]] =
-    ZIO.serviceWithZIO[Nats](_.request[A, B](subject, request, 2.seconds))
-
-  def subscribeRaw(
-    subject: Subject,
-    queue: Option[QueueGroup] = None
-  ): ZStream[Nats, NatsError, NatsMessage] =
-    ZStream.serviceWithStream[Nats](_.subscribeRaw(subject, queue))
-
-  def subscribe[A: NatsCodec](
-    subject: Subject,
-    queue: Option[QueueGroup] = None
-  ): ZStream[Nats, NatsError, Envelope[A]] =
-    ZStream.serviceWithStream[Nats](_.subscribe[A](subject, queue))
-
-  def flush(timeout: Duration = 1.second): ZIO[Nats, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats](_.flush(timeout))
-
-  def status: URIO[Nats, ConnectionStatus] =
-    ZIO.serviceWithZIO[Nats](_.status)
-
-  def rtt: ZIO[Nats, NatsError, Duration] =
-    ZIO.serviceWithZIO[Nats](_.rtt)
-
-  def connectedUrl: URIO[Nats, Option[String]] =
-    ZIO.serviceWithZIO[Nats](_.connectedUrl)
-
-  def statistics: URIO[Nats, ConnectionStats] =
-    ZIO.serviceWithZIO[Nats](_.statistics)
-
-  def outgoingPendingMessageCount: URIO[Nats, Long] =
-    ZIO.serviceWithZIO[Nats](_.outgoingPendingMessageCount)
-
-  def outgoingPendingBytes: URIO[Nats, Long] =
-    ZIO.serviceWithZIO[Nats](_.outgoingPendingBytes)
-
-  def lifecycleEvents: ZStream[Nats, Nothing, NatsEvent] =
-    ZStream.serviceWithStream[Nats](_.lifecycleEvents)
-
-  // -------------------------------------------------------------------------
   // Layer construction
   // -------------------------------------------------------------------------
 
@@ -253,7 +190,7 @@ object Nats {
    * Create a managed NATS connection. The connection is closed when the
    * enclosing [[Scope]] ends.
    *
-   * Connection lifecycle events are available via [[Nats.lifecycleEvents]]
+   * Connection lifecycle events are available via [[Nats#lifecycleEvents]]
    * on the returned service.
    */
   def make(config: NatsConfig): ZIO[Scope, NatsError, Nats] =

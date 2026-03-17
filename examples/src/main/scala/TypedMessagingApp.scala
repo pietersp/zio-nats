@@ -36,15 +36,17 @@ object TypedMessagingApp extends ZIOAppDefault {
 
   val program: ZIO[Nats, NatsError, Unit] =
     for {
+      nats <- ZIO.service[Nats]
+
       // subscribe[User] is the typed overload — auto-decoded via NatsCodec[User]
-      userFiber <- Nats
+      userFiber <- nats
                      .subscribe[User](Subject("demo.users"))
                      .take(3)
                      .tap(env => Console.printLine(s"  user:  ${env.value.name}, age ${env.value.age}").orDie)
                      .runDrain
                      .fork
 
-      orderFiber <- Nats
+      orderFiber <- nats
                       .subscribe[Order](Subject("demo.orders"))
                       .take(2)
                       .tap(env => Console.printLine(s"  order: ${env.value.id} - $$${env.value.amount}").orDie)
@@ -54,13 +56,13 @@ object TypedMessagingApp extends ZIOAppDefault {
       _ <- ZIO.sleep(200.millis)
 
       _ <- Console.printLine("Publishing users...").orDie
-      _ <- Nats.publish(Subject("demo.users"), User("Alice", 30))
-      _ <- Nats.publish(Subject("demo.users"), User("Bob", 25))
-      _ <- Nats.publish(Subject("demo.users"), User("Charlie", 35))
+      _ <- nats.publish(Subject("demo.users"), User("Alice", 30))
+      _ <- nats.publish(Subject("demo.users"), User("Bob", 25))
+      _ <- nats.publish(Subject("demo.users"), User("Charlie", 35))
 
       _ <- Console.printLine("Publishing orders...").orDie
-      _ <- Nats.publish(Subject("demo.orders"), Order("ord-1", 99.99, "Alice"))
-      _ <- Nats.publish(Subject("demo.orders"), Order("ord-2", 14.50, "Bob"))
+      _ <- nats.publish(Subject("demo.orders"), Order("ord-1", 99.99, "Alice"))
+      _ <- nats.publish(Subject("demo.orders"), Order("ord-2", 14.50, "Bob"))
 
       _ <- userFiber.join
       _ <- orderFiber.join

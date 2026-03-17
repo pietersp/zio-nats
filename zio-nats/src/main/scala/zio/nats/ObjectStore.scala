@@ -161,12 +161,6 @@ object ObjectStore {
 
 object ObjectStoreManagement {
 
-  def create(config: ObjectStoreConfig): ZIO[ObjectStoreManagement, NatsError, ObjectStoreBucketStatus] =
-    ZIO.serviceWithZIO[ObjectStoreManagement](_.create(config))
-
-  def delete(bucketName: String): ZIO[ObjectStoreManagement, NatsError, Unit] =
-    ZIO.serviceWithZIO[ObjectStoreManagement](_.delete(bucketName))
-
   val live: ZLayer[Nats, NatsError, ObjectStoreManagement] =
     ZLayer {
       for {

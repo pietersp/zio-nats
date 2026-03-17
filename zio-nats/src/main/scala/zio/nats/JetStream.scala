@@ -17,7 +17,8 @@ import zio.*
  * ==Example==
  * {{{
  * for {
- *   ack <- JetStream.publish(Subject("orders.created"), order)
+ *   js  <- ZIO.service[JetStream]
+ *   ack <- js.publish(Subject("orders.created"), order)
  *   _   <- Console.printLine(s"Stored at seq ${ack.seqno}")
  * } yield ()
  * }}}
@@ -52,24 +53,6 @@ trait JetStream {
 }
 
 object JetStream {
-
-  def publish[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams = JsPublishParams.empty): ZIO[JetStream, NatsError, PublishAck] =
-    ZIO.serviceWithZIO[JetStream](_.publish(subject, data, params))
-
-  def publishAsync[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams = JsPublishParams.empty): ZIO[JetStream, NatsError, Task[PublishAck]] =
-    ZIO.serviceWithZIO[JetStream](_.publishAsync(subject, data, params))
-
-  def consumer(
-    streamName: String,
-    consumerName: String
-  ): ZIO[JetStream, NatsError, Consumer] =
-    ZIO.serviceWithZIO[JetStream](_.consumer(streamName, consumerName))
-
-  def orderedConsumer(
-    streamName: String,
-    config: OrderedConsumerConfig
-  ): ZIO[JetStream, NatsError, OrderedConsumer] =
-    ZIO.serviceWithZIO[JetStream](_.orderedConsumer(streamName, config))
 
   /** Create from a [[Nats]] connection. */
   val live: ZLayer[Nats, NatsError, JetStream] =

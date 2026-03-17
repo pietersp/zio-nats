@@ -96,21 +96,6 @@ trait JetStreamManagement {
 
 object JetStreamManagement {
 
-  def addStream(config: StreamConfig): ZIO[JetStreamManagement, NatsError, StreamSummary] =
-    ZIO.serviceWithZIO[JetStreamManagement](_.addStream(config))
-
-  def deleteStream(name: String): ZIO[JetStreamManagement, NatsError, Boolean] =
-    ZIO.serviceWithZIO[JetStreamManagement](_.deleteStream(name))
-
-  def getStreamNames: ZIO[JetStreamManagement, NatsError, List[String]] =
-    ZIO.serviceWithZIO[JetStreamManagement](_.getStreamNames)
-
-  def addOrUpdateConsumer(
-    streamName: String,
-    config: ConsumerConfig
-  ): ZIO[JetStreamManagement, NatsError, ConsumerSummary] =
-    ZIO.serviceWithZIO[JetStreamManagement](_.addOrUpdateConsumer(streamName, config))
-
   /** Create from a Nats connection. */
   val live: ZLayer[Nats, NatsError, JetStreamManagement] =
     ZLayer {

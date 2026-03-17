@@ -38,14 +38,15 @@ import zio.nats.config.NatsConfig
 object Main extends ZIOAppDefault {
   val program: ZIO[Nats, NatsError, Unit] =
     for {
-      fiber <- Nats.subscribeRaw(Subject("greetings"))
+      nats  <- ZIO.service[Nats]
+      fiber <- nats.subscribeRaw(Subject("greetings"))
                  .take(3)
                  .tap(msg => Console.printLine(s"Received: ${msg.dataAsString}").orDie)
                  .runDrain
                  .fork
       _     <- ZIO.sleep(200.millis)
       _     <- ZIO.foreachDiscard(1 to 3) { i =>
-                 Nats.publish(Subject("greetings"), s"Hello #$i")
+                 nats.publish(Subject("greetings"), s"Hello #$i")
                }
       _     <- fiber.join
     } yield ()
@@ -58,7 +59,7 @@ object Main extends ZIOAppDefault {
 ```
 
 > `Subject` and `QueueGroup` are opaque types from `import zio.nats._` — no additional import needed.
-> `Nats.subscribeRaw` returns raw `NatsMessage`s without decoding; `Nats.subscribe[A]` decodes each message and wraps it in `Envelope[A]`.
+> `nats.subscribeRaw` returns raw `NatsMessage`s without decoding; `nats.subscribe[A]` decodes each message and wraps it in `Envelope[A]`.
 
 ## Core concepts
 
@@ -91,21 +92,23 @@ val appLayer =
 ### Publish
 
 ```scala
+// nats: Nats obtained via ZIO.service[Nats]
+
 // UTF-8 string (built-in NatsCodec[String])
-Nats.publish(Subject("events.user"), "payload")
+nats.publish(Subject("events.user"), "payload")
 
 // Raw bytes (built-in NatsCodec[Chunk[Byte]])
-Nats.publish(Subject("events.user"), bytes)
+nats.publish(Subject("events.user"), bytes)
 
 // With headers
-Nats.publish(
+nats.publish(
   Subject("events.user"),
   bytes,
   PublishParams(headers = Headers("Content-Type" -> "application/json"))
 )
 
 // With reply-to
-Nats.publish(
+nats.publish(
   Subject("events.user"),
   bytes,
   PublishParams(replyTo = Some(Subject("_INBOX.reply")))
@@ -125,8 +128,10 @@ h.add("X-Trace", "def") // Headers with Chunk("abc", "def") for X-Trace
 `subscribe[A]` and `subscribeRaw` return a `ZStream`. The underlying jnats `Dispatcher` is created when the stream is consumed and closed automatically when the stream is interrupted.
 
 ```scala
+// nats: Nats obtained via ZIO.service[Nats]
+
 // Raw NatsMessage — use subscribeRaw when you don't need typed decoding
-Nats.subscribeRaw(Subject("events.>"))
+nats.subscribeRaw(Subject("events.>"))
   .tap(msg => ZIO.debug(s"${msg.subject}: ${msg.dataAsString}"))
   .runDrain
 ```
@@ -137,13 +142,13 @@ Messages are load-balanced across all subscribers in the same queue group:
 
 ```scala
 // Typed — decoded payload in Envelope
-Nats.subscribe[WorkItem](Subject("work.queue"), QueueGroup("workers"))
+nats.subscribe[WorkItem](Subject("work.queue"), QueueGroup("workers"))
   .map(_.value)
   .tap(item => process(item))
   .runDrain
 
 // Raw bytes
-Nats.subscribe[Chunk[Byte]](Subject("work.queue"), QueueGroup("workers"))
+nats.subscribe[Chunk[Byte]](Subject("work.queue"), QueueGroup("workers"))
   .tap(env => process(env.message))
   .runDrain
 ```
@@ -191,8 +196,10 @@ import codecs.derived  // NatsCodec[Person] is now in scope
 ### Type-Safe Publish
 
 ```scala
+// nats: Nats obtained via ZIO.service[Nats]
+
 // Publish typed data — automatically serialized with the in-scope NatsCodec
-Nats.publish(Subject("users"), Person("Alice", 30))
+nats.publish(Subject("users"), Person("Alice", 30))
 ```
 
 ### Type-Safe Subscribe
@@ -200,19 +207,21 @@ Nats.publish(Subject("users"), Person("Alice", 30))
 `subscribe[A]` returns a `ZStream` of `Envelope[A]`. Each `Envelope` holds the decoded value and the raw `NatsMessage` (headers, subject, reply-to).
 
 ```scala
+// nats: Nats obtained via ZIO.service[Nats]
+
 // Access decoded value via .value
-Nats.subscribe[Person](Subject("users"))
+nats.subscribe[Person](Subject("users"))
   .map(_.value)
   .tap(person => ZIO.debug(s"Got: ${person.name}"))
   .runDrain
 
 // Or use the .payload extension to strip the Envelope from the whole stream
-Nats.subscribe[Person](Subject("users")).payload
+nats.subscribe[Person](Subject("users")).payload
   .tap(person => ZIO.debug(s"Got: ${person.name}"))
   .runDrain
 
 // Keep the full Envelope for header access
-Nats.subscribe[Person](Subject("users"))
+nats.subscribe[Person](Subject("users"))
   .tap(env => ZIO.debug(s"Headers: ${env.message.headers}, Person: ${env.value}"))
   .runDrain
 ```
@@ -220,7 +229,7 @@ Nats.subscribe[Person](Subject("users"))
 Queue-group subscriptions also support typed decoding:
 
 ```scala
-Nats.subscribe[Order](Subject("orders"), QueueGroup("processors")).payload
+nats.subscribe[Order](Subject("orders"), QueueGroup("processors")).payload
   .tap(order => ZIO.debug(s"order: ${order.id}"))
   .runDrain
 ```
@@ -319,20 +328,21 @@ val layer =
   JetStreamManagement.live
 
 val setup = for {
-  _ <- JetStreamManagement.addStream(
-         StreamConfig(
-           name        = "ORDERS",
-           subjects    = List("orders.>"),
-           storageType = StorageType.Memory
+  jsm <- ZIO.service[JetStreamManagement]
+  _   <- jsm.addStream(
+           StreamConfig(
+             name        = "ORDERS",
+             subjects    = List("orders.>"),
+             storageType = StorageType.Memory
+           )
          )
-       )
-  _ <- JetStreamManagement.addOrUpdateConsumer(
-         "ORDERS",
-         ConsumerConfig.durable("processor").copy(
-           filterSubject = Some("orders.>"),
-           ackPolicy     = AckPolicy.Explicit
+  _   <- jsm.addOrUpdateConsumer(
+           "ORDERS",
+           ConsumerConfig.durable("processor").copy(
+             filterSubject = Some("orders.>"),
+             ackPolicy     = AckPolicy.Explicit
+           )
          )
-       )
 } yield ()
 ```
 
@@ -408,10 +418,10 @@ for {
 ```scala
 val layer = ZLayer.succeed(NatsConfig.default) >>> Nats.live >+> KeyValueManagement.live
 
-val createBucket =
-  KeyValueManagement.create(
-    KeyValueConfig(name = "config", storageType = StorageType.Memory)
-  ).provide(layer)
+val createBucket = (for {
+  kvm <- ZIO.service[KeyValueManagement]
+  _   <- kvm.create(KeyValueConfig(name = "config", storageType = StorageType.Memory))
+} yield ()).provide(layer)
 ```
 
 ### Operations
@@ -482,10 +492,10 @@ kv.watchAll(KeyValueWatchOptions(metaOnly = true))  // headers only, skip values
 // Management
 val layer = ZLayer.succeed(NatsConfig.default) >>> Nats.live >+> ObjectStoreManagement.live
 
-val createBucket =
-  ObjectStoreManagement.create(
-    ObjectStoreConfig(name = "assets", storageType = StorageType.Memory)
-  ).provide(layer)
+val createBucket = (for {
+  osm <- ZIO.service[ObjectStoreManagement]
+  _   <- osm.create(ObjectStoreConfig(name = "assets", storageType = StorageType.Memory))
+} yield ()).provide(layer)
 
 // Obtain a bucket handle (requires Nats in the environment)
 val os: ZIO[Nats, NatsError, ObjectStore] = ObjectStore.bucket("assets")
@@ -627,9 +637,10 @@ object MySpec extends ZIOSpecDefault {
   def spec = suite("MySpec")(
     test("publishes and receives") {
       for {
-        fiber <- Nats.subscribeRaw(Subject("t")).take(1).runCollect.fork
+        nats  <- ZIO.service[Nats]
+        fiber <- nats.subscribeRaw(Subject("t")).take(1).runCollect.fork
         _     <- ZIO.sleep(200.millis)
-        _     <- Nats.publish(Subject("t"), "hi")
+        _     <- nats.publish(Subject("t"), "hi")
         msgs  <- fiber.join
       } yield assertTrue(msgs.head.dataAsString == "hi")
     }

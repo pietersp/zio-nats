@@ -5,9 +5,8 @@ import zio.nats.config.NatsConfig
 /**
  * Minimal zio-nats quick-start using the ZIO environment pattern.
  *
- * The Nats companion accessors (Nats.publish, Nats.subscribe, etc.) accept Nats
- * from the ZIO environment and route raw subscribe through an unambiguous
- * internal helper, so no type annotations are needed at call sites.
+ * Obtain the `Nats` service via `ZIO.service[Nats]` and call methods
+ * directly on the instance.
  *
  * Requires a running NATS server: nats-server
  *
@@ -17,8 +16,8 @@ object QuickStartApp extends ZIOAppDefault {
 
   val program: ZIO[Nats, NatsError, Unit] =
     for {
-      // Nats.subscribeRaw has a unique name — no overload ambiguity.
-      fiber <- Nats
+      nats  <- ZIO.service[Nats]
+      fiber <- nats
                  .subscribeRaw(Subject("greetings"))
                  .take(3)
                  .tap(msg => Console.printLine(s"Received: ${msg.dataAsString}").orDie)
@@ -29,7 +28,7 @@ object QuickStartApp extends ZIOAppDefault {
 
       // Publish 3 messages
       _ <- ZIO.foreachDiscard(1 to 3) { i =>
-             Nats.publish(Subject("greetings"), s"Hello #$i".toNatsData)
+             nats.publish(Subject("greetings"), s"Hello #$i".toNatsData)
            }
 
       _ <- fiber.join
