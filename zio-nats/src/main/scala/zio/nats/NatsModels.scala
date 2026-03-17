@@ -8,6 +8,7 @@ import io.nats.client.api.{
   KeyValueWatchOption as JKeyValueWatchOption,
   ObjectInfo as JObjectInfo,
   ObjectStoreStatus as JObjectStoreStatus,
+  ObjectStoreWatchOption as JObjectStoreWatchOption,
   PublishAck as JPublishAck,
   PurgeResponse as JPurgeResponse,
   StreamInfo as JStreamInfo
@@ -284,6 +285,35 @@ private[nats] object KeyValueBucketStatus {
     isCompressed = s.isCompressed,
     ttl = Option(s.getTtl).filter(_.toMillis > 0).map(d => Duration.fromMillis(d.toMillis))
   )
+}
+
+// ---------------------------------------------------------------------------
+// Object Store watch options
+// ---------------------------------------------------------------------------
+
+/**
+ * Options that control which entries an ObjectStore watch delivers.
+ *
+ * @param ignoreDeletes  Skip deleted-object entries (default: include them).
+ * @param includeHistory Start from the first entry for all objects instead of the last (default: last per object).
+ * @param updatesOnly    Start only from new entries written after the watch begins (default: last per object).
+ */
+case class ObjectStoreWatchOptions(
+  ignoreDeletes: Boolean = false,
+  includeHistory: Boolean = false,
+  updatesOnly: Boolean = false
+)
+
+object ObjectStoreWatchOptions {
+  val default: ObjectStoreWatchOptions = ObjectStoreWatchOptions()
+
+  private[nats] def toJava(opts: ObjectStoreWatchOptions): Array[JObjectStoreWatchOption] = {
+    val buf = scala.collection.mutable.ArrayBuffer.empty[JObjectStoreWatchOption]
+    if (opts.ignoreDeletes) buf += JObjectStoreWatchOption.IGNORE_DELETE
+    if (opts.includeHistory) buf += JObjectStoreWatchOption.INCLUDE_HISTORY
+    if (opts.updatesOnly) buf += JObjectStoreWatchOption.UPDATES_ONLY
+    buf.toArray
+  }
 }
 
 // ---------------------------------------------------------------------------

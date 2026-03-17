@@ -62,6 +62,69 @@ object ObjectStoreSpec extends ZIOSpecDefault {
       } yield assertTrue(names.contains("os-stat-a"), names.contains("os-stat-b"))
     },
 
+    test("seal makes bucket read-only") {
+      for {
+        osm    <- ZIO.service[ObjectStoreManagement]
+        _      <- osm.create(ObjectStoreConfig(name = "os-seal", storageType = StorageType.Memory))
+        os     <- ObjectStore.bucket("os-seal")
+        _      <- os.put("pre-seal", Chunk.fromArray("data".getBytes))
+        status <- os.seal()
+        putErr <- os.put("post-seal", Chunk.fromArray("data".getBytes)).either
+        _      <- osm.delete("os-seal")
+      } yield assertTrue(
+        status.isSealed,
+        putErr.isLeft
+      )
+    },
+
+    test("addLink creates an alias for an object") {
+      for {
+        osm  <- ZIO.service[ObjectStoreManagement]
+        _    <- osm.create(ObjectStoreConfig(name = "os-link", storageType = StorageType.Memory))
+        os   <- ObjectStore.bucket("os-link")
+        _    <- os.put("original", Chunk.fromArray("link-data".getBytes))
+        link <- os.addLink("my-link", "original")
+        got  <- os.get[Chunk[Byte]]("my-link")
+        _    <- osm.delete("os-link")
+      } yield assertTrue(
+        link.name == "my-link",
+        got.toArray.sameElements("link-data".getBytes)
+      )
+    },
+
+    test("getInfo fails for deleted objects; delete() returns deleted summary") {
+      for {
+        osm      <- ZIO.service[ObjectStoreManagement]
+        _        <- osm.create(ObjectStoreConfig(name = "os-getinfo", storageType = StorageType.Memory))
+        os       <- ObjectStore.bucket("os-getinfo")
+        _        <- os.put("del-obj", Chunk.fromArray("hello".getBytes))
+        deleted  <- os.delete("del-obj")
+        notFound <- os.getInfo("del-obj").either
+        _        <- osm.delete("os-getinfo")
+      } yield assertTrue(
+        deleted.name == "del-obj",
+        deleted.isDeleted,
+        notFound.isLeft
+      )
+    },
+
+    test("watch with IGNORE_DELETE skips deleted entries") {
+      for {
+        osm      <- ZIO.service[ObjectStoreManagement]
+        _        <- osm.create(ObjectStoreConfig(name = "os-watch-del", storageType = StorageType.Memory))
+        os       <- ObjectStore.bucket("os-watch-del")
+        _        <- os.put("obj-a", Chunk.fromArray("data".getBytes))
+        _        <- os.delete("obj-a")
+        entries  <- os
+                      .watch(ObjectStoreWatchOptions(ignoreDeletes = true, includeHistory = true))
+                      .take(2)
+                      .runCollect
+                      .timeout(5.seconds)
+                      .map(_.getOrElse(Chunk.empty))
+        _        <- osm.delete("os-watch-del")
+      } yield assertTrue(entries.forall(!_.isDeleted))
+    },
+
     test("watch emits object changes") {
       for {
         osm      <- ZIO.service[ObjectStoreManagement]
