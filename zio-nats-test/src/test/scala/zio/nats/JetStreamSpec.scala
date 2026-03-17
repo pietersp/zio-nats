@@ -262,6 +262,30 @@ object JetStreamSpec extends ZIOSpecDefault {
       }
     ),
 
+    suite("Consumer unpin")(
+      test("unpin on a pinned consumer returns a result without throwing") {
+        for {
+          jsm      <- ZIO.service[JetStreamManagement]
+          js       <- ZIO.service[JetStream]
+          _        <- createStream(jsm, "unpin-stream", "unpin.>")
+          _        <- jsm.addOrUpdateConsumer(
+                        "unpin-stream",
+                        ConsumerConfig
+                          .durable("unpin-cons")
+                          .copy(
+                            filterSubject = Some("unpin.>"),
+                            priorityPolicy = Some(PriorityPolicy.PinnedClient),
+                            priorityGroups = List("g1")
+                          )
+                      )
+          consumer <- js.consumer("unpin-stream", "unpin-cons")
+          // No client is currently pinned, so unpin returns false (not an error)
+          result   <- consumer.unpin("g1").either
+          _        <- jsm.deleteStream("unpin-stream")
+        } yield assertTrue(result.isRight)
+      }
+    ),
+
     suite("Message access")(
       test("getLastMessage retrieves the latest message on a subject") {
         for {

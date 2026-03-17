@@ -16,6 +16,14 @@ trait Consumer {
     pollTimeout: Duration = 5.seconds
   ): ZStream[Any, NatsError, JetStreamMessage]
   def next(timeout: Duration = 5.seconds): IO[NatsError, Option[JetStreamMessage]]
+
+  /**
+   * Unpin this consumer from the specified priority group, allowing a
+   * different client to be pinned. Returns true if the server accepted the
+   * request. Requires the consumer to have been created with
+   * [[PriorityPolicy.PinnedClient]].
+   */
+  def unpin(group: String): IO[NatsError, Boolean]
 }
 
 /**
@@ -39,6 +47,9 @@ trait OrderedConsumer {
     pollTimeout: Duration = 5.seconds
   ): ZStream[Any, NatsError, JetStreamMessage]
   def next(timeout: Duration = 5.seconds): IO[NatsError, Option[JetStreamMessage]]
+
+  /** Unpin this ordered consumer from the specified priority group. */
+  def unpin(group: String): IO[NatsError, Boolean]
 }
 
 private[nats] final class OrderedConsumerLive(
@@ -59,6 +70,9 @@ private[nats] final class OrderedConsumerLive(
 
   def next(timeout: Duration): IO[NatsError, Option[JetStreamMessage]] =
     JetStreamConsumer.next(ctx, timeout)
+
+  def unpin(group: String): IO[NatsError, Boolean] =
+    ZIO.attemptBlocking(ctx.unpin(group)).mapError(NatsError.fromThrowable)
 }
 
 private[nats] final class ConsumerLive(
@@ -78,4 +92,7 @@ private[nats] final class ConsumerLive(
 
   def next(timeout: Duration): IO[NatsError, Option[JetStreamMessage]] =
     JetStreamConsumer.next(ctx, timeout)
+
+  def unpin(group: String): IO[NatsError, Boolean] =
+    ZIO.attemptBlocking(ctx.unpin(group)).mapError(NatsError.fromThrowable)
 }
