@@ -235,6 +235,55 @@ object KeyValueSpec extends ZIOSpecDefault {
       } yield assertTrue(names.contains("kv-stat-a"), names.contains("kv-stat-b"))
     },
 
+    test("delete with expectedRevision fails on wrong revision") {
+      for {
+        kvm  <- ZIO.service[KeyValueManagement]
+        _    <- kvm.create(KeyValueConfig(name = "kv-del-rev", storageType = StorageType.Memory))
+        kv   <- KeyValue.bucket("kv-del-rev")
+        rev  <- kv.put("k", "v1")
+        ok   <- kv.delete("k", rev).either
+        fail <- kv.put("k", "v2").flatMap(rev2 => kv.delete("k", rev).either)
+        _    <- kvm.delete("kv-del-rev")
+      } yield assertTrue(ok.isRight, fail.isLeft)
+    },
+
+    test("purge with expectedRevision guards against concurrent writes") {
+      for {
+        kvm  <- ZIO.service[KeyValueManagement]
+        _    <- kvm.create(KeyValueConfig(name = "kv-purge-rev", storageType = StorageType.Memory))
+        kv   <- KeyValue.bucket("kv-purge-rev")
+        rev  <- kv.put("p", "v1")
+        ok   <- kv.purge("p", rev).either
+        _    <- kvm.delete("kv-purge-rev")
+      } yield assertTrue(ok.isRight)
+    },
+
+    test("consumeKeys streams all keys") {
+      for {
+        kvm  <- ZIO.service[KeyValueManagement]
+        _    <- kvm.create(KeyValueConfig(name = "kv-consume", storageType = StorageType.Memory))
+        kv   <- KeyValue.bucket("kv-consume")
+        _    <- kv.put("a", "1")
+        _    <- kv.put("b", "2")
+        _    <- kv.put("c", "3")
+        keys <- kv.consumeKeys().runCollect
+        _    <- kvm.delete("kv-consume")
+      } yield assertTrue(keys.toSet == Set("a", "b", "c"))
+    },
+
+    test("consumeKeys with filter streams matching keys") {
+      for {
+        kvm  <- ZIO.service[KeyValueManagement]
+        _    <- kvm.create(KeyValueConfig(name = "kv-consume-f", storageType = StorageType.Memory))
+        kv   <- KeyValue.bucket("kv-consume-f")
+        _    <- kv.put("foo.1", "a")
+        _    <- kv.put("foo.2", "b")
+        _    <- kv.put("bar.1", "c")
+        keys <- kv.consumeKeys("foo.*").runCollect
+        _    <- kvm.delete("kv-consume-f")
+      } yield assertTrue(keys.toSet == Set("foo.1", "foo.2"))
+    },
+
     test("watchAll with UPDATES_ONLY skips existing values") {
       for {
         kvm      <- ZIO.service[KeyValueManagement]

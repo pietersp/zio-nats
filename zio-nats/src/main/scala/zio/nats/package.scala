@@ -32,6 +32,7 @@ package object nats {
   type DiscardPolicy     = io.nats.client.api.DiscardPolicy
   type RetentionPolicy   = io.nats.client.api.RetentionPolicy
   type CompressionOption = io.nats.client.api.CompressionOption
+  type PriorityPolicy    = io.nats.client.api.PriorityPolicy
   object AckPolicy {
     val Explicit: AckPolicy = io.nats.client.api.AckPolicy.Explicit
     val All: AckPolicy      = io.nats.client.api.AckPolicy.All
@@ -68,6 +69,13 @@ package object nats {
     val S2: CompressionOption   = io.nats.client.api.CompressionOption.S2
   }
 
+  object PriorityPolicy {
+    val None: PriorityPolicy        = io.nats.client.api.PriorityPolicy.None
+    val Overflow: PriorityPolicy    = io.nats.client.api.PriorityPolicy.Overflow
+    val Prioritized: PriorityPolicy = io.nats.client.api.PriorityPolicy.Prioritized
+    val PinnedClient: PriorityPolicy = io.nats.client.api.PriorityPolicy.PinnedClient
+  }
+
   // --- Config class re-exports (users don't need zio.nats.configuration._) ---
   type StreamConfig = configuration.StreamConfig
   val StreamConfig = configuration.StreamConfig
@@ -79,4 +87,6 @@ package object nats {
   val ObjectStoreConfig = configuration.ObjectStoreConfig
   type OrderedConsumerConfig = configuration.OrderedConsumerConfig
   val OrderedConsumerConfig = configuration.OrderedConsumerConfig
+  type RepublishConfig = configuration.RepublishConfig
+  val RepublishConfig = configuration.RepublishConfig
 }

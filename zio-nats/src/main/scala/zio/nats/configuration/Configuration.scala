@@ -6,6 +6,8 @@ import io.nats.client.api.{
   DeliverPolicy,
   External,
   Mirror,
+  PriorityPolicy,
+  Republish,
   ReplayPolicy,
   Source,
   ConsumerConfiguration as JConsumerConfiguration,
@@ -62,6 +64,20 @@ case class SourceConfig(
 case class ExternalConfig(
   api: String,
   deliver: String
+)
+
+/**
+ * Republish configuration — re-publishes messages from a stream to another
+ * subject after they are stored.
+ *
+ * @param source      Subject filter matching the published subject.
+ * @param destination Subject template for the re-published message.
+ * @param headersOnly If true, re-publish only headers (no body).
+ */
+case class RepublishConfig(
+  source: String,
+  destination: String,
+  headersOnly: Boolean = false
 )
 
 object StreamConfig {
@@ -138,7 +154,12 @@ case class ConsumerConfig(
   maxBatch: Long = -1,
   maxExpires: Duration = zio.Duration.Zero,
   maxBytes: Long = -1,
-  headersOnly: Boolean = false
+  headersOnly: Boolean = false,
+  backoff: List[Duration] = Nil,
+  metadata: Map[String, String] = Map.empty,
+  pauseUntil: Option[java.time.ZonedDateTime] = None,
+  priorityPolicy: Option[PriorityPolicy] = None,
+  priorityGroups: List[String] = Nil
 ) {
   def toJava: JConsumerConfiguration = ConsumerConfig.toJava(this)
 }
@@ -173,6 +194,12 @@ object ConsumerConfig {
     if (config.maxExpires.toMillis > 0) builder.maxExpires(config.maxExpires.toMillis)
     if (config.maxBytes > 0) builder.maxBytes(config.maxBytes)
     if (config.headersOnly) builder.headersOnly(java.lang.Boolean.TRUE)
+    if (config.backoff.nonEmpty)
+      builder.backoff(config.backoff.map(d => java.time.Duration.ofMillis(d.toMillis))*)
+    if (config.metadata.nonEmpty) builder.metadata(config.metadata.asJava)
+    config.pauseUntil.foreach(t => builder.pauseUntil(t))
+    config.priorityPolicy.foreach(p => builder.priorityPolicy(p))
+    if (config.priorityGroups.nonEmpty) builder.priorityGroups(config.priorityGroups.asJava)
 
     builder.build()
   }
@@ -188,7 +215,10 @@ case class KeyValueConfig(
   compression: Boolean = false,
   numberOfReplicas: Int = 1,
   ttl: Option[Duration] = None,
-  limitMarkerTtl: Option[Duration] = None
+  limitMarkerTtl: Option[Duration] = None,
+  mirror: Option[MirrorConfig] = None,
+  sources: List[SourceConfig] = Nil,
+  republish: Option[RepublishConfig] = None
 ) {
   def toJava: JKeyValueConfiguration = KeyValueConfig.toJava(this)
 }
@@ -210,6 +240,28 @@ object KeyValueConfig {
     if (config.maxHistoryPerKey > 0) builder.maxHistoryPerKey(config.maxHistoryPerKey)
     config.ttl.foreach(d => builder.ttl(java.time.Duration.ofMillis(d.toMillis)))
     config.limitMarkerTtl.foreach(d => builder.limitMarker(java.time.Duration.ofMillis(d.toMillis)))
+
+    config.mirror.foreach { m =>
+      val mb = Mirror.builder().name(m.name)
+      m.filterSubject.foreach(s => mb.filterSubject(s))
+      m.external.foreach { ext =>
+        mb.external(External.builder().api(ext.api).deliver(ext.deliver).build())
+      }
+      builder.mirror(mb.build())
+    }
+
+    config.sources.foreach { s =>
+      val sb = Source.builder().name(s.name)
+      s.filterSubject.foreach(f => sb.filterSubject(f))
+      s.external.foreach { ext =>
+        sb.external(External.builder().api(ext.api).deliver(ext.deliver).build())
+      }
+      builder.sources(sb.build())
+    }
+
+    config.republish.foreach { r =>
+      builder.republish(Republish.builder().source(r.source).destination(r.destination).headersOnly(r.headersOnly).build())
+    }
 
     builder.build()
   }
@@ -259,7 +311,8 @@ case class ObjectStoreConfig(
   name: String,
   description: Option[String] = None,
   maxBucketSize: Long = -1,
-  storageType: StorageType = StorageType.File
+  storageType: StorageType = StorageType.File,
+  ttl: Option[Duration] = None
 ) {
   def toJava: JObjectStoreConfiguration = ObjectStoreConfig.toJava(this)
 }
@@ -275,6 +328,7 @@ object ObjectStoreConfig {
 
     config.description.foreach(d => builder.description(d))
     if (config.maxBucketSize > 0) builder.maxBucketSize(config.maxBucketSize)
+    config.ttl.foreach(d => builder.ttl(java.time.Duration.ofMillis(d.toMillis)))
 
     builder.build()
   }

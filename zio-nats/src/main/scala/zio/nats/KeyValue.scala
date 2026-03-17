@@ -1,6 +1,6 @@
 package zio.nats
 
-import io.nats.client.api.{KeyValueEntry as JKeyValueEntry, KeyValuePurgeOptions, KeyValueWatcher as JKeyValueWatcher}
+import io.nats.client.api.{KeyResult as JKeyResult, KeyValueEntry as JKeyValueEntry, KeyValuePurgeOptions, KeyValueWatcher as JKeyValueWatcher}
 import io.nats.client.{KeyValue as JKeyValue, KeyValueManagement as JKeyValueManagement, MessageTtl}
 import zio.*
 import zio.nats.configuration.KeyValueConfig
@@ -45,8 +45,31 @@ trait KeyValue {
   /** Soft-delete: places a delete marker. History is preserved. */
   def delete(key: String): IO[NatsError, Unit]
 
+  /**
+   * Soft-delete only if the current revision matches `expectedRevision`.
+   * Fails with JetStreamApiError on revision mismatch.
+   */
+  def delete(key: String, expectedRevision: Long): IO[NatsError, Unit]
+
   /** Hard-purge: removes all history for the key. */
   def purge(key: String): IO[NatsError, Unit]
+
+  /**
+   * Hard-purge only if the current revision matches `expectedRevision`.
+   * Fails with JetStreamApiError on revision mismatch.
+   */
+  def purge(key: String, expectedRevision: Long): IO[NatsError, Unit]
+
+  /**
+   * Hard-purge and set a TTL on the resulting tombstone marker.
+   * The bucket must have been created with TTL support.
+   */
+  def purge(key: String, markerTtl: Duration): IO[NatsError, Unit]
+
+  /**
+   * Hard-purge with both a revision guard and a tombstone TTL.
+   */
+  def purge(key: String, expectedRevision: Long, markerTtl: Duration): IO[NatsError, Unit]
 
   // --- Watch ---
   /** Stream changes for a specific key. Never completes unless interrupted. */
@@ -86,6 +109,18 @@ trait KeyValue {
 
   /** List keys matching any of the given subject filters. */
   def keys(filters: List[String]): IO[NatsError, List[String]]
+
+  /**
+   * Stream all keys incrementally. More memory-efficient than `keys` for large
+   * buckets — the stream completes when all keys have been delivered.
+   */
+  def consumeKeys(): ZStream[Any, NatsError, String]
+
+  /** Stream keys matching a subject filter (e.g. "foo.*"). */
+  def consumeKeys(filter: String): ZStream[Any, NatsError, String]
+
+  /** Stream keys matching any of the given subject filters. */
+  def consumeKeys(filters: List[String]): ZStream[Any, NatsError, String]
 
   def history(key: String): IO[NatsError, List[KeyValueEntry]]
   def getStatus: IO[NatsError, KeyValueBucketStatus]
@@ -178,8 +213,20 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
   override def delete(key: String): IO[NatsError, Unit] =
     ZIO.attemptBlocking(kv.delete(key)).mapError(NatsError.fromThrowable)
 
+  override def delete(key: String, expectedRevision: Long): IO[NatsError, Unit] =
+    ZIO.attemptBlocking(kv.delete(key, expectedRevision)).mapError(NatsError.fromThrowable)
+
   override def purge(key: String): IO[NatsError, Unit] =
     ZIO.attemptBlocking(kv.purge(key)).mapError(NatsError.fromThrowable)
+
+  override def purge(key: String, expectedRevision: Long): IO[NatsError, Unit] =
+    ZIO.attemptBlocking(kv.purge(key, expectedRevision)).mapError(NatsError.fromThrowable)
+
+  override def purge(key: String, markerTtl: Duration): IO[NatsError, Unit] =
+    ZIO.attemptBlocking(kv.purge(key, MessageTtl.seconds(markerTtl.toSeconds.toInt))).mapError(NatsError.fromThrowable)
+
+  override def purge(key: String, expectedRevision: Long, markerTtl: Duration): IO[NatsError, Unit] =
+    ZIO.attemptBlocking(kv.purge(key, expectedRevision, MessageTtl.seconds(markerTtl.toSeconds.toInt))).mapError(NatsError.fromThrowable)
 
   override def watch(key: String): ZStream[Any, NatsError, KeyValueEntry] =
     watchInternal(WatchTarget.SingleKey(key), KeyValueWatchOptions.default)
@@ -252,6 +299,30 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
 
   override def keys(filters: List[String]): IO[NatsError, List[String]] =
     ZIO.attemptBlocking(kv.keys(filters.asJava).asScala.toList).mapError(NatsError.fromThrowable)
+
+  override def consumeKeys(): ZStream[Any, NatsError, String] =
+    consumeKeysInternal(ZIO.attemptBlocking(kv.consumeKeys()).mapError(NatsError.fromThrowable))
+
+  override def consumeKeys(filter: String): ZStream[Any, NatsError, String] =
+    consumeKeysInternal(ZIO.attemptBlocking(kv.consumeKeys(filter)).mapError(NatsError.fromThrowable))
+
+  override def consumeKeys(filters: List[String]): ZStream[Any, NatsError, String] =
+    consumeKeysInternal(ZIO.attemptBlocking(kv.consumeKeys(filters.asJava)).mapError(NatsError.fromThrowable))
+
+  private def consumeKeysInternal(
+    acquireQueue: IO[NatsError, java.util.concurrent.LinkedBlockingQueue[JKeyResult]]
+  ): ZStream[Any, NatsError, String] =
+    ZStream.unwrap(
+      acquireQueue.map { queue =>
+        ZStream.repeatZIOOption(
+          ZIO.attemptBlocking(queue.take()).mapError(e => Some(NatsError.fromThrowable(e))).flatMap { r =>
+            if (r.isDone) ZIO.fail(None)
+            else if (r.isException) ZIO.fail(Some(NatsError.fromThrowable(r.getException)))
+            else ZIO.succeed(r.getKey)
+          }
+        )
+      }
+    )
 
   override def history(key: String): IO[NatsError, List[KeyValueEntry]] =
     ZIO

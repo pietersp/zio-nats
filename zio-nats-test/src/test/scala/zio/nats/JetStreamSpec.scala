@@ -260,6 +260,20 @@ object JetStreamSpec extends ZIOSpecDefault {
           _ <- jsm.deleteStream("consume-stream")
         } yield assertTrue(msgs.size == 2)
       }
+    ),
+
+    suite("Message access")(
+      test("getLastMessage retrieves the latest message on a subject") {
+        for {
+          jsm  <- ZIO.service[JetStreamManagement]
+          js   <- ZIO.service[JetStream]
+          _    <- createStream(jsm, "msg-last-stream", "msg.last.>")
+          _    <- js.publish(Subject("msg.last.x"), Chunk.fromArray("first".getBytes))
+          _    <- js.publish(Subject("msg.last.x"), Chunk.fromArray("second".getBytes))
+          msg  <- jsm.getLastMessage("msg-last-stream", "msg.last.x")
+          _    <- jsm.deleteStream("msg-last-stream")
+        } yield assertTrue(new String(msg.getData) == "second")
+      }
     )
   ).provideShared(
     NatsTestLayers.nats,

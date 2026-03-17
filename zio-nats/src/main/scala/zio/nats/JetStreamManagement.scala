@@ -33,6 +33,7 @@ trait JetStreamManagement {
 
   // --- Message access ---
   def getMessage(streamName: String, seq: Long): IO[NatsError, MessageInfo]
+  def getLastMessage(streamName: String, subject: String): IO[NatsError, MessageInfo]
   def deleteMessage(streamName: String, seq: Long): IO[NatsError, Boolean]
 
   // --- Account info ---
@@ -151,6 +152,9 @@ private[nats] final class JetStreamManagementLive(jsm: JJetStreamManagement) ext
 
   override def getMessage(streamName: String, seq: Long): IO[NatsError, MessageInfo] =
     ZIO.attemptBlocking(jsm.getMessage(streamName, seq)).mapError(NatsError.fromThrowable)
+
+  override def getLastMessage(streamName: String, subject: String): IO[NatsError, MessageInfo] =
+    ZIO.attemptBlocking(jsm.getLastMessage(streamName, subject)).mapError(NatsError.fromThrowable)
 
   override def deleteMessage(streamName: String, seq: Long): IO[NatsError, Boolean] =
     ZIO.attemptBlocking(jsm.deleteMessage(streamName, seq)).mapError(NatsError.fromThrowable)
