@@ -338,18 +338,20 @@ private[nats] object PurgeSummary {
 }
 
 // ---------------------------------------------------------------------------
-// Key-Value return type
+// Key-Value types
 // ---------------------------------------------------------------------------
 
 /**
- * A single entry in a NATS KV bucket, as returned by [[KeyValue.get]],
- * [[KeyValue.history]], and watch streams.
+ * Raw metadata for a single entry in a NATS KV bucket.
  *
- * @param key       The entry key.
- * @param value     Raw payload bytes. Empty for delete/purge markers.
- * @param revision  The stream sequence number of this entry (monotonically increasing).
- * @param operation Whether this entry is a [[KeyValueOperation.Put]], [[KeyValueOperation.Delete]],
- *                  or [[KeyValueOperation.Purge]] marker.
+ * Embedded in [[KvEnvelope]] to give callers access to revision, operation,
+ * and other server-side metadata alongside the decoded value.
+ *
+ * @param key        The entry key.
+ * @param value      Raw payload bytes. Empty for delete/purge markers.
+ * @param revision   The stream sequence number (monotonically increasing).
+ * @param operation  Whether this entry is a [[KeyValueOperation.Put]],
+ *                   [[KeyValueOperation.Delete]], or [[KeyValueOperation.Purge]] marker.
  * @param bucketName The bucket this entry belongs to.
  */
 final case class KeyValueEntry(
@@ -359,8 +361,8 @@ final case class KeyValueEntry(
   operation: KeyValueOperation,
   bucketName: String
 ) {
-  def valueAsString: String = new String(value.toArray, java.nio.charset.StandardCharsets.UTF_8)
-  def decode[A: NatsCodec]: Either[NatsDecodeError, A] = NatsCodec[A].decode(value)
+  private[nats] def valueAsString: String = new String(value.toArray, java.nio.charset.StandardCharsets.UTF_8)
+  private[nats] def decode[A: NatsCodec]: Either[NatsDecodeError, A] = NatsCodec[A].decode(value)
 }
 
 private[nats] object KeyValueEntry {
@@ -371,6 +373,43 @@ private[nats] object KeyValueEntry {
     operation = KeyValueOperation.fromJava(e.getOperation),
     bucketName = e.getBucket
   )
+}
+
+/**
+ * A decoded Key-Value entry paired with its server-side [[KeyValueEntry]] metadata.
+ *
+ * Returned by [[KeyValue.get]], [[KeyValue.watch]], and [[KeyValue.history]] so
+ * callers have access to both the decoded payload and the entry metadata
+ * (key, revision, operation, bucket name).
+ *
+ * Delete and purge marker entries are never emitted as [[KvEnvelope]]s —
+ * they are silently filtered by the library. Pass `Chunk[Byte]` as the type
+ * parameter to skip decoding and receive raw bytes.
+ *
+ * {{{
+ * kv.watch[UserProfile]("user.42").map { env =>
+ *   // env.value    — the decoded UserProfile
+ *   // env.key      — the KV key ("user.42")
+ *   // env.revision — the stream sequence number
+ *   // env.entry    — full KeyValueEntry with raw bytes and operation
+ * }
+ * }}}
+ *
+ * @param value   The decoded payload.
+ * @param entry   The raw [[KeyValueEntry]] containing metadata and raw bytes.
+ */
+final case class KvEnvelope[+A](value: A, entry: KeyValueEntry) {
+  /** The entry key. */
+  def key: String = entry.key
+
+  /** The stream sequence revision of this entry (monotonically increasing). */
+  def revision: Long = entry.revision
+
+  /** The KV operation. Always [[KeyValueOperation.Put]] for typed results. */
+  def operation: KeyValueOperation = entry.operation
+
+  /** The bucket this entry belongs to. */
+  def bucketName: String = entry.bucketName
 }
 
 // ---------------------------------------------------------------------------
