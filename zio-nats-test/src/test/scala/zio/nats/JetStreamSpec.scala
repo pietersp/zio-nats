@@ -150,6 +150,40 @@ object JetStreamSpec extends ZIOSpecDefault {
       }
     ),
 
+    suite("Ordered Consumer")(
+      test("fetch messages in order") {
+        for {
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- jsm.addStream(StreamConfig("ord-stream", subjects = List("ord.>"), storageType = StorageType.Memory))
+          _   <- js.publish(Subject("ord.1"), "a")
+          _   <- js.publish(Subject("ord.2"), "b")
+          _   <- js.publish(Subject("ord.3"), "c")
+          oc  <- js.orderedConsumer("ord-stream", OrderedConsumerConfig())
+          msgs <- oc
+                    .fetch(FetchOptions(maxMessages = 3, expiresIn = 5.seconds))
+                    .runCollect
+          _ <- jsm.deleteStream("ord-stream")
+        } yield assertTrue(
+          msgs.size == 3,
+          msgs.map(_.dataAsString).toList == List("a", "b", "c")
+        )
+      },
+
+      test("ordered consumer with filter subject") {
+        for {
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- jsm.addStream(StreamConfig("ord-filter-stream", subjects = List("ordf.>"), storageType = StorageType.Memory))
+          _   <- js.publish(Subject("ordf.x"), "x-msg")
+          _   <- js.publish(Subject("ordf.y"), "y-msg")
+          oc  <- js.orderedConsumer("ord-filter-stream", OrderedConsumerConfig(filterSubjects = List("ordf.x")))
+          msg <- oc.next(5.seconds)
+          _   <- jsm.deleteStream("ord-filter-stream")
+        } yield assertTrue(msg.exists(_.dataAsString == "x-msg"))
+      }
+    ),
+
     suite("Consuming (Simplified API)")(
       test("fetch a batch of messages") {
         for {

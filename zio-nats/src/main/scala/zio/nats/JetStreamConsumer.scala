@@ -1,6 +1,6 @@
 package zio.nats
 
-import io.nats.client.{ConsumeOptions, FetchConsumeOptions, ConsumerContext as JConsumerContext}
+import io.nats.client.{BaseConsumerContext as JBaseConsumerContext, ConsumeOptions, FetchConsumeOptions}
 import zio.*
 import zio.stream.*
 
@@ -20,12 +20,12 @@ private[nats] object JetStreamConsumer {
    * should be ack'd or nak'd explicitly.
    *
    * @param consumerCtx
-   *   a JConsumerContext from JetStream.consumerContext
+   *   a JBaseConsumerContext from JetStream.consumerContext
    * @param options
    *   optional ConsumeOptions (batch size, heartbeat interval, etc.)
    */
   def consume(
-    consumerCtx: JConsumerContext,
+    consumerCtx: JBaseConsumerContext,
     options: Option[ConsumeOptions] = None
   ): ZStream[Any, NatsError, JetStreamMessage] =
     ZStream.asyncScoped[Any, NatsError, JetStreamMessage] { emit =>
@@ -49,12 +49,12 @@ private[nats] object JetStreamConsumer {
    * elapses. Each message should be explicitly ack'd.
    *
    * @param consumerCtx
-   *   a JConsumerContext
+   *   a JBaseConsumerContext
    * @param options
    *   FetchConsumeOptions (maxMessages, maxBytes, expiresIn)
    */
   def fetch(
-    consumerCtx: JConsumerContext,
+    consumerCtx: JBaseConsumerContext,
     options: FetchConsumeOptions
   ): ZStream[Any, NatsError, JetStreamMessage] =
     ZStream.unwrapScoped {
@@ -81,14 +81,14 @@ private[nats] object JetStreamConsumer {
    * Pulls are managed automatically. Messages are delivered one-at-a-time.
    *
    * @param consumerCtx
-   *   a JConsumerContext
+   *   a JBaseConsumerContext
    * @param options
    *   optional ConsumeOptions
    * @param pollTimeout
    *   how long each nextMessage() call waits before retrying
    */
   def iterate(
-    consumerCtx: JConsumerContext,
+    consumerCtx: JBaseConsumerContext,
     options: Option[ConsumeOptions] = None,
     pollTimeout: Duration = 5.seconds
   ): ZStream[Any, NatsError, JetStreamMessage] =
@@ -114,7 +114,7 @@ private[nats] object JetStreamConsumer {
     }
 
   def next(
-    consumerCtx: JConsumerContext,
+    consumerCtx: JBaseConsumerContext,
     timeout: Duration = 5.seconds
   ): IO[NatsError, Option[JetStreamMessage]] =
     ZIO

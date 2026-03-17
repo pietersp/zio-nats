@@ -1,6 +1,7 @@
 package zio.nats
 
-import io.nats.client.{ConsumerContext as JConsumerContext, JetStream as JJetStream, StreamContext as JStreamContext}
+import io.nats.client.{JetStream as JJetStream, StreamContext as JStreamContext}
+import zio.nats.configuration.OrderedConsumerConfig
 import zio.*
 
 /** JetStream publishing service. */
@@ -28,6 +29,9 @@ trait JetStream {
 
   /** Get a [[Consumer]] handle for a named durable consumer. */
   def consumer(streamName: String, consumerName: String): IO[NatsError, Consumer]
+
+  /** Get an [[OrderedConsumer]] handle for the given stream. */
+  def orderedConsumer(streamName: String, config: OrderedConsumerConfig): IO[NatsError, OrderedConsumer]
 }
 
 object JetStream {
@@ -43,6 +47,12 @@ object JetStream {
     consumerName: String
   ): ZIO[JetStream, NatsError, Consumer] =
     ZIO.serviceWithZIO[JetStream](_.consumer(streamName, consumerName))
+
+  def orderedConsumer(
+    streamName: String,
+    config: OrderedConsumerConfig
+  ): ZIO[JetStream, NatsError, OrderedConsumer] =
+    ZIO.serviceWithZIO[JetStream](_.orderedConsumer(streamName, config))
 
   /** Create from a [[Nats]] connection. */
   val live: ZLayer[Nats, NatsError, JetStream] =
@@ -98,14 +108,11 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
       .attemptBlocking(js.getConsumerContext(streamName, consumerName))
       .mapBoth(NatsError.fromThrowable, ctx => new ConsumerLive(streamName, consumerName, ctx))
 
+  override def orderedConsumer(streamName: String, config: OrderedConsumerConfig): IO[NatsError, OrderedConsumer] =
+    ZIO
+      .attemptBlocking(js.getStreamContext(streamName).createOrderedConsumer(config.toJava))
+      .mapBoth(NatsError.fromThrowable, ctx => new OrderedConsumerLive(streamName, ctx))
+
   private[nats] def streamContext(streamName: String): IO[NatsError, JStreamContext] =
     ZIO.attemptBlocking(js.getStreamContext(streamName)).mapError(NatsError.fromThrowable)
-
-  private[nats] def consumerContext(
-    streamName: String,
-    consumerName: String
-  ): IO[NatsError, JConsumerContext] =
-    ZIO
-      .attemptBlocking(js.getConsumerContext(streamName, consumerName))
-      .mapError(NatsError.fromThrowable)
 }

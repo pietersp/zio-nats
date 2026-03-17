@@ -1,6 +1,6 @@
 package zio.nats
 
-import io.nats.client.ConsumerContext as JConsumerContext
+import io.nats.client.{BaseConsumerContext as JBaseConsumerContext, ConsumerContext as JConsumerContext, OrderedConsumerContext as JOrderedConsumerContext}
 import zio.*
 import zio.stream.*
 
@@ -18,10 +18,53 @@ trait Consumer {
   def next(timeout: Duration = 5.seconds): IO[NatsError, Option[JetStreamMessage]]
 }
 
+/**
+ * Consumer handle for an ordered consumer.
+ *
+ * Ordered consumers guarantee strict in-order delivery and automatically
+ * re-create themselves on the server on reconnect or sequence gaps.
+ * The underlying consumer name may change between calls; use
+ * [[currentConsumerName]] to inspect it.
+ */
+trait OrderedConsumer {
+  def streamName: String
+
+  /** The current server-side consumer name. Returns None until the first fetch/consume. */
+  def currentConsumerName: Option[String]
+
+  def fetch(options: FetchOptions = FetchOptions.default): ZStream[Any, NatsError, JetStreamMessage]
+  def consume(options: ConsumeOptions = ConsumeOptions.default): ZStream[Any, NatsError, JetStreamMessage]
+  def iterate(
+    options: ConsumeOptions = ConsumeOptions.default,
+    pollTimeout: Duration = 5.seconds
+  ): ZStream[Any, NatsError, JetStreamMessage]
+  def next(timeout: Duration = 5.seconds): IO[NatsError, Option[JetStreamMessage]]
+}
+
+private[nats] final class OrderedConsumerLive(
+  val streamName: String,
+  ctx: JOrderedConsumerContext
+) extends OrderedConsumer {
+
+  override def currentConsumerName: Option[String] = Option(ctx.getConsumerName)
+
+  def fetch(options: FetchOptions): ZStream[Any, NatsError, JetStreamMessage] =
+    JetStreamConsumer.fetch(ctx, options.toJava)
+
+  def consume(options: ConsumeOptions): ZStream[Any, NatsError, JetStreamMessage] =
+    JetStreamConsumer.consume(ctx, Some(options.toJava))
+
+  def iterate(options: ConsumeOptions, pollTimeout: Duration): ZStream[Any, NatsError, JetStreamMessage] =
+    JetStreamConsumer.iterate(ctx, Some(options.toJava), pollTimeout)
+
+  def next(timeout: Duration): IO[NatsError, Option[JetStreamMessage]] =
+    JetStreamConsumer.next(ctx, timeout)
+}
+
 private[nats] final class ConsumerLive(
   val streamName: String,
   val consumerName: String,
-  ctx: JConsumerContext
+  ctx: JBaseConsumerContext
 ) extends Consumer {
 
   def fetch(options: FetchOptions): ZStream[Any, NatsError, JetStreamMessage] =

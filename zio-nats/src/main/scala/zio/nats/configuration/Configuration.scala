@@ -11,6 +11,7 @@ import io.nats.client.api.{
   ConsumerConfiguration as JConsumerConfiguration,
   KeyValueConfiguration as JKeyValueConfiguration,
   ObjectStoreConfiguration as JObjectStoreConfiguration,
+  OrderedConsumerConfiguration as JOrderedConsumerConfiguration,
   StreamConfiguration as JStreamConfiguration
 }
 import zio.Duration
@@ -211,6 +212,46 @@ object KeyValueConfig {
     config.limitMarkerTtl.foreach(d => builder.limitMarker(java.time.Duration.ofMillis(d.toMillis)))
 
     builder.build()
+  }
+}
+
+/**
+ * Configuration for an ordered consumer.
+ *
+ * Ordered consumers automatically re-create themselves on the server on reconnect or
+ * sequence gaps, ensuring strict in-order delivery without manual ack.
+ *
+ * @param filterSubjects  Subjects to filter on (default: all subjects in the stream).
+ * @param deliverPolicy   Where to start delivering (default: last per subject).
+ * @param startSequence   Starting stream sequence (used with DeliverPolicy.ByStartSequence).
+ * @param startTime       Starting time (used with DeliverPolicy.ByStartTime).
+ * @param replayPolicy    Replay policy (default: Instant).
+ * @param headersOnly     Deliver only headers, skip message bodies.
+ * @param consumerNamePrefix  Prefix for the auto-generated consumer name.
+ */
+case class OrderedConsumerConfig(
+  filterSubjects: List[String] = Nil,
+  deliverPolicy: Option[DeliverPolicy] = None,
+  startSequence: Option[Long] = None,
+  startTime: Option[java.time.ZonedDateTime] = None,
+  replayPolicy: Option[ReplayPolicy] = None,
+  headersOnly: Boolean = false,
+  consumerNamePrefix: Option[String] = None
+) {
+  def toJava: JOrderedConsumerConfiguration = OrderedConsumerConfig.toJava(this)
+}
+
+object OrderedConsumerConfig {
+  def toJava(config: OrderedConsumerConfig): JOrderedConsumerConfiguration = {
+    val occ = new JOrderedConsumerConfiguration()
+    if (config.filterSubjects.nonEmpty) occ.filterSubjects(config.filterSubjects.asJava)
+    config.deliverPolicy.foreach(occ.deliverPolicy)
+    config.startSequence.foreach(s => occ.startSequence(s))
+    config.startTime.foreach(t => occ.startTime(t))
+    config.replayPolicy.foreach(occ.replayPolicy)
+    if (config.headersOnly) occ.headersOnly(true)
+    config.consumerNamePrefix.foreach(occ.consumerNamePrefix)
+    occ
   }
 }
 

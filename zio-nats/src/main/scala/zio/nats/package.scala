@@ -77,4 +77,6 @@ package object nats {
   val KeyValueConfig = configuration.KeyValueConfig
   type ObjectStoreConfig = configuration.ObjectStoreConfig
   val ObjectStoreConfig = configuration.ObjectStoreConfig
+  type OrderedConsumerConfig = configuration.OrderedConsumerConfig
+  val OrderedConsumerConfig = configuration.OrderedConsumerConfig
 }
