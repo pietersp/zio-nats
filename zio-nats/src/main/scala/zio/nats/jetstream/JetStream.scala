@@ -3,7 +3,6 @@ package zio.nats.jetstream
 import io.nats.client.{JetStream as JJetStream, StreamContext as JStreamContext}
 import zio.*
 import zio.nats.{Nats, NatsCodec, NatsError, NatsMessage, Subject}
-import zio.nats.configuration.OrderedConsumerConfig
 
 /**
  * JetStream publishing service.

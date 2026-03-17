@@ -114,19 +114,18 @@ package object nats {
     @scala.annotation.targetName("objectDataPayload")
     def payload: ZIO[R, E, A] = zio.map(_.value)
 
-  // --- Config class re-exports (users don't need zio.nats.configuration._) ---
-  type StreamConfig = configuration.StreamConfig
-  val StreamConfig = configuration.StreamConfig
-  type ConsumerConfig = configuration.ConsumerConfig
-  val ConsumerConfig = configuration.ConsumerConfig
-  type KeyValueConfig = configuration.KeyValueConfig
-  val KeyValueConfig = configuration.KeyValueConfig
-  type ObjectStoreConfig = configuration.ObjectStoreConfig
-  val ObjectStoreConfig = configuration.ObjectStoreConfig
-  type OrderedConsumerConfig = configuration.OrderedConsumerConfig
-  val OrderedConsumerConfig = configuration.OrderedConsumerConfig
-  type RepublishConfig = configuration.RepublishConfig
-  val RepublishConfig = configuration.RepublishConfig
+  // --- JetStream config re-exports ---
+  type StreamConfig          = jetstream.StreamConfig;          val StreamConfig          = jetstream.StreamConfig
+  type ConsumerConfig        = jetstream.ConsumerConfig;        val ConsumerConfig        = jetstream.ConsumerConfig
+  type OrderedConsumerConfig = jetstream.OrderedConsumerConfig; val OrderedConsumerConfig = jetstream.OrderedConsumerConfig
+  type MirrorConfig          = jetstream.MirrorConfig;          val MirrorConfig          = jetstream.MirrorConfig
+  type SourceConfig          = jetstream.SourceConfig;          val SourceConfig          = jetstream.SourceConfig
+  type ExternalConfig        = jetstream.ExternalConfig;        val ExternalConfig        = jetstream.ExternalConfig
+  // --- KV config re-exports ---
+  type KeyValueConfig  = kv.KeyValueConfig;  val KeyValueConfig  = kv.KeyValueConfig
+  type RepublishConfig = kv.RepublishConfig; val RepublishConfig = kv.RepublishConfig
+  // --- ObjectStore config re-exports ---
+  type ObjectStoreConfig = objectstore.ObjectStoreConfig; val ObjectStoreConfig = objectstore.ObjectStoreConfig
 
   // ---- JetStream re-exports (users don't need zio.nats.jetstream._) ----
   type JetStream           = jetstream.JetStream;           val JetStream           = jetstream.JetStream

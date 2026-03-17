@@ -4,7 +4,6 @@ import io.nats.client.api.{ObjectInfo as JObjectInfo, ObjectStoreWatcher as JObj
 import io.nats.client.{ObjectStore as JObjectStore, ObjectStoreManagement as JObjectStoreManagement}
 import zio.*
 import zio.nats.{Nats, NatsCodec, NatsError}
-import zio.nats.configuration.ObjectStoreConfig
 import zio.stream.*
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, PipedInputStream, PipedOutputStream}

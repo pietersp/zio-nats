@@ -1,4 +1,4 @@
-package zio.nats.configuration
+package zio.nats.jetstream
 
 import io.nats.client.api.{
   AckPolicy,
@@ -11,8 +11,6 @@ import io.nats.client.api.{
   ReplayPolicy,
   Source,
   ConsumerConfiguration as JConsumerConfiguration,
-  KeyValueConfiguration as JKeyValueConfiguration,
-  ObjectStoreConfiguration as JObjectStoreConfiguration,
   OrderedConsumerConfiguration as JOrderedConsumerConfiguration,
   StreamConfiguration as JStreamConfiguration
 }
@@ -20,6 +18,51 @@ import zio.Duration
 import zio.nats.StorageType
 
 import scala.jdk.CollectionConverters.*
+
+// ---------------------------------------------------------------------------
+// Shared structural types (used by both StreamConfig and KeyValueConfig)
+// ---------------------------------------------------------------------------
+
+/**
+ * Configures a stream to mirror another stream.
+ *
+ * @param name          The name of the stream to mirror.
+ * @param filterSubject Restrict mirroring to messages on this subject.
+ * @param external      External stream reference (for cross-account mirroring).
+ */
+case class MirrorConfig(
+  name: String,
+  filterSubject: Option[String] = None,
+  external: Option[ExternalConfig] = None
+)
+
+/**
+ * Configures an aggregate source stream to pull from.
+ *
+ * @param name          The source stream name.
+ * @param filterSubject Restrict sourcing to messages on this subject.
+ * @param external      External stream reference (for cross-account aggregation).
+ */
+case class SourceConfig(
+  name: String,
+  filterSubject: Option[String] = None,
+  external: Option[ExternalConfig] = None
+)
+
+/**
+ * External API reference for cross-account stream mirroring or sourcing.
+ *
+ * @param api     The JetStream API prefix subject of the external account.
+ * @param deliver The delivery subject prefix used for the external subscription.
+ */
+case class ExternalConfig(
+  api: String,
+  deliver: String
+)
+
+// ---------------------------------------------------------------------------
+// StreamConfig
+// ---------------------------------------------------------------------------
 
 /**
  * Configuration for a JetStream stream.
@@ -79,57 +122,6 @@ case class StreamConfig(
   def toJava: JStreamConfiguration = StreamConfig.toJava(this)
 }
 
-/**
- * Configures a stream to mirror another stream.
- *
- * @param name          The name of the stream to mirror.
- * @param filterSubject Restrict mirroring to messages on this subject.
- * @param external      External stream reference (for cross-account mirroring).
- */
-case class MirrorConfig(
-  name: String,
-  filterSubject: Option[String] = None,
-  external: Option[ExternalConfig] = None
-)
-
-/**
- * Configures an aggregate source stream to pull from.
- *
- * @param name          The source stream name.
- * @param filterSubject Restrict sourcing to messages on this subject.
- * @param external      External stream reference (for cross-account aggregation).
- */
-case class SourceConfig(
-  name: String,
-  filterSubject: Option[String] = None,
-  external: Option[ExternalConfig] = None
-)
-
-/**
- * External API reference for cross-account stream mirroring or sourcing.
- *
- * @param api     The JetStream API prefix subject of the external account.
- * @param deliver The delivery subject prefix used for the external subscription.
- */
-case class ExternalConfig(
-  api: String,
-  deliver: String
-)
-
-/**
- * Republish configuration — re-publishes messages from a stream to another
- * subject after they are stored.
- *
- * @param source      Subject filter matching the published subject.
- * @param destination Subject template for the re-published message.
- * @param headersOnly If true, re-publish only headers (no body).
- */
-case class RepublishConfig(
-  source: String,
-  destination: String,
-  headersOnly: Boolean = false
-)
-
 object StreamConfig {
   def apply(name: String, subjects: String*): StreamConfig =
     StreamConfig(name = name, subjects = subjects.toList)
@@ -181,6 +173,10 @@ object StreamConfig {
     builder.build()
   }
 }
+
+// ---------------------------------------------------------------------------
+// ConsumerConfig
+// ---------------------------------------------------------------------------
 
 /**
  * Configuration for a JetStream consumer.
@@ -289,84 +285,9 @@ object ConsumerConfig {
   }
 }
 
-/**
- * Configuration for a NATS KV bucket.
- *
- * @param name              Unique bucket name.
- * @param description       Optional human-readable description.
- * @param maxValueSize      Maximum size of a single value in bytes (-1 = unlimited).
- * @param maxBucketSize     Maximum total bytes for the bucket (-1 = unlimited).
- * @param maxHistoryPerKey  Maximum revisions to keep per key (-1 = unlimited).
- * @param storageType       File or Memory storage.
- * @param compression       Enable server-side compression.
- * @param numberOfReplicas  Number of server replicas (default: 1).
- * @param ttl               Default TTL for all entries (server must support per-message TTL).
- * @param limitMarkerTtl    TTL applied to delete/purge tombstone markers.
- * @param mirror            Mirror another KV bucket into this one.
- * @param sources           Aggregate entries from other KV buckets.
- * @param republish         Re-publish stored entries to another subject.
- */
-case class KeyValueConfig(
-  name: String,
-  description: Option[String] = None,
-  maxValueSize: Long = -1,
-  maxBucketSize: Long = -1,
-  maxHistoryPerKey: Int = -1,
-  storageType: StorageType = StorageType.File,
-  compression: Boolean = false,
-  numberOfReplicas: Int = 1,
-  ttl: Option[Duration] = None,
-  limitMarkerTtl: Option[Duration] = None,
-  mirror: Option[MirrorConfig] = None,
-  sources: List[SourceConfig] = Nil,
-  republish: Option[RepublishConfig] = None
-) {
-  def toJava: JKeyValueConfiguration = KeyValueConfig.toJava(this)
-}
-
-object KeyValueConfig {
-  def apply(name: String): KeyValueConfig = new KeyValueConfig(name = name)
-
-  def toJava(config: KeyValueConfig): JKeyValueConfiguration = {
-    val builder = JKeyValueConfiguration
-      .builder()
-      .name(config.name)
-      .storageType(config.storageType.toJava)
-      .compression(config.compression)
-      .replicas(config.numberOfReplicas)
-
-    config.description.foreach(d => builder.description(d))
-    if (config.maxValueSize > 0) builder.maxValueSize(config.maxValueSize)
-    if (config.maxBucketSize > 0) builder.maxBucketSize(config.maxBucketSize)
-    if (config.maxHistoryPerKey > 0) builder.maxHistoryPerKey(config.maxHistoryPerKey)
-    config.ttl.foreach(d => builder.ttl(java.time.Duration.ofMillis(d.toMillis)))
-    config.limitMarkerTtl.foreach(d => builder.limitMarker(java.time.Duration.ofMillis(d.toMillis)))
-
-    config.mirror.foreach { m =>
-      val mb = Mirror.builder().name(m.name)
-      m.filterSubject.foreach(s => mb.filterSubject(s))
-      m.external.foreach { ext =>
-        mb.external(External.builder().api(ext.api).deliver(ext.deliver).build())
-      }
-      builder.mirror(mb.build())
-    }
-
-    config.sources.foreach { s =>
-      val sb = Source.builder().name(s.name)
-      s.filterSubject.foreach(f => sb.filterSubject(f))
-      s.external.foreach { ext =>
-        sb.external(External.builder().api(ext.api).deliver(ext.deliver).build())
-      }
-      builder.sources(sb.build())
-    }
-
-    config.republish.foreach { r =>
-      builder.republish(Republish.builder().source(r.source).destination(r.destination).headersOnly(r.headersOnly).build())
-    }
-
-    builder.build()
-  }
-}
+// ---------------------------------------------------------------------------
+// OrderedConsumerConfig
+// ---------------------------------------------------------------------------
 
 /**
  * Configuration for an ordered consumer.
@@ -374,12 +295,12 @@ object KeyValueConfig {
  * Ordered consumers automatically re-create themselves on the server on reconnect or
  * sequence gaps, ensuring strict in-order delivery without manual ack.
  *
- * @param filterSubjects  Subjects to filter on (default: all subjects in the stream).
- * @param deliverPolicy   Where to start delivering (default: last per subject).
- * @param startSequence   Starting stream sequence (used with DeliverPolicy.ByStartSequence).
- * @param startTime       Starting time (used with DeliverPolicy.ByStartTime).
- * @param replayPolicy    Replay policy (default: Instant).
- * @param headersOnly     Deliver only headers, skip message bodies.
+ * @param filterSubjects      Subjects to filter on (default: all subjects in the stream).
+ * @param deliverPolicy       Where to start delivering (default: last per subject).
+ * @param startSequence       Starting stream sequence (used with DeliverPolicy.ByStartSequence).
+ * @param startTime           Starting time (used with DeliverPolicy.ByStartTime).
+ * @param replayPolicy        Replay policy (default: Instant).
+ * @param headersOnly         Deliver only headers, skip message bodies.
  * @param consumerNamePrefix  Prefix for the auto-generated consumer name.
  */
 case class OrderedConsumerConfig(
@@ -405,41 +326,5 @@ object OrderedConsumerConfig {
     if (config.headersOnly) occ.headersOnly(true)
     config.consumerNamePrefix.foreach(occ.consumerNamePrefix)
     occ
-  }
-}
-
-/**
- * Configuration for a NATS Object Store bucket.
- *
- * @param name           Unique bucket name.
- * @param description    Optional human-readable description.
- * @param maxBucketSize  Maximum total bytes for the bucket (-1 = unlimited).
- * @param storageType    File or Memory storage.
- * @param ttl            Default TTL for all objects in the bucket.
- */
-case class ObjectStoreConfig(
-  name: String,
-  description: Option[String] = None,
-  maxBucketSize: Long = -1,
-  storageType: StorageType = StorageType.File,
-  ttl: Option[Duration] = None
-) {
-  def toJava: JObjectStoreConfiguration = ObjectStoreConfig.toJava(this)
-}
-
-object ObjectStoreConfig {
-  def apply(name: String): ObjectStoreConfig = new ObjectStoreConfig(name = name)
-
-  def toJava(config: ObjectStoreConfig): JObjectStoreConfiguration = {
-    val builder = JObjectStoreConfiguration
-      .builder()
-      .name(config.name)
-      .storageType(config.storageType.toJava)
-
-    config.description.foreach(d => builder.description(d))
-    if (config.maxBucketSize > 0) builder.maxBucketSize(config.maxBucketSize)
-    config.ttl.foreach(d => builder.ttl(java.time.Duration.ofMillis(d.toMillis)))
-
-    builder.build()
   }
 }

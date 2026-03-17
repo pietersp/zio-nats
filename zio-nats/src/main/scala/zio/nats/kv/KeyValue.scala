@@ -4,7 +4,6 @@ import io.nats.client.api.{KeyResult as JKeyResult, KeyValueEntry as JKeyValueEn
 import io.nats.client.{KeyValue as JKeyValue, KeyValueManagement as JKeyValueManagement, MessageTtl}
 import zio.*
 import zio.nats.{Nats, NatsCodec, NatsError}
-import zio.nats.configuration.KeyValueConfig
 import zio.stream.*
 
 import scala.jdk.CollectionConverters.*

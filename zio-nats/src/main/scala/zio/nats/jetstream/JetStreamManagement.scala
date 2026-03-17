@@ -4,7 +4,6 @@ import io.nats.client.api.*
 import io.nats.client.{PurgeOptions, JetStreamManagement as JJetStreamManagement}
 import zio.*
 import zio.nats.{Nats, NatsError}
-import zio.nats.configuration.{ConsumerConfig, StreamConfig}
 
 import scala.jdk.CollectionConverters.*
 

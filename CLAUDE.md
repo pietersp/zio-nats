@@ -88,11 +88,10 @@ The library uses sub-packages for each feature area. Everything is re-exported f
 
 ```
 zio.nats
-├── jetstream/          JetStream service, management, consumer, and models
-├── kv/                 Key-Value service, management, and models
-├── objectstore/        Object Store service, management, and models
-├── configuration/      StreamConfig, ConsumerConfig, KVConfig, OSConfig
-└── config/             NatsConfig (connection settings)
+├── jetstream/          JetStream service, management, consumer, models, and config
+├── kv/                 Key-Value service, management, models, and config
+├── objectstore/        Object Store service, management, models, and config
+└── config/             NatsConfig (connection settings only)
 ```
 
 Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-exporting an opaque type as a plain alias strips its opacity — so they stay in `zio.nats`.
@@ -114,11 +113,13 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | `zio-nats/src/main/scala/zio/nats/jetstream/Consumer.scala` | `Consumer`, `OrderedConsumer` traits + live impls |
 | `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamMessage.scala` | `JetStreamMessage` with ack operations |
 | `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamModels.scala` | `JsEnvelope`, `PublishAck`, `PublishOptions`, `FetchOptions`, `ConsumeOptions`, summaries, etc. |
+| `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamConfig.scala` | `StreamConfig`, `ConsumerConfig`, `OrderedConsumerConfig`, `MirrorConfig`, `SourceConfig`, `ExternalConfig` |
 | `zio-nats/src/main/scala/zio/nats/kv/KeyValue.scala` | KV service + management |
 | `zio-nats/src/main/scala/zio/nats/kv/KeyValueModels.scala` | `KeyValueEntry`, `KvEnvelope`, `KvEvent`, `KeyValueOperation`, watch options, bucket status |
+| `zio-nats/src/main/scala/zio/nats/kv/KeyValueConfig.scala` | `KeyValueConfig`, `RepublishConfig` |
 | `zio-nats/src/main/scala/zio/nats/objectstore/ObjectStore.scala` | ObjectStore service + management |
 | `zio-nats/src/main/scala/zio/nats/objectstore/ObjectStoreModels.scala` | `ObjectMeta`, `ObjectData`, `ObjectSummary`, watch options, bucket status |
-| `zio-nats/src/main/scala/zio/nats/config/NatsConfig.scala` | Connection config |
-| `zio-nats/src/main/scala/zio/nats/configuration/Configuration.scala` | Stream/Consumer/KV/ObjectStore config |
+| `zio-nats/src/main/scala/zio/nats/objectstore/ObjectStoreConfig.scala` | `ObjectStoreConfig` |
+| `zio-nats/src/main/scala/zio/nats/config/NatsConfig.scala` | Connection config (host, port, TLS, reconnect) |
 | `zio-nats/src/main/scala/zio/nats/package.scala` | Type aliases (`NatsIO[A]`), all sub-package re-exports |
 | `zio-nats-testkit/src/main/scala/zio/nats/NatsTestLayers.scala` | Test layers (Docker NATS) |
