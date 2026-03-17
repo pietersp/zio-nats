@@ -24,13 +24,24 @@ case class StreamConfig(
   description: Option[String] = None,
   maxBytes: Long = -1,
   maxMsgSize: Long = -1,
+  maxMsgs: Long = -1,
+  maxMsgsPerSubject: Long = -1,
+  maxAge: Option[Duration] = None,
+  duplicateWindow: Option[Duration] = None,
   storageType: StorageType = StorageType.File,
   discardPolicy: io.nats.client.api.DiscardPolicy = io.nats.client.api.DiscardPolicy.Old,
   retentionPolicy: io.nats.client.api.RetentionPolicy = io.nats.client.api.RetentionPolicy.Limits,
   compressionOption: CompressionOption = CompressionOption.None,
   numberOfReplicas: Int = 1,
   mirror: Option[MirrorConfig] = None,
-  sources: List[SourceConfig] = Nil
+  sources: List[SourceConfig] = Nil,
+  allowRollupHeaders: Boolean = false,
+  denyDelete: Boolean = false,
+  denyPurge: Boolean = false,
+  allowDirect: Boolean = false,
+  mirrorDirect: Boolean = false,
+  isSealed: Boolean = false,
+  firstSequence: Long = -1
 ) {
   def toJava: JStreamConfiguration = StreamConfig.toJava(this)
 }
@@ -70,6 +81,17 @@ object StreamConfig {
     config.description.foreach(d => builder.description(d))
     if (config.maxBytes > 0) builder.maxBytes(config.maxBytes)
     if (config.maxMsgSize > 0) builder.maxMsgSize(config.maxMsgSize)
+    if (config.maxMsgs > 0) builder.maxMessages(config.maxMsgs)
+    if (config.maxMsgsPerSubject > 0) builder.maxMessagesPerSubject(config.maxMsgsPerSubject)
+    config.maxAge.foreach(d => builder.maxAge(java.time.Duration.ofMillis(d.toMillis)))
+    config.duplicateWindow.foreach(d => builder.duplicateWindow(java.time.Duration.ofMillis(d.toMillis)))
+    if (config.allowRollupHeaders) builder.allowRollup(true)
+    if (config.denyDelete) builder.denyDelete(true)
+    if (config.denyPurge) builder.denyPurge(true)
+    if (config.allowDirect) builder.allowDirect(true)
+    if (config.mirrorDirect) builder.mirrorDirect(true)
+    if (config.isSealed) builder.seal()
+    if (config.firstSequence > 0) builder.firstSequence(config.firstSequence)
 
     config.mirror.foreach { mirror =>
       val mirrorBuilder = Mirror.builder().name(mirror.name)

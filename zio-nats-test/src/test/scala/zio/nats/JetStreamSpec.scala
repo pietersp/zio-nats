@@ -30,6 +30,65 @@ object JetStreamSpec extends ZIOSpecDefault {
         )
       },
 
+      test("maxMsgs limits the number of retained messages") {
+        for {
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- jsm.addStream(
+                   StreamConfig(
+                     name = "maxmsgs-stream",
+                     subjects = List("maxmsgs.>"),
+                     storageType = StorageType.Memory,
+                     maxMsgs = 2
+                   )
+                 )
+          _ <- js.publish(Subject("maxmsgs.1"), "a")
+          _ <- js.publish(Subject("maxmsgs.2"), "b")
+          _ <- js.publish(Subject("maxmsgs.3"), "c")
+          info <- jsm.getStreamInfo("maxmsgs-stream")
+          _    <- jsm.deleteStream("maxmsgs-stream")
+        } yield assertTrue(info.messageCount == 2L)
+      },
+
+      test("maxMsgsPerSubject caps messages per subject") {
+        for {
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- jsm.addStream(
+                   StreamConfig(
+                     name = "maxpersub-stream",
+                     subjects = List("maxpersub.>"),
+                     storageType = StorageType.Memory,
+                     maxMsgsPerSubject = 1
+                   )
+                 )
+          _ <- js.publish(Subject("maxpersub.a"), "v1")
+          _ <- js.publish(Subject("maxpersub.a"), "v2")
+          _ <- js.publish(Subject("maxpersub.b"), "v1")
+          info <- jsm.getStreamInfo("maxpersub-stream")
+          _    <- jsm.deleteStream("maxpersub-stream")
+        } yield assertTrue(info.messageCount == 2L)
+      },
+
+      test("duplicateWindow controls the dedup window") {
+        for {
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- jsm.addStream(
+                   StreamConfig(
+                     name = "dupewin-stream",
+                     subjects = List("dupewin.>"),
+                     storageType = StorageType.Memory,
+                     duplicateWindow = Some(30.seconds)
+                   )
+                 )
+          opts  = JsPublishParams(options = Some(PublishOptions(messageId = Some("dw-1"))))
+          ack1 <- js.publish(Subject("dupewin.test"), "first", opts)
+          ack2 <- js.publish(Subject("dupewin.test"), "first", opts)
+          _    <- jsm.deleteStream("dupewin-stream")
+        } yield assertTrue(!ack1.isDuplicate, ack2.isDuplicate)
+      },
+
       test("add and list consumers") {
         for {
           jsm  <- ZIO.service[JetStreamManagement]
