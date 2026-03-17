@@ -23,17 +23,11 @@ trait KeyValue {
 
   // --- Conditional writes ---
   /**
-   * Put if the key does not exist (returns revision or fails with
-   * JetStreamApiError). Pass `Chunk[Byte]` or `String` for raw/text writes.
+   * Put only if the key does not exist (returns revision or fails with
+   * JetStreamApiError). Pass an optional per-entry `ttl` (minimum 1 second;
+   * the bucket must have been created with a TTL to use this).
    */
-  def create[A: NatsCodec](key: String, value: A): IO[NatsError, Long]
-
-  /**
-   * Put if the key does not exist, with a per-entry TTL (minimum 1 second).
-   * The bucket must have been created with a TTL to use this. Returns revision
-   * or fails with JetStreamApiError.
-   */
-  def create[A: NatsCodec](key: String, value: A, ttl: Duration): IO[NatsError, Long]
+  def create[A: NatsCodec](key: String, value: A, ttl: Option[Duration] = None): IO[NatsError, Long]
 
   /**
    * Compare-and-swap: update only if current revision matches expectedRevision.
@@ -42,72 +36,47 @@ trait KeyValue {
   def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): IO[NatsError, Long]
 
   // --- Delete / Purge ---
-  /** Soft-delete: places a delete marker. History is preserved. */
-  def delete(key: String): IO[NatsError, Unit]
+  /**
+   * Soft-delete: places a delete marker. History is preserved.
+   * Pass `expectedRevision` to guard the delete (fails with JetStreamApiError
+   * on mismatch).
+   */
+  def delete(key: String, expectedRevision: Option[Long] = None): IO[NatsError, Unit]
 
   /**
-   * Soft-delete only if the current revision matches `expectedRevision`.
-   * Fails with JetStreamApiError on revision mismatch.
+   * Hard-purge: removes all history for the key.
+   * Pass `expectedRevision` to guard the purge, and/or `markerTtl` to set a
+   * TTL on the resulting tombstone marker (bucket must support TTL).
    */
-  def delete(key: String, expectedRevision: Long): IO[NatsError, Unit]
-
-  /** Hard-purge: removes all history for the key. */
-  def purge(key: String): IO[NatsError, Unit]
-
-  /**
-   * Hard-purge only if the current revision matches `expectedRevision`.
-   * Fails with JetStreamApiError on revision mismatch.
-   */
-  def purge(key: String, expectedRevision: Long): IO[NatsError, Unit]
-
-  /**
-   * Hard-purge and set a TTL on the resulting tombstone marker.
-   * The bucket must have been created with TTL support.
-   */
-  def purge(key: String, markerTtl: Duration): IO[NatsError, Unit]
-
-  /**
-   * Hard-purge with both a revision guard and a tombstone TTL.
-   */
-  def purge(key: String, expectedRevision: Long, markerTtl: Duration): IO[NatsError, Unit]
+  def purge(
+    key: String,
+    expectedRevision: Option[Long] = None,
+    markerTtl: Option[Duration] = None
+  ): IO[NatsError, Unit]
 
   // --- Watch ---
-  /** Stream changes for a specific key. Never completes unless interrupted. */
-  def watch(key: String): ZStream[Any, NatsError, KeyValueEntry]
+  /** Stream changes for a specific key with optional watch options. */
+  def watch(key: String, options: KeyValueWatchOptions = KeyValueWatchOptions.default): ZStream[Any, NatsError, KeyValueEntry]
 
-  /** Stream changes for a specific key with watch options (filtering, start position). */
-  def watch(key: String, options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry]
+  /** Stream changes for multiple keys with optional watch options. */
+  def watch(keys: List[String], options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry]
 
-  /** Stream changes for multiple keys with watch options. */
-  def watch(keys: List[String], options: KeyValueWatchOptions = KeyValueWatchOptions.default): ZStream[Any, NatsError, KeyValueEntry]
-
-  /** Stream changes for all keys in the bucket. */
-  def watchAll: ZStream[Any, NatsError, KeyValueEntry]
-
-  /** Stream changes for all keys in the bucket with watch options (filtering, start position). */
-  def watchAll(options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry]
+  /** Stream changes for all keys in the bucket with optional watch options. */
+  def watchAll(options: KeyValueWatchOptions = KeyValueWatchOptions.default): ZStream[Any, NatsError, KeyValueEntry]
 
   // --- Delete / tombstone cleanup ---
   /**
-   * Remove all tombstone (delete/purge marker) entries older than the default
-   * threshold (30 minutes). Use [[purgeDeletes(threshold)]] to override.
-   */
-  def purgeDeletes(): IO[NatsError, Unit]
-
-  /**
-   * Remove tombstone entries older than `threshold`. Pass `Duration.Zero` to
-   * use the server default (30 minutes); pass a negative duration to remove
+   * Remove tombstone (delete/purge marker) entries. Pass `None` to use the
+   * server default threshold (30 minutes); pass a negative duration to remove
    * ALL markers regardless of age.
    */
-  def purgeDeletes(threshold: Duration): IO[NatsError, Unit]
+  def purgeDeletes(threshold: Option[Duration] = None): IO[NatsError, Unit]
 
   // --- Enumeration ---
+  /** List all keys in the bucket. */
   def keys: IO[NatsError, List[String]]
 
-  /** List keys matching a subject filter (e.g. "foo.*"). */
-  def keys(filter: String): IO[NatsError, List[String]]
-
-  /** List keys matching any of the given subject filters. */
+  /** List keys matching any of the given subject filters (e.g. `List("foo.*")`). */
   def keys(filters: List[String]): IO[NatsError, List[String]]
 
   /**
@@ -115,9 +84,6 @@ trait KeyValue {
    * buckets — the stream completes when all keys have been delivered.
    */
   def consumeKeys(): ZStream[Any, NatsError, String]
-
-  /** Stream keys matching a subject filter (e.g. "foo.*"). */
-  def consumeKeys(filter: String): ZStream[Any, NatsError, String]
 
   /** Stream keys matching any of the given subject filters. */
   def consumeKeys(filters: List[String]): ZStream[Any, NatsError, String]
@@ -153,10 +119,7 @@ object KeyValue {
   def put[A: NatsCodec](key: String, value: A): ZIO[KeyValue, NatsError, Long] =
     ZIO.serviceWithZIO[KeyValue](_.put(key, value))
 
-  def create[A: NatsCodec](key: String, value: A): ZIO[KeyValue, NatsError, Long] =
-    ZIO.serviceWithZIO[KeyValue](_.create(key, value))
-
-  def create[A: NatsCodec](key: String, value: A, ttl: Duration): ZIO[KeyValue, NatsError, Long] =
+  def create[A: NatsCodec](key: String, value: A, ttl: Option[Duration] = None): ZIO[KeyValue, NatsError, Long] =
     ZIO.serviceWithZIO[KeyValue](_.create(key, value, ttl))
 
   def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): ZIO[KeyValue, NatsError, Long] =
@@ -199,48 +162,42 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
   override def put[A: NatsCodec](key: String, value: A): IO[NatsError, Long] =
     ZIO.attemptBlocking(kv.put(key, NatsCodec[A].encode(value).toArray)).mapError(NatsError.fromThrowable)
 
-  override def create[A: NatsCodec](key: String, value: A): IO[NatsError, Long] =
-    ZIO.attemptBlocking(kv.create(key, NatsCodec[A].encode(value).toArray)).mapError(NatsError.fromThrowable)
-
-  override def create[A: NatsCodec](key: String, value: A, ttl: Duration): IO[NatsError, Long] =
-    ZIO
-      .attemptBlocking(kv.create(key, NatsCodec[A].encode(value).toArray, MessageTtl.seconds(ttl.toSeconds.toInt)))
-      .mapError(NatsError.fromThrowable)
+  override def create[A: NatsCodec](key: String, value: A, ttl: Option[Duration] = None): IO[NatsError, Long] = {
+    val bytes = NatsCodec[A].encode(value).toArray
+    ttl match {
+      case None    => ZIO.attemptBlocking(kv.create(key, bytes)).mapError(NatsError.fromThrowable)
+      case Some(d) => ZIO.attemptBlocking(kv.create(key, bytes, MessageTtl.seconds(d.toSeconds.toInt))).mapError(NatsError.fromThrowable)
+    }
+  }
 
   override def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): IO[NatsError, Long] =
     ZIO.attemptBlocking(kv.update(key, NatsCodec[A].encode(value).toArray, expectedRevision)).mapError(NatsError.fromThrowable)
 
-  override def delete(key: String): IO[NatsError, Unit] =
-    ZIO.attemptBlocking(kv.delete(key)).mapError(NatsError.fromThrowable)
+  override def delete(key: String, expectedRevision: Option[Long] = None): IO[NatsError, Unit] =
+    expectedRevision match {
+      case None      => ZIO.attemptBlocking(kv.delete(key)).mapError(NatsError.fromThrowable)
+      case Some(rev) => ZIO.attemptBlocking(kv.delete(key, rev)).mapError(NatsError.fromThrowable)
+    }
 
-  override def delete(key: String, expectedRevision: Long): IO[NatsError, Unit] =
-    ZIO.attemptBlocking(kv.delete(key, expectedRevision)).mapError(NatsError.fromThrowable)
+  override def purge(
+    key: String,
+    expectedRevision: Option[Long] = None,
+    markerTtl: Option[Duration] = None
+  ): IO[NatsError, Unit] =
+    (expectedRevision, markerTtl) match {
+      case (None,      None)    => ZIO.attemptBlocking(kv.purge(key)).mapError(NatsError.fromThrowable)
+      case (Some(rev), None)    => ZIO.attemptBlocking(kv.purge(key, rev)).mapError(NatsError.fromThrowable)
+      case (None,      Some(d)) => ZIO.attemptBlocking(kv.purge(key, MessageTtl.seconds(d.toSeconds.toInt))).mapError(NatsError.fromThrowable)
+      case (Some(rev), Some(d)) => ZIO.attemptBlocking(kv.purge(key, rev, MessageTtl.seconds(d.toSeconds.toInt))).mapError(NatsError.fromThrowable)
+    }
 
-  override def purge(key: String): IO[NatsError, Unit] =
-    ZIO.attemptBlocking(kv.purge(key)).mapError(NatsError.fromThrowable)
-
-  override def purge(key: String, expectedRevision: Long): IO[NatsError, Unit] =
-    ZIO.attemptBlocking(kv.purge(key, expectedRevision)).mapError(NatsError.fromThrowable)
-
-  override def purge(key: String, markerTtl: Duration): IO[NatsError, Unit] =
-    ZIO.attemptBlocking(kv.purge(key, MessageTtl.seconds(markerTtl.toSeconds.toInt))).mapError(NatsError.fromThrowable)
-
-  override def purge(key: String, expectedRevision: Long, markerTtl: Duration): IO[NatsError, Unit] =
-    ZIO.attemptBlocking(kv.purge(key, expectedRevision, MessageTtl.seconds(markerTtl.toSeconds.toInt))).mapError(NatsError.fromThrowable)
-
-  override def watch(key: String): ZStream[Any, NatsError, KeyValueEntry] =
-    watchInternal(WatchTarget.SingleKey(key), KeyValueWatchOptions.default)
-
-  override def watch(key: String, options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry] =
+  override def watch(key: String, options: KeyValueWatchOptions = KeyValueWatchOptions.default): ZStream[Any, NatsError, KeyValueEntry] =
     watchInternal(WatchTarget.SingleKey(key), options)
 
-  override def watch(keys: List[String], options: KeyValueWatchOptions = KeyValueWatchOptions.default): ZStream[Any, NatsError, KeyValueEntry] =
+  override def watch(keys: List[String], options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry] =
     watchInternal(WatchTarget.MultiKey(keys), options)
 
-  override def watchAll: ZStream[Any, NatsError, KeyValueEntry] =
-    watchInternal(WatchTarget.All, KeyValueWatchOptions.default)
-
-  override def watchAll(options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry] =
+  override def watchAll(options: KeyValueWatchOptions = KeyValueWatchOptions.default): ZStream[Any, NatsError, KeyValueEntry] =
     watchInternal(WatchTarget.All, options)
 
   private sealed trait WatchTarget
@@ -281,30 +238,22 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
       )(sub => ZIO.attemptBlocking(sub.unsubscribe()).ignoreLogged)
     }
 
-  override def purgeDeletes(): IO[NatsError, Unit] =
-    ZIO.attemptBlocking(kv.purgeDeletes()).mapError(NatsError.fromThrowable)
-
-  override def purgeDeletes(threshold: Duration): IO[NatsError, Unit] = {
-    val opts = KeyValuePurgeOptions.builder()
-      .deleteMarkersThreshold(threshold.toMillis)
-      .build()
-    ZIO.attemptBlocking(kv.purgeDeletes(opts)).mapError(NatsError.fromThrowable)
-  }
+  override def purgeDeletes(threshold: Option[Duration] = None): IO[NatsError, Unit] =
+    threshold match {
+      case None    => ZIO.attemptBlocking(kv.purgeDeletes()).mapError(NatsError.fromThrowable)
+      case Some(d) =>
+        val opts = KeyValuePurgeOptions.builder().deleteMarkersThreshold(d.toMillis).build()
+        ZIO.attemptBlocking(kv.purgeDeletes(opts)).mapError(NatsError.fromThrowable)
+    }
 
   override def keys: IO[NatsError, List[String]] =
     ZIO.attemptBlocking(kv.keys().asScala.toList).mapError(NatsError.fromThrowable)
-
-  override def keys(filter: String): IO[NatsError, List[String]] =
-    ZIO.attemptBlocking(kv.keys(filter).asScala.toList).mapError(NatsError.fromThrowable)
 
   override def keys(filters: List[String]): IO[NatsError, List[String]] =
     ZIO.attemptBlocking(kv.keys(filters.asJava).asScala.toList).mapError(NatsError.fromThrowable)
 
   override def consumeKeys(): ZStream[Any, NatsError, String] =
     consumeKeysInternal(ZIO.attemptBlocking(kv.consumeKeys()).mapError(NatsError.fromThrowable))
-
-  override def consumeKeys(filter: String): ZStream[Any, NatsError, String] =
-    consumeKeysInternal(ZIO.attemptBlocking(kv.consumeKeys(filter)).mapError(NatsError.fromThrowable))
 
   override def consumeKeys(filters: List[String]): ZStream[Any, NatsError, String] =
     consumeKeysInternal(ZIO.attemptBlocking(kv.consumeKeys(filters.asJava)).mapError(NatsError.fromThrowable))

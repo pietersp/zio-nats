@@ -59,14 +59,11 @@ trait ObjectStore {
    */
   def getStream(objectName: String): ZStream[Any, NatsError, Byte]
 
-  /** Retrieve metadata for an object (without downloading data). */
-  def getInfo(objectName: String): IO[NatsError, ObjectSummary]
-
   /**
-   * Retrieve metadata for an object, optionally including deleted objects.
-   * Use when you need to inspect a deleted object's metadata.
+   * Retrieve metadata for an object (without downloading data).
+   * Pass `includingDeleted = true` to inspect a deleted object's metadata.
    */
-  def getInfo(objectName: String, includingDeleted: Boolean): IO[NatsError, ObjectSummary]
+  def getInfo(objectName: String, includingDeleted: Boolean = false): IO[NatsError, ObjectSummary]
 
   /** Soft-delete an object (marks as deleted; history preserved). */
   def delete(objectName: String): IO[NatsError, ObjectSummary]
@@ -100,12 +97,9 @@ trait ObjectStore {
 
   /**
    * Stream changes to objects in this bucket. Never completes unless
-   * interrupted.
+   * interrupted. Pass `options` to filter or set the start position.
    */
-  def watch: ZStream[Any, NatsError, ObjectSummary]
-
-  /** Stream changes with watch options (filtering, start position). */
-  def watch(options: ObjectStoreWatchOptions): ZStream[Any, NatsError, ObjectSummary]
+  def watch(options: ObjectStoreWatchOptions = ObjectStoreWatchOptions.default): ZStream[Any, NatsError, ObjectSummary]
 }
 
 /** Service for managing Object Store buckets. */
@@ -222,13 +216,7 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
                 .concat(ZStream.fromZIO(dl.join.unit).drain)
     }
 
-  override def getInfo(objectName: String): IO[NatsError, ObjectSummary] =
-    ZIO.attemptBlocking(Option(os.getInfo(objectName))).mapError(NatsError.fromThrowable).flatMap {
-      case Some(info) => ZIO.succeed(ObjectSummary.fromJava(info))
-      case None       => ZIO.fail(NatsError.ObjectStoreOperationFailed(s"Object not found: $objectName", new NoSuchElementException(objectName)))
-    }
-
-  override def getInfo(objectName: String, includingDeleted: Boolean): IO[NatsError, ObjectSummary] =
+  override def getInfo(objectName: String, includingDeleted: Boolean = false): IO[NatsError, ObjectSummary] =
     ZIO.attemptBlocking(Option(os.getInfo(objectName, includingDeleted))).mapError(NatsError.fromThrowable).flatMap {
       case Some(info) => ZIO.succeed(ObjectSummary.fromJava(info))
       case None       => ZIO.fail(NatsError.ObjectStoreOperationFailed(s"Object not found: $objectName", new NoSuchElementException(objectName)))
@@ -260,10 +248,7 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
   override def getStatus: IO[NatsError, ObjectStoreBucketStatus] =
     ZIO.attemptBlocking(os.getStatus).mapBoth(NatsError.fromThrowable, ObjectStoreBucketStatus.fromJava)
 
-  override def watch: ZStream[Any, NatsError, ObjectSummary] =
-    watchInternal(ObjectStoreWatchOptions.default)
-
-  override def watch(options: ObjectStoreWatchOptions): ZStream[Any, NatsError, ObjectSummary] =
+  override def watch(options: ObjectStoreWatchOptions = ObjectStoreWatchOptions.default): ZStream[Any, NatsError, ObjectSummary] =
     watchInternal(options)
 
   private def watchInternal(options: ObjectStoreWatchOptions): ZStream[Any, NatsError, ObjectSummary] =

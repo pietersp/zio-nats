@@ -77,36 +77,23 @@ trait Nats {
   // -------------------------------------------------------------------------
 
   /**
-   * Subscribe to `subject`, returning a [[ZStream]] of raw [[NatsMessage]]s.
-   *
-   * The underlying jnats Dispatcher is created when the stream starts and
-   * closed automatically on interruption or completion.
-   */
-  def subscribe(subject: Subject): ZStream[Any, NatsError, NatsMessage]
-
-  /**
-   * Subscribe with a [[QueueGroup]] for load-balanced delivery.
-   *
-   * Within a queue group, each published message is delivered to exactly one
-   * subscriber in the group.
-   */
-  def subscribe(
-    subject: Subject,
-    queue: QueueGroup
-  ): ZStream[Any, NatsError, NatsMessage]
-
-  /**
    * Subscribe and automatically decode each message payload.
    *
    * Returns a stream of [[Envelope]]s so callers have access to both the
    * decoded value and the raw [[NatsMessage]] (headers, subject, reply-to).
+   *
+   * Pass an optional [[QueueGroup]] to enable load-balanced delivery: within a
+   * queue group, each published message is delivered to exactly one subscriber.
    *
    * Pass `Chunk[Byte]` to use the identity codec (raw bytes).
    *
    * Decode failures are converted to [[NatsError.DecodingError]] and propagated
    * through the stream's error channel.
    */
-  def subscribe[A: NatsCodec](subject: Subject): ZStream[Any, NatsError, Envelope[A]]
+  def subscribe[A: NatsCodec](
+    subject: Subject,
+    queue: Option[QueueGroup] = None
+  ): ZStream[Any, NatsError, Envelope[A]]
 
   // -------------------------------------------------------------------------
   // Utility
@@ -149,16 +136,18 @@ trait Nats {
   def underlying: JConnection
 
   /**
-   * Subscribe to `subject` and receive raw [[NatsMessage]]s.
+   * Subscribe to `subject` and receive raw [[NatsMessage]]s without decoding.
    *
-   * Unlike the overloaded `subscribe(subject)`, this method is unambiguous at
-   * every call site because it has a unique name. Prefer this over
-   * `subscribe(subject)` when holding a `Nats` instance directly.
+   * Pass an optional [[QueueGroup]] to enable load-balanced delivery.
    *
-   * Equivalent to `subscribe(subject)` — the underlying jnats Dispatcher is
-   * created when the stream starts and closed on interruption or completion.
+   * Use when you need the full [[NatsMessage]] (subject, headers, reply-to,
+   * raw bytes) and do not need typed decoding. For typed access prefer
+   * [[subscribe]][A] which wraps each message in an [[Envelope]].
    */
-  def subscribeRaw(subject: Subject): ZStream[Any, NatsError, NatsMessage]
+  def subscribeRaw(
+    subject: Subject,
+    queue: Option[QueueGroup] = None
+  ): ZStream[Any, NatsError, NatsMessage]
 }
 
 object Nats {
@@ -197,24 +186,17 @@ object Nats {
   ): ZIO[Nats, NatsError, Envelope[B]] =
     ZIO.serviceWithZIO[Nats](_.request[A, B](subject, request, 2.seconds))
 
-  /**
-   * Subscribe to `subject` and receive raw [[NatsMessage]]s.
-   *
-   * Uses a unique name to avoid the typed/raw overload ambiguity that arises
-   * with `subscribe(subject)`. Prefer this over `subscribe(subject)` when
-   * calling through the environment accessor.
-   */
-  def subscribeRaw(subject: Subject): ZStream[Nats, NatsError, NatsMessage] =
-    ZStream.serviceWithStream[Nats](_.subscribeRaw(subject))
-
-  def subscribe(
+  def subscribeRaw(
     subject: Subject,
-    queue: QueueGroup
+    queue: Option[QueueGroup] = None
   ): ZStream[Nats, NatsError, NatsMessage] =
-    ZStream.serviceWithStream[Nats](_.subscribe(subject, queue))
+    ZStream.serviceWithStream[Nats](_.subscribeRaw(subject, queue))
 
-  def subscribe[A: NatsCodec](subject: Subject): ZStream[Nats, NatsError, Envelope[A]] =
-    ZStream.serviceWithStream[Nats](_.subscribe[A](subject))
+  def subscribe[A: NatsCodec](
+    subject: Subject,
+    queue: Option[QueueGroup] = None
+  ): ZStream[Nats, NatsError, Envelope[A]] =
+    ZStream.serviceWithStream[Nats](_.subscribe[A](subject, queue))
 
   def flush(timeout: Duration = 1.second): ZIO[Nats, NatsError, Unit] =
     ZIO.serviceWithZIO[Nats](_.flush(timeout))
@@ -310,24 +292,22 @@ private[nats] final class NatsLive(conn: JConnection) extends Nats {
       }
   }
 
-  override def subscribe(subject: Subject): ZStream[Any, NatsError, NatsMessage] =
-    subscribeInternal(subject.value, None)
-
-  override def subscribeRaw(subject: Subject): ZStream[Any, NatsError, NatsMessage] =
-    subscribeInternal(subject.value, None)
-
-  override def subscribe(
+  override def subscribeRaw(
     subject: Subject,
-    queue: QueueGroup
+    queue: Option[QueueGroup] = None
   ): ZStream[Any, NatsError, NatsMessage] =
-    subscribeInternal(subject.value, Some(queue.value))
+    subscribeInternal(subject.value, queue.map(_.value))
 
-  override def subscribe[A: NatsCodec](subject: Subject): ZStream[Any, NatsError, Envelope[A]] =
-    subscribeInternal(subject.value, None).mapZIO { msg =>
-      ZIO
-        .fromEither(msg.decode[A])
-        .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
-    }
+  override def subscribe[A: NatsCodec](
+    subject: Subject,
+    queue: Option[QueueGroup] = None
+  ): ZStream[Any, NatsError, Envelope[A]] =
+    subscribeInternal(subject.value, queue.map(_.value)).mapZIO(decode[A])
+
+  private def decode[A: NatsCodec](msg: NatsMessage): IO[NatsError, Envelope[A]] =
+    ZIO
+      .fromEither(msg.decode[A])
+      .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
 
   /**
    * Internal: Dispatcher → ZStream pattern.

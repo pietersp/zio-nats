@@ -148,7 +148,7 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         _        <- osm.create(ObjectStoreConfig(name = "os-watch", storageType = StorageType.Memory))
         os       <- ObjectStore.bucket("os-watch")
         received <- Promise.make[Nothing, ObjectSummary]
-        fiber    <- os.watch
+        fiber    <- os.watch()
                    .filter(!_.isDeleted)
                    .tap(info => received.succeed(info))
                    .take(1)

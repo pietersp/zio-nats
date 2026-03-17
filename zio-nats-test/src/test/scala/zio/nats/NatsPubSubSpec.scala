@@ -114,13 +114,13 @@ object NatsPubSubSpec extends ZIOSpecDefault {
         counter <- Ref.make(0)
         latch   <- Promise.make[Nothing, Unit]
         fiber1  <- nats
-                    .subscribe(subject, QueueGroup("group1"))
+                    .subscribe[Chunk[Byte]](subject, Some(QueueGroup("group1")))
                     .tap(_ => counter.update(_ + 1) *> latch.succeed(()))
                     .take(1)
                     .runDrain
                     .fork
         fiber2 <- nats
-                    .subscribe(subject, QueueGroup("group1"))
+                    .subscribe[Chunk[Byte]](subject, Some(QueueGroup("group1")))
                     .tap(_ => counter.update(_ + 1) *> latch.succeed(()))
                     .take(1)
                     .runDrain

@@ -114,7 +114,7 @@ object KeyValueSpec extends ZIOSpecDefault {
                  )
                )
         kv  <- KeyValue.bucket("kv-entry-ttl")
-        rev <- kv.create("ttl-key", "hello", 5.seconds)
+        rev <- kv.create("ttl-key", "hello", Some(5.seconds))
         e   <- kv.get("ttl-key")
         _   <- kvm.delete("kv-entry-ttl")
       } yield assertTrue(rev == 1L, e.exists(_.valueAsString == "hello"))
@@ -191,7 +191,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         kv  <- KeyValue.bucket("kv-purgdel")
         _   <- kv.put("pd", "v1")
         _   <- kv.delete("pd")
-        _   <- kv.purgeDeletes(-1.millis) // negative = remove ALL markers regardless of age
+        _   <- kv.purgeDeletes(Some(-1.millis)) // negative = remove ALL markers regardless of age
         hist <- kv.history("pd")
         _    <- kvm.delete("kv-purgdel")
       } yield assertTrue(hist.forall(_.operation != KeyValueOperation.Delete))
@@ -205,7 +205,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         _   <- kv.put("foo.1", "a")
         _   <- kv.put("foo.2", "b")
         _   <- kv.put("bar.1", "c")
-        ks  <- kv.keys("foo.*")
+        ks  <- kv.keys(List("foo.*"))
         _   <- kvm.delete("kv-keyfilter")
       } yield assertTrue(ks.toSet == Set("foo.1", "foo.2"))
     },
@@ -241,8 +241,8 @@ object KeyValueSpec extends ZIOSpecDefault {
         _    <- kvm.create(KeyValueConfig(name = "kv-del-rev", storageType = StorageType.Memory))
         kv   <- KeyValue.bucket("kv-del-rev")
         rev  <- kv.put("k", "v1")
-        ok   <- kv.delete("k", rev).either
-        fail <- kv.put("k", "v2").flatMap(rev2 => kv.delete("k", rev).either)
+        ok   <- kv.delete("k", Some(rev)).either
+        fail <- kv.put("k", "v2").flatMap(rev2 => kv.delete("k", Some(rev)).either)
         _    <- kvm.delete("kv-del-rev")
       } yield assertTrue(ok.isRight, fail.isLeft)
     },
@@ -253,7 +253,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         _    <- kvm.create(KeyValueConfig(name = "kv-purge-rev", storageType = StorageType.Memory))
         kv   <- KeyValue.bucket("kv-purge-rev")
         rev  <- kv.put("p", "v1")
-        ok   <- kv.purge("p", rev).either
+        ok   <- kv.purge("p", Some(rev)).either
         _    <- kvm.delete("kv-purge-rev")
       } yield assertTrue(ok.isRight)
     },
@@ -279,7 +279,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         _    <- kv.put("foo.1", "a")
         _    <- kv.put("foo.2", "b")
         _    <- kv.put("bar.1", "c")
-        keys <- kv.consumeKeys("foo.*").runCollect
+        keys <- kv.consumeKeys(List("foo.*")).runCollect
         _    <- kvm.delete("kv-consume-f")
       } yield assertTrue(keys.toSet == Set("foo.1", "foo.2"))
     },

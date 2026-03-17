@@ -58,7 +58,7 @@ object Main extends ZIOAppDefault {
 ```
 
 > `Subject` and `QueueGroup` are opaque types from `import zio.nats._` — no additional import needed.
-> `Nats.subscribeRaw` is the unambiguous name for raw subscriptions; `Nats.subscribe[A]` is the typed overload.
+> `Nats.subscribeRaw` returns raw `NatsMessage`s without decoding; `Nats.subscribe[A]` decodes each message and wraps it in `Envelope[A]`.
 
 ## Core concepts
 
@@ -122,10 +122,10 @@ h.add("X-Trace", "def") // Headers with Chunk("abc", "def") for X-Trace
 
 ### Subscribe
 
-`subscribe` / `subscribeRaw` return a `ZStream`. The underlying jnats `Dispatcher` is created when the stream is consumed and closed automatically when the stream is interrupted.
+`subscribe[A]` and `subscribeRaw` return a `ZStream`. The underlying jnats `Dispatcher` is created when the stream is consumed and closed automatically when the stream is interrupted.
 
 ```scala
-// Raw messages — use subscribeRaw to avoid ambiguity with the typed overload
+// Raw NatsMessage — use subscribeRaw when you don't need typed decoding
 Nats.subscribeRaw(Subject("events.>"))
   .tap(msg => ZIO.debug(s"${msg.subject}: ${msg.dataAsString}"))
   .runDrain
@@ -136,8 +136,15 @@ Nats.subscribeRaw(Subject("events.>"))
 Messages are load-balanced across all subscribers in the same queue group:
 
 ```scala
-Nats.subscribe(Subject("work.queue"), QueueGroup("workers"))
-  .tap(msg => process(msg))
+// Typed — decoded payload in Envelope
+Nats.subscribe[WorkItem](Subject("work.queue"), QueueGroup("workers"))
+  .map(_.value)
+  .tap(item => process(item))
+  .runDrain
+
+// Raw bytes
+Nats.subscribe[Chunk[Byte]](Subject("work.queue"), QueueGroup("workers"))
+  .tap(env => process(env.message))
   .runDrain
 ```
 
@@ -210,11 +217,10 @@ Nats.subscribe[Person](Subject("users"))
   .runDrain
 ```
 
-For queue-group load balancing with typed messages, subscribe raw and decode manually:
+Queue-group subscriptions also support typed decoding:
 
 ```scala
-Nats.subscribe(Subject("orders"), QueueGroup("processors"))
-  .mapZIO(msg => ZIO.fromEither(msg.decode[Order]).mapError(e => NatsError.DecodingError(e.message, e)))
+Nats.subscribe[Order](Subject("orders"), QueueGroup("processors")).payload
   .tap(order => ZIO.debug(s"order: ${order.id}"))
   .runDrain
 ```
@@ -419,32 +425,32 @@ kv.get("feature.flag")                     // IO[NatsError, Option[KeyValueEntry
 kv.get("feature.flag", revision = 3L)      // get by revision
 
 // Compare-and-swap
-kv.create("lock", bytes)                          // create-only (fails if key exists)
-kv.create("lease", bytes, ttl = 30.seconds)       // create with per-entry TTL
-kv.update("lock", newBytes, expectedRevision = 3) // update only if revision matches
+kv.create("lock", bytes)                               // create-only (fails if key exists)
+kv.create("lease", bytes, ttl = Some(30.seconds))      // create with per-entry TTL
+kv.update("lock", newBytes, expectedRevision = 3)      // update only if revision matches
 
 // Delete / purge
-kv.delete("stale-key")                        // soft delete — history preserved
-kv.delete("stale-key", expectedRevision = 5)  // conditional delete
-kv.purge("old-key")                           // remove all history for the key
-kv.purge("old-key", expectedRevision = 5)     // conditional purge
-kv.purge("old-key", markerTtl = 5.minutes)    // purge with TTL on tombstone marker
+kv.delete("stale-key")                                 // soft delete — history preserved
+kv.delete("stale-key", expectedRevision = Some(5))     // conditional delete
+kv.purge("old-key")                                    // remove all history for the key
+kv.purge("old-key", expectedRevision = Some(5))        // conditional purge
+kv.purge("old-key", markerTtl = Some(5.minutes))       // purge with TTL on tombstone marker
 
 // Enumerate — eagerly loads all keys
 kv.keys                         // IO[NatsError, List[String]]
-kv.keys("foo.*")                // filter by subject pattern
+kv.keys(List("foo.*"))          // filter by subject pattern
 kv.keys(List("foo.*", "bar.*")) // multiple filters
 
 // Enumerate — streaming (memory-efficient for large buckets)
-kv.consumeKeys()                // ZStream[Any, NatsError, String]
-kv.consumeKeys("foo.*")
+kv.consumeKeys()                        // ZStream[Any, NatsError, String]
+kv.consumeKeys(List("foo.*"))
 kv.consumeKeys(List("foo.*", "bar.*"))
 
 kv.history("key")   // IO[NatsError, List[KeyValueEntry]]
 
 // Purge delete/purge markers
-kv.purgeDeletes()                      // removes markers older than 30 minutes
-kv.purgeDeletes(threshold = 1.hour)    // custom threshold
+kv.purgeDeletes()                             // removes markers older than 30 minutes
+kv.purgeDeletes(threshold = Some(1.hour))     // custom threshold
 ```
 
 ### Watch for changes
@@ -452,7 +458,7 @@ kv.purgeDeletes(threshold = 1.hour)    // custom threshold
 ```scala
 // Watch a single key — never completes unless interrupted
 kv.watch("feature.flag")   // ZStream[Any, NatsError, KeyValueEntry]
-kv.watchAll                // watch entire bucket
+kv.watchAll()              // watch entire bucket
 
 // Watch with options
 kv.watch("feature.>", KeyValueWatchOptions(
@@ -512,7 +518,7 @@ os.list                                      // IO[NatsError, List[ObjectSummary
 os.getStatus                                 // IO[NatsError, ObjectStoreBucketStatus]
 
 // Watch for changes
-os.watch                                     // ZStream[Any, NatsError, ObjectSummary]
+os.watch()                                   // ZStream[Any, NatsError, ObjectSummary]
 os.watch(ObjectStoreWatchOptions(
   ignoreDeletes  = true,
   includeHistory = true,
