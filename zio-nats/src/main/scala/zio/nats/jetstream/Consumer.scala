@@ -1,8 +1,9 @@
-package zio.nats
+package zio.nats.jetstream
 
-import io.nats.client.{BaseConsumerContext as JBaseConsumerContext, ConsumerContext as JConsumerContext, OrderedConsumerContext as JOrderedConsumerContext}
+import io.nats.client.{BaseConsumerContext as JBaseConsumerContext, OrderedConsumerContext as JOrderedConsumerContext}
 import zio.*
 import zio.stream.*
+import zio.nats.{NatsCodec, NatsError}
 
 /**
  * High-level consumer handle returned by [[JetStream.consumer]].
@@ -64,7 +65,7 @@ trait Consumer {
    * Unpin this consumer from the specified priority group, allowing a
    * different client to be pinned. Returns true if the server accepted the
    * request. Requires the consumer to have been created with
-   * [[PriorityPolicy.PinnedClient]].
+   * [[zio.nats.PriorityPolicy.PinnedClient]].
    */
   def unpin(group: String): IO[NatsError, Boolean]
 }

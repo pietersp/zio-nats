@@ -127,4 +127,42 @@ package object nats {
   val OrderedConsumerConfig = configuration.OrderedConsumerConfig
   type RepublishConfig = configuration.RepublishConfig
   val RepublishConfig = configuration.RepublishConfig
+
+  // ---- JetStream re-exports (users don't need zio.nats.jetstream._) ----
+  type JetStream           = jetstream.JetStream;           val JetStream           = jetstream.JetStream
+  type JetStreamManagement = jetstream.JetStreamManagement; val JetStreamManagement = jetstream.JetStreamManagement
+  type Consumer            = jetstream.Consumer
+  type OrderedConsumer     = jetstream.OrderedConsumer
+  type JetStreamMessage    = jetstream.JetStreamMessage
+  type JsEnvelope[A]       = jetstream.JsEnvelope[A];       val JsEnvelope          = jetstream.JsEnvelope
+  type PublishAck          = jetstream.PublishAck;           val PublishAck          = jetstream.PublishAck
+  type PublishOptions      = jetstream.PublishOptions;       val PublishOptions      = jetstream.PublishOptions
+  type JsPublishParams     = jetstream.JsPublishParams;      val JsPublishParams     = jetstream.JsPublishParams
+  type FetchOptions        = jetstream.FetchOptions;         val FetchOptions        = jetstream.FetchOptions
+  type ConsumeOptions      = jetstream.ConsumeOptions;       val ConsumeOptions      = jetstream.ConsumeOptions
+  type StreamSummary       = jetstream.StreamSummary;        val StreamSummary       = jetstream.StreamSummary
+  type ConsumerSummary     = jetstream.ConsumerSummary;      val ConsumerSummary     = jetstream.ConsumerSummary
+  type PurgeSummary        = jetstream.PurgeSummary;         val PurgeSummary        = jetstream.PurgeSummary
+  type ConsumerPauseInfo   = jetstream.ConsumerPauseInfo;    val ConsumerPauseInfo   = jetstream.ConsumerPauseInfo
+  type MessageInfo         = jetstream.MessageInfo
+  type AccountStatistics   = jetstream.AccountStatistics
+
+  // ---- Key-Value re-exports (users don't need zio.nats.kv._) ----
+  type KeyValue             = kv.KeyValue;             val KeyValue             = kv.KeyValue
+  type KeyValueManagement   = kv.KeyValueManagement;   val KeyValueManagement   = kv.KeyValueManagement
+  type KeyValueEntry        = kv.KeyValueEntry;        val KeyValueEntry        = kv.KeyValueEntry
+  type KvEnvelope[A]        = kv.KvEnvelope[A];        val KvEnvelope           = kv.KvEnvelope
+  type KvEvent[A]           = kv.KvEvent[A];           val KvEvent              = kv.KvEvent
+  type KeyValueOperation    = kv.KeyValueOperation;    val KeyValueOperation    = kv.KeyValueOperation
+  type KeyValueWatchOptions = kv.KeyValueWatchOptions; val KeyValueWatchOptions = kv.KeyValueWatchOptions
+  type KeyValueBucketStatus = kv.KeyValueBucketStatus; val KeyValueBucketStatus = kv.KeyValueBucketStatus
+
+  // ---- Object Store re-exports (users don't need zio.nats.objectstore._) ----
+  type ObjectStore             = objectstore.ObjectStore;             val ObjectStore             = objectstore.ObjectStore
+  type ObjectStoreManagement   = objectstore.ObjectStoreManagement;   val ObjectStoreManagement   = objectstore.ObjectStoreManagement
+  type ObjectData[A]           = objectstore.ObjectData[A];           val ObjectData              = objectstore.ObjectData
+  type ObjectSummary           = objectstore.ObjectSummary;           val ObjectSummary           = objectstore.ObjectSummary
+  type ObjectMeta              = objectstore.ObjectMeta;              val ObjectMeta              = objectstore.ObjectMeta
+  type ObjectStoreBucketStatus = objectstore.ObjectStoreBucketStatus; val ObjectStoreBucketStatus = objectstore.ObjectStoreBucketStatus
+  type ObjectStoreWatchOptions = objectstore.ObjectStoreWatchOptions; val ObjectStoreWatchOptions = objectstore.ObjectStoreWatchOptions
 }

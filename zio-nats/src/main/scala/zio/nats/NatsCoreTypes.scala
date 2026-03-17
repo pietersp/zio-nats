@@ -3,8 +3,6 @@ package zio.nats
 import io.nats.client.{Connection => JConnection}
 import zio.Chunk
 
-import scala.jdk.CollectionConverters._
-
 /**
  * An opaque type alias for NATS subject strings.
  *
@@ -158,27 +156,6 @@ object PublishParams {
 }
 
 // ---------------------------------------------------------------------------
-// KeyValueOperation
-// ---------------------------------------------------------------------------
-
-/**
- * The type of operation that produced a [[KeyValueEntry]].
- *
- *   - `Put`    — a value was written.
- *   - `Delete` — a soft-delete marker was placed (history preserved).
- *   - `Purge`  — all history for the key was erased (tombstone written).
- */
-enum KeyValueOperation { case Put, Delete, Purge }
-
-object KeyValueOperation {
-  private[nats] def fromJava(op: io.nats.client.api.KeyValueOperation): KeyValueOperation = op match {
-    case io.nats.client.api.KeyValueOperation.PUT   => Put
-    case io.nats.client.api.KeyValueOperation.DELETE => Delete
-    case io.nats.client.api.KeyValueOperation.PURGE => Purge
-  }
-}
-
-// ---------------------------------------------------------------------------
 // StorageType
 // ---------------------------------------------------------------------------
 
@@ -201,39 +178,6 @@ object StorageType {
   private[nats] def fromJava(st: io.nats.client.api.StorageType): StorageType = st match {
     case io.nats.client.api.StorageType.File   => File
     case io.nats.client.api.StorageType.Memory => Memory
-  }
-}
-
-// ---------------------------------------------------------------------------
-// ObjectMeta
-// ---------------------------------------------------------------------------
-
-/**
- * Custom metadata for an Object Store entry.
- *
- * Pass to [[ObjectStore.put]] or [[ObjectStore.putStream]] to attach a
- * description or headers alongside the stored object.
- *
- * @param name        The object name (unique within the bucket).
- * @param description Optional human-readable description.
- * @param headers     Optional NATS headers to store with the object.
- */
-final case class ObjectMeta(
-  name: String,
-  description: Option[String] = None,
-  headers: Headers = Headers.empty
-) {
-  private[nats] def toJava: io.nats.client.api.ObjectMeta = {
-    val b = io.nats.client.api.ObjectMeta.builder(name)
-    description.foreach(b.description)
-    if (headers.nonEmpty) {
-      val jHeaders = new io.nats.client.impl.Headers()
-      headers.values.foreach { case (key, values) =>
-        jHeaders.add(key, values.toList.asJava)
-      }
-      b.headers(jHeaders)
-    }
-    b.build()
   }
 }
 

@@ -82,19 +82,43 @@ All publish/put/get/create/update methods are generic `[A: NatsCodec]`. Passing 
 - `KeyValueError` → `KeyNotFound`
 - `ObjectStoreError`
 
+### Package Structure
+
+The library uses sub-packages for each feature area. Everything is re-exported from `package object nats` so `import zio.nats.*` remains the only import end-users need.
+
+```
+zio.nats
+├── jetstream/          JetStream service, management, consumer, and models
+├── kv/                 Key-Value service, management, and models
+├── objectstore/        Object Store service, management, and models
+├── configuration/      StreamConfig, ConsumerConfig, KVConfig, OSConfig
+└── config/             NatsConfig (connection settings)
+```
+
+Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-exporting an opaque type as a plain alias strips its opacity — so they stay in `zio.nats`.
+
+`private[nats]` visibility is preserved across sub-packages: Scala includes sub-packages in its visibility scope.
+
 ### Key Files
 
 | File | Contents |
 |------|----------|
 | `zio-nats/src/main/scala/zio/nats/Nats.scala` | Core pub/sub service + `NatsLive`; `lifecycleEvents` stream |
-| `zio-nats/src/main/scala/zio/nats/JetStream.scala` | JetStream publish + `JetStreamLive` |
-| `zio-nats/src/main/scala/zio/nats/KeyValue.scala` | KV service + management |
-| `zio-nats/src/main/scala/zio/nats/ObjectStore.scala` | ObjectStore service + management |
 | `zio-nats/src/main/scala/zio/nats/NatsCodec.scala` | Serialization typeclass |
 | `zio-nats/src/main/scala/zio/nats/NatsError.scala` | Error hierarchy |
-| `zio-nats/src/main/scala/zio/nats/NatsCoreTypes.scala` | `Subject`, `QueueGroup`, `Headers`, `PublishParams`, enums |
-| `zio-nats/src/main/scala/zio/nats/NatsModels.scala` | `PublishAck`, `JsPublishParams`, `KeyValueEntry`, etc. |
+| `zio-nats/src/main/scala/zio/nats/NatsCoreTypes.scala` | `Subject` (opaque), `QueueGroup` (opaque), `Headers`, `PublishParams`, `StorageType`, `ConnectionStatus`, `NatsServerInfo` |
+| `zio-nats/src/main/scala/zio/nats/NatsModels.scala` | `Envelope[+A]`, `ConnectionStats` |
+| `zio-nats/src/main/scala/zio/nats/NatsEvent.scala` | `NatsEvent` enum |
+| `zio-nats/src/main/scala/zio/nats/jetstream/JetStream.scala` | JetStream publish + `JetStreamLive` |
+| `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamManagement.scala` | JetStream stream/consumer admin |
+| `zio-nats/src/main/scala/zio/nats/jetstream/Consumer.scala` | `Consumer`, `OrderedConsumer` traits + live impls |
+| `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamMessage.scala` | `JetStreamMessage` with ack operations |
+| `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamModels.scala` | `JsEnvelope`, `PublishAck`, `PublishOptions`, `FetchOptions`, `ConsumeOptions`, summaries, etc. |
+| `zio-nats/src/main/scala/zio/nats/kv/KeyValue.scala` | KV service + management |
+| `zio-nats/src/main/scala/zio/nats/kv/KeyValueModels.scala` | `KeyValueEntry`, `KvEnvelope`, `KvEvent`, `KeyValueOperation`, watch options, bucket status |
+| `zio-nats/src/main/scala/zio/nats/objectstore/ObjectStore.scala` | ObjectStore service + management |
+| `zio-nats/src/main/scala/zio/nats/objectstore/ObjectStoreModels.scala` | `ObjectMeta`, `ObjectData`, `ObjectSummary`, watch options, bucket status |
 | `zio-nats/src/main/scala/zio/nats/config/NatsConfig.scala` | Connection config |
 | `zio-nats/src/main/scala/zio/nats/configuration/Configuration.scala` | Stream/Consumer/KV/ObjectStore config |
-| `zio-nats/src/main/scala/zio/nats/package.scala` | Type aliases (`NatsIO[A]`), re-exports |
+| `zio-nats/src/main/scala/zio/nats/package.scala` | Type aliases (`NatsIO[A]`), all sub-package re-exports |
 | `zio-nats-testkit/src/main/scala/zio/nats/NatsTestLayers.scala` | Test layers (Docker NATS) |

@@ -1,8 +1,9 @@
-package zio.nats
+package zio.nats.kv
 
 import io.nats.client.api.{KeyResult as JKeyResult, KeyValueEntry as JKeyValueEntry, KeyValuePurgeOptions, KeyValueWatcher as JKeyValueWatcher}
 import io.nats.client.{KeyValue as JKeyValue, KeyValueManagement as JKeyValueManagement, MessageTtl}
 import zio.*
+import zio.nats.{Nats, NatsCodec, NatsError}
 import zio.nats.configuration.KeyValueConfig
 import zio.stream.*
 
@@ -19,7 +20,7 @@ import scala.jdk.CollectionConverters.*
  * operation, and bucket name). Pass `Chunk[Byte]` as `A` to skip decoding
  * and receive raw bytes.
  *
- * Obtain an instance via [[KeyValue.bucket]] (requires a [[Nats]] connection
+ * Obtain an instance via [[KeyValue.bucket]] (requires a [[zio.nats.Nats]] connection
  * in scope). Use [[KeyValueManagement]] to create or delete buckets.
  *
  * ==Example==
@@ -157,7 +158,7 @@ trait KeyValue {
  * Service for managing Key-Value buckets.
  *
  * Provides administrative operations to create, update, and delete KV buckets.
- * Obtain an instance via [[KeyValueManagement.live]] (requires [[Nats]] in scope).
+ * Obtain an instance via [[KeyValueManagement.live]] (requires [[zio.nats.Nats]] in scope).
  */
 trait KeyValueManagement {
   /** Create a new KV bucket with the given configuration. */
@@ -218,7 +219,7 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
 
   private def decodeOpt[A: NatsCodec](opt: Option[KeyValueEntry]): IO[NatsError, Option[KvEnvelope[A]]] =
     opt match {
-      case None                                            => ZIO.none
+      case None                                             => ZIO.none
       case Some(e) if e.operation != KeyValueOperation.Put => ZIO.none
       case Some(e) =>
         ZIO.fromEither(e.decode[A])
