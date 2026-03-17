@@ -50,7 +50,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         _        <- kvm.create(KeyValueConfig(name = "kv-watch", storageType = StorageType.Memory))
         kv       <- KeyValue.bucket("kv-watch")
         received <- Promise.make[Nothing, KvEnvelope[String]]
-        fiber    <- kv.watch[String]("watch-key")
+        fiber    <- kv.watch[String](List("watch-key"))
                    .tap(e => received.succeed(e))
                    .take(1)
                    .runDrain
@@ -130,7 +130,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         received <- Ref.make(List.empty[KvEnvelope[String]])
         // Watch with updatesOnly so we control exactly which events are delivered
         fiber    <- kv
-                      .watch[String]("d", KeyValueWatchOptions(ignoreDeletes = true, updatesOnly = true))
+                      .watch[String](List("d"), KeyValueWatchOptions(ignoreDeletes = true, updatesOnly = true))
                       .tap(e => received.update(_ :+ e))
                       .runDrain
                       .fork
@@ -160,7 +160,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         _    <- kv.put("r", "v3")
         // replay only from rev2 onwards
         entries <- kv
-                     .watch[String]("r", KeyValueWatchOptions(fromRevision = Some(rev1 + 1)))
+                     .watch[String](List("r"), KeyValueWatchOptions(fromRevision = Some(rev1 + 1)))
                      .take(2)
                      .runCollect
                      .timeout(5.seconds)

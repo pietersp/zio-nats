@@ -91,23 +91,17 @@ trait KeyValue {
   // --- Watch ---
 
   /**
-   * Stream decoded values for a specific key.
+   * Stream decoded values for one or more keys.
    *
-   * Emits a [[KvEnvelope]] for each Put operation on the key. Delete and purge
-   * markers are silently filtered. The stream never completes on its own —
-   * interrupt it to stop watching.
+   * Pass a single-element list to watch one key, or multiple keys to watch
+   * all of them in a single subscription. Emits a [[KvEnvelope]] for each Put
+   * operation; delete and purge markers are silently filtered. The stream
+   * never completes on its own — interrupt it to stop watching.
    */
   def watch[A: NatsCodec](
-    key: String,
+    keys: List[String],
     options: KeyValueWatchOptions = KeyValueWatchOptions.default
   ): ZStream[Any, NatsError, KvEnvelope[A]]
-
-  /**
-   * Stream decoded values for multiple keys.
-   *
-   * Only Put operations are emitted; delete and purge markers are filtered.
-   */
-  def watch[A: NatsCodec](keys: List[String], options: KeyValueWatchOptions): ZStream[Any, NatsError, KvEnvelope[A]]
 
   /**
    * Stream decoded values for all keys in the bucket.
@@ -308,16 +302,10 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
   // ---------------------------------------------------------------------------
 
   override def watch[A: NatsCodec](
-    key: String,
+    keys: List[String],
     options: KeyValueWatchOptions = KeyValueWatchOptions.default
   ): ZStream[Any, NatsError, KvEnvelope[A]] =
-    decodeStream(watchInternal(WatchTarget.SingleKey(key), options))
-
-  override def watch[A: NatsCodec](
-    keys: List[String],
-    options: KeyValueWatchOptions
-  ): ZStream[Any, NatsError, KvEnvelope[A]] =
-    decodeStream(watchInternal(WatchTarget.MultiKey(keys), options))
+    decodeStream(watchInternal(WatchTarget.Keys(keys), options))
 
   override def watchAll[A: NatsCodec](
     options: KeyValueWatchOptions = KeyValueWatchOptions.default
@@ -325,8 +313,7 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
     decodeStream(watchInternal(WatchTarget.All, options))
 
   private enum WatchTarget {
-    case SingleKey(key: String)
-    case MultiKey(keys: List[String])
+    case Keys(keys: List[String])
     case All
   }
 
@@ -341,12 +328,7 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
           }
           val jOpts = KeyValueWatchOptions.toJava(options)
           target match {
-            case WatchTarget.SingleKey(k) =>
-              options.fromRevision match {
-                case Some(rev) => kv.watch(k, watcher, rev, jOpts*)
-                case None      => kv.watch(k, watcher, jOpts*)
-              }
-            case WatchTarget.MultiKey(ks) =>
+            case WatchTarget.Keys(ks) =>
               options.fromRevision match {
                 case Some(rev) => kv.watch(ks.asJava, watcher, rev, jOpts*)
                 case None      => kv.watch(ks.asJava, watcher, jOpts*)

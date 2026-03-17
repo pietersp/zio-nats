@@ -387,7 +387,7 @@ private[nats] object KeyValueEntry {
  * parameter to skip decoding and receive raw bytes.
  *
  * {{{
- * kv.watch[UserProfile]("user.42").map { env =>
+ * kv.watch[UserProfile](List("user.42")).map { env =>
  *   // env.value    — the decoded UserProfile
  *   // env.key      — the KV key ("user.42")
  *   // env.revision — the stream sequence number
