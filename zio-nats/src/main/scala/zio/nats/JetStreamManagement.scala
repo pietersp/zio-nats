@@ -27,6 +27,10 @@ trait JetStreamManagement {
   def getConsumerNames(streamName: String): IO[NatsError, List[String]]
   def getConsumers(streamName: String): IO[NatsError, List[ConsumerSummary]]
 
+  // --- Consumer pause / resume ---
+  def pauseConsumer(streamName: String, consumerName: String, pauseUntil: java.time.ZonedDateTime): IO[NatsError, ConsumerPauseInfo]
+  def resumeConsumer(streamName: String, consumerName: String): IO[NatsError, Boolean]
+
   // --- Message access ---
   def getMessage(streamName: String, seq: Long): IO[NatsError, MessageInfo]
   def deleteMessage(streamName: String, seq: Long): IO[NatsError, Boolean]
@@ -132,6 +136,18 @@ private[nats] final class JetStreamManagementLive(jsm: JJetStreamManagement) ext
     ZIO
       .attemptBlocking(jsm.getConsumers(streamName).asScala.toList)
       .mapBoth(NatsError.fromThrowable, _.map(ConsumerSummary.fromJava))
+
+  override def pauseConsumer(
+    streamName: String,
+    consumerName: String,
+    pauseUntil: java.time.ZonedDateTime
+  ): IO[NatsError, ConsumerPauseInfo] =
+    ZIO
+      .attemptBlocking(jsm.pauseConsumer(streamName, consumerName, pauseUntil))
+      .mapBoth(NatsError.fromThrowable, ConsumerPauseInfo.fromJava)
+
+  override def resumeConsumer(streamName: String, consumerName: String): IO[NatsError, Boolean] =
+    ZIO.attemptBlocking(jsm.resumeConsumer(streamName, consumerName)).mapError(NatsError.fromThrowable)
 
   override def getMessage(streamName: String, seq: Long): IO[NatsError, MessageInfo] =
     ZIO.attemptBlocking(jsm.getMessage(streamName, seq)).mapError(NatsError.fromThrowable)

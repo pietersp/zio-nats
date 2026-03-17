@@ -2,6 +2,7 @@ package zio.nats
 
 import io.nats.client.api.{
   ConsumerInfo as JConsumerInfo,
+  ConsumerPauseResponse as JConsumerPauseResponse,
   KeyValueEntry as JKeyValueEntry,
   KeyValueStatus as JKeyValueStatus,
   KeyValueWatchOption as JKeyValueWatchOption,
@@ -198,6 +199,24 @@ private[nats] object ObjectSummary {
     chunks = info.getChunks,
     description = Option(info.getDescription),
     isDeleted = info.isDeleted
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Consumer pause response
+// ---------------------------------------------------------------------------
+
+final case class ConsumerPauseInfo(
+  isPaused: Boolean,
+  pauseUntil: Option[java.time.ZonedDateTime],
+  pauseRemaining: Option[Duration]
+)
+
+private[nats] object ConsumerPauseInfo {
+  def fromJava(r: JConsumerPauseResponse): ConsumerPauseInfo = ConsumerPauseInfo(
+    isPaused = r.isPaused,
+    pauseUntil = Option(r.getPauseUntil),
+    pauseRemaining = Option(r.getPauseRemaining).map(d => Duration.fromMillis(d.toMillis))
   )
 }
 

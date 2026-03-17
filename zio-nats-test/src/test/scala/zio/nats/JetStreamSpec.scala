@@ -150,6 +150,20 @@ object JetStreamSpec extends ZIOSpecDefault {
       }
     ),
 
+    suite("Consumer pause and resume")(
+      test("pause and resume a consumer") {
+        for {
+          jsm <- ZIO.service[JetStreamManagement]
+          _   <- jsm.addStream(StreamConfig("pause-stream", subjects = List("pause.>"), storageType = StorageType.Memory))
+          _   <- jsm.addOrUpdateConsumer("pause-stream", ConsumerConfig.durable("pause-cons"))
+          pauseUntil = java.time.ZonedDateTime.now().plusSeconds(30)
+          pauseInfo <- jsm.pauseConsumer("pause-stream", "pause-cons", pauseUntil)
+          resumed   <- jsm.resumeConsumer("pause-stream", "pause-cons")
+          _         <- jsm.deleteStream("pause-stream")
+        } yield assertTrue(pauseInfo.isPaused, resumed)
+      }
+    ),
+
     suite("Ordered Consumer")(
       test("fetch messages in order") {
         for {
