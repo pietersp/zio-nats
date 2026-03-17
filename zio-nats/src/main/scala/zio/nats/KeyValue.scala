@@ -73,20 +73,18 @@ trait KeyValue {
   def purgeDeletes(threshold: Option[Duration] = None): IO[NatsError, Unit]
 
   // --- Enumeration ---
-  /** List all keys in the bucket. */
-  def keys: IO[NatsError, List[String]]
-
-  /** List keys matching any of the given subject filters (e.g. `List("foo.*")`). */
-  def keys(filters: List[String]): IO[NatsError, List[String]]
+  /**
+   * List keys in the bucket. Pass subject filters (e.g. `List("foo.*")`) to
+   * restrict results; omit or pass `Nil` for all keys.
+   */
+  def keys(filters: List[String] = Nil): IO[NatsError, List[String]]
 
   /**
    * Stream all keys incrementally. More memory-efficient than `keys` for large
    * buckets — the stream completes when all keys have been delivered.
+   * Pass subject filters to restrict results; omit or pass `Nil` for all keys.
    */
-  def consumeKeys(): ZStream[Any, NatsError, String]
-
-  /** Stream keys matching any of the given subject filters. */
-  def consumeKeys(filters: List[String]): ZStream[Any, NatsError, String]
+  def consumeKeys(filters: List[String] = Nil): ZStream[Any, NatsError, String]
 
   def history(key: String): IO[NatsError, List[KeyValueEntry]]
   def getStatus: IO[NatsError, KeyValueBucketStatus]
@@ -246,17 +244,17 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
         ZIO.attemptBlocking(kv.purgeDeletes(opts)).mapError(NatsError.fromThrowable)
     }
 
-  override def keys: IO[NatsError, List[String]] =
-    ZIO.attemptBlocking(kv.keys().asScala.toList).mapError(NatsError.fromThrowable)
+  override def keys(filters: List[String] = Nil): IO[NatsError, List[String]] =
+    if (filters.isEmpty)
+      ZIO.attemptBlocking(kv.keys().asScala.toList).mapError(NatsError.fromThrowable)
+    else
+      ZIO.attemptBlocking(kv.keys(filters.asJava).asScala.toList).mapError(NatsError.fromThrowable)
 
-  override def keys(filters: List[String]): IO[NatsError, List[String]] =
-    ZIO.attemptBlocking(kv.keys(filters.asJava).asScala.toList).mapError(NatsError.fromThrowable)
-
-  override def consumeKeys(): ZStream[Any, NatsError, String] =
-    consumeKeysInternal(ZIO.attemptBlocking(kv.consumeKeys()).mapError(NatsError.fromThrowable))
-
-  override def consumeKeys(filters: List[String]): ZStream[Any, NatsError, String] =
-    consumeKeysInternal(ZIO.attemptBlocking(kv.consumeKeys(filters.asJava)).mapError(NatsError.fromThrowable))
+  override def consumeKeys(filters: List[String] = Nil): ZStream[Any, NatsError, String] =
+    if (filters.isEmpty)
+      consumeKeysInternal(ZIO.attemptBlocking(kv.consumeKeys()).mapError(NatsError.fromThrowable))
+    else
+      consumeKeysInternal(ZIO.attemptBlocking(kv.consumeKeys(filters.asJava)).mapError(NatsError.fromThrowable))
 
   private def consumeKeysInternal(
     acquireQueue: IO[NatsError, java.util.concurrent.LinkedBlockingQueue[JKeyResult]]

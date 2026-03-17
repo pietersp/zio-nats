@@ -437,7 +437,7 @@ kv.purge("old-key", expectedRevision = Some(5))        // conditional purge
 kv.purge("old-key", markerTtl = Some(5.minutes))       // purge with TTL on tombstone marker
 
 // Enumerate — eagerly loads all keys
-kv.keys                         // IO[NatsError, List[String]]
+kv.keys()                       // IO[NatsError, List[String]]
 kv.keys(List("foo.*"))          // filter by subject pattern
 kv.keys(List("foo.*", "bar.*")) // multiple filters
 

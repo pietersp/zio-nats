@@ -72,7 +72,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         _   <- kv.put("a", "1")
         _   <- kv.put("b", "2")
         _   <- kv.put("c", "3")
-        ks  <- kv.keys
+        ks  <- kv.keys()
         _   <- kvm.delete("kv-keys")
       } yield assertTrue(ks.sorted == List("a", "b", "c"))
     },
