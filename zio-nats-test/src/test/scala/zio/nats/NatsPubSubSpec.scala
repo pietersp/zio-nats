@@ -76,18 +76,18 @@ object NatsPubSubSpec extends ZIOSpecDefault {
       } yield assertTrue(reply.value == "pong")
     },
 
-    test("rtt returns a non-negative duration") {
+    test("rtt returns a positive duration for an active connection") {
       for {
         nats <- ZIO.service[Nats]
         d    <- nats.rtt
-      } yield assertTrue(d.toNanos >= 0)
+      } yield assertTrue(d.toNanos > 0)
     },
 
-    test("connectedUrl is set while connected") {
+    test("connectedUrl returns the NATS server URL while connected") {
       for {
         nats <- ZIO.service[Nats]
         url  <- nats.connectedUrl
-      } yield assertTrue(url.isDefined)
+      } yield assertTrue(url.exists(_.startsWith("nats://")))
     },
 
     test("statistics tracks outgoing messages") {
@@ -99,27 +99,30 @@ object NatsPubSubSpec extends ZIOSpecDefault {
       } yield assertTrue(after.outMsgs > before.outMsgs)
     },
 
-    test("outgoingPendingMessageCount and bytes are non-negative") {
+    test("outgoingPendingMessageCount and bytes drop to zero after flush") {
       for {
-        nats <- ZIO.service[Nats]
-        msgs <- nats.outgoingPendingMessageCount
+        nats  <- ZIO.service[Nats]
+        _     <- nats.publish(Subject("pending.test"), Chunk.fromArray("x".getBytes))
+        _     <- nats.flush(5.seconds)
+        msgs  <- nats.outgoingPendingMessageCount
         bytes <- nats.outgoingPendingBytes
-      } yield assertTrue(msgs >= 0, bytes >= 0)
+      } yield assertTrue(msgs == 0L, bytes == 0L)
     },
 
-    test("flush(timeout) completes without error after publishing") {
+    test("flush(timeout) drains the outgoing message queue") {
       for {
         nats <- ZIO.service[Nats]
         _    <- nats.publish(Subject("flush.test"), Chunk.fromArray("x".getBytes))
         _    <- nats.flush(5.seconds)
-      } yield assertCompletes
+        msgs <- nats.outgoingPendingMessageCount
+      } yield assertTrue(msgs == 0L)
     },
 
     test("serverInfo returns a non-empty server name and version") {
       for {
         nats <- ZIO.service[Nats]
         info <- nats.serverInfo
-      } yield assertTrue(info.version.nonEmpty, info.port > 0)
+      } yield assertTrue(info.serverName.nonEmpty, info.version.nonEmpty, info.port > 0)
     },
 
     test("status returns Connected while the connection is active") {

@@ -205,11 +205,13 @@ object JetStreamSpec extends ZIOSpecDefault {
         } yield assertTrue(result.isLeft)
       },
 
-      test("getAccountStatistics returns non-negative counts") {
+      test("getAccountStatistics reflects created streams") {
         for {
           jsm   <- ZIO.service[JetStreamManagement]
+          _     <- createStream(jsm, "acct-stats-stream", "acctstats.>")
           stats <- jsm.getAccountStatistics
-        } yield assertTrue(stats.getStreams >= 0, stats.getConsumers >= 0)
+          _     <- jsm.deleteStream("acct-stats-stream")
+        } yield assertTrue(stats.getStreams >= 1, stats.getConsumers >= 0)
       },
 
       test("StreamConfig advanced fields are accepted by the server") {
