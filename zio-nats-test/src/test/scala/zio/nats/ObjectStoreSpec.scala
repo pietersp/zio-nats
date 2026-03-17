@@ -15,15 +15,14 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         _       <- osm.create(ObjectStoreConfig(name = "os-basic", storageType = StorageType.Memory))
         os      <- ObjectStore.bucket("os-basic")
         info    <- os.put("my-object", Chunk.fromArray("hello-object".getBytes))
-        data    <- os.get[Chunk[Byte]]("my-object")
-        objInfo <- os.getInfo("my-object")
-        _       <- os.delete("my-object")
-        _       <- osm.delete("os-basic")
+        data <- os.get[Chunk[Byte]]("my-object")
+        _    <- os.delete("my-object")
+        _    <- osm.delete("os-basic")
       } yield assertTrue(
         info.name == "my-object",
-        data.toArray.sameElements("hello-object".getBytes),
-        objInfo.name == "my-object",
-        objInfo.size == 12L
+        data.value.toArray.sameElements("hello-object".getBytes),
+        data.summary.name == "my-object",
+        data.summary.size == 12L
       )
     },
 
@@ -46,9 +45,9 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         os     <- ObjectStore.bucket("os-large")
         bigData = Chunk.fromArray(Array.fill(128 * 1024)(42.toByte))
         _      <- os.put("big-obj", bigData)
-        got    <- os.get[Chunk[Byte]]("big-obj")
-        _      <- osm.delete("os-large")
-      } yield assertTrue(got == bigData)
+        got <- os.get[Chunk[Byte]]("big-obj")
+        _   <- osm.delete("os-large")
+      } yield assertTrue(got.value == bigData)
     },
 
     test("ObjectStoreManagement.getStatuses returns status for all buckets") {
@@ -85,11 +84,11 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         os   <- ObjectStore.bucket("os-link")
         _    <- os.put("original", Chunk.fromArray("link-data".getBytes))
         link <- os.addLink("my-link", "original")
-        got  <- os.get[Chunk[Byte]]("my-link")
-        _    <- osm.delete("os-link")
+        got <- os.get[Chunk[Byte]]("my-link")
+        _   <- osm.delete("os-link")
       } yield assertTrue(
         link.name == "my-link",
-        got.toArray.sameElements("link-data".getBytes)
+        got.value.toArray.sameElements("link-data".getBytes)
       )
     },
 

@@ -19,6 +19,31 @@ import zio.*
 import scala.jdk.CollectionConverters.*
 
 // ---------------------------------------------------------------------------
+// Envelope — typed value + raw NatsMessage
+// ---------------------------------------------------------------------------
+
+/**
+ * A decoded message value paired with its raw [[NatsMessage]].
+ *
+ * Returned by [[Nats.request]] and [[Nats.subscribe]] so callers have access
+ * to both the decoded payload and the full message metadata (headers,
+ * subject, reply-to, raw bytes).
+ *
+ * {{{
+ * Nats.subscribe[UserEvent](subject).map { env =>
+ *   // env.value   — the decoded UserEvent
+ *   // env.message — the full NatsMessage (headers, subject, etc.)
+ * }
+ * }}}
+ *
+ * @param value
+ *   The decoded payload.
+ * @param message
+ *   The raw [[NatsMessage]] that was received.
+ */
+final case class Envelope[+A](value: A, message: NatsMessage)
+
+// ---------------------------------------------------------------------------
 // Connection statistics
 // ---------------------------------------------------------------------------
 
@@ -228,8 +253,28 @@ private[nats] object KeyValueEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Object Store return type
+// Object Store return types
 // ---------------------------------------------------------------------------
+
+/**
+ * A decoded object value paired with its [[ObjectSummary]] metadata.
+ *
+ * Returned by [[ObjectStore.get]] so callers have access to both the decoded
+ * payload and the object's metadata (name, size, description, etc.).
+ *
+ * {{{
+ * os.get[MyData]("config.json").map { obj =>
+ *   // obj.value   — the decoded MyData
+ *   // obj.summary — ObjectSummary (name, size, chunks, isDeleted, …)
+ * }
+ * }}}
+ *
+ * @param value
+ *   The decoded payload.
+ * @param summary
+ *   Metadata returned by the server when retrieving the object.
+ */
+final case class ObjectData[+A](value: A, summary: ObjectSummary)
 
 final case class ObjectSummary(
   name: String,

@@ -7,6 +7,8 @@ package zio
  */
 package object nats {
 
+  import zio.stream.ZStream
+
   /** Type alias: a ZIO effect that requires the core Nats service. */
   type NatsIO[+A] = ZIO[Nats, NatsError, A]
 
@@ -75,6 +77,44 @@ package object nats {
     val Prioritized: PriorityPolicy = io.nats.client.api.PriorityPolicy.Prioritized
     val PinnedClient: PriorityPolicy = io.nats.client.api.PriorityPolicy.PinnedClient
   }
+
+  // ---------------------------------------------------------------------------
+  // Envelope / ObjectData convenience extensions
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Strips the [[Envelope]] wrapper from a ZIO effect, returning only the
+   * decoded payload and discarding the raw [[NatsMessage]] metadata.
+   *
+   * {{{
+   * Nats.request[Query, Response](subject, query).payload  // ZIO[Nats, NatsError, Response]
+   * }}}
+   */
+  extension [R, E, A](zio: ZIO[R, E, Envelope[A]])
+    def payload: ZIO[R, E, A] = zio.map(_.value)
+
+  /**
+   * Strips the [[Envelope]] wrapper from every element of a ZStream, emitting
+   * only the decoded payloads and discarding the raw [[NatsMessage]] metadata.
+   *
+   * {{{
+   * Nats.subscribe[Event](subject).payload  // ZStream[Nats, NatsError, Event]
+   * }}}
+   */
+  extension [R, E, A](stream: ZStream[R, E, Envelope[A]])
+    def payload: ZStream[R, E, A] = stream.map(_.value)
+
+  /**
+   * Strips the [[ObjectData]] wrapper from a ZIO effect, returning only the
+   * decoded payload and discarding the [[ObjectSummary]] metadata.
+   *
+   * {{{
+   * os.get[MyData]("config.json").payload  // ZIO[Any, NatsError, MyData]
+   * }}}
+   */
+  extension [R, E, A](zio: ZIO[R, E, ObjectData[A]])
+    @scala.annotation.targetName("objectDataPayload")
+    def payload: ZIO[R, E, A] = zio.map(_.value)
 
   // --- Config class re-exports (users don't need zio.nats.configuration._) ---
   type StreamConfig = configuration.StreamConfig

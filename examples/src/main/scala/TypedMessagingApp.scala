@@ -40,14 +40,14 @@ object TypedMessagingApp extends ZIOAppDefault {
       userFiber <- Nats
                      .subscribe[User](Subject("demo.users"))
                      .take(3)
-                     .tap(user => Console.printLine(s"  user:  ${user.name}, age ${user.age}").orDie)
+                     .tap(env => Console.printLine(s"  user:  ${env.value.name}, age ${env.value.age}").orDie)
                      .runDrain
                      .fork
 
       orderFiber <- Nats
                       .subscribe[Order](Subject("demo.orders"))
                       .take(2)
-                      .tap(order => Console.printLine(s"  order: ${order.id} - $$${order.amount}").orDie)
+                      .tap(env => Console.printLine(s"  order: ${env.value.id} - $$${env.value.amount}").orDie)
                       .runDrain
                       .fork
 

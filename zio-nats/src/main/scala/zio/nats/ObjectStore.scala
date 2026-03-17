@@ -33,11 +33,14 @@ trait ObjectStore {
   /**
    * Retrieve and decode an object to type A.
    *
+   * Returns an [[ObjectData]] containing both the decoded value and the
+   * [[ObjectSummary]] metadata (name, size, chunks, description, etc.).
+   *
    * Use `get[Chunk[Byte]](name)` to retrieve raw bytes.
    * For very large objects prefer [[getStream]] to avoid loading the full
    * object into memory.
    */
-  def get[A: NatsCodec](objectName: String): IO[NatsError, A]
+  def get[A: NatsCodec](objectName: String): IO[NatsError, ObjectData[A]]
 
   /**
    * Store raw bytes from a ZStream without buffering the full content in
@@ -161,14 +164,14 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
       .attemptBlocking(os.put(meta.toJava, new ByteArrayInputStream(NatsCodec[A].encode(data).toArray)))
       .mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
 
-  override def get[A: NatsCodec](objectName: String): IO[NatsError, A] =
+  override def get[A: NatsCodec](objectName: String): IO[NatsError, ObjectData[A]] =
     ZIO.attemptBlocking {
       val baos = new ByteArrayOutputStream()
-      os.get(objectName, baos)
-      Chunk.fromArray(baos.toByteArray)
-    }.mapError(NatsError.fromThrowable).flatMap { bytes =>
+      val info = os.get(objectName, baos)
+      (Chunk.fromArray(baos.toByteArray), ObjectSummary.fromJava(info))
+    }.mapError(NatsError.fromThrowable).flatMap { case (bytes, summary) =>
       NatsCodec[A].decode(bytes) match {
-        case Right(value) => ZIO.succeed(value)
+        case Right(value) => ZIO.succeed(ObjectData(value, summary))
         case Left(err)    => ZIO.fail(NatsError.DecodingError(err.message, err))
       }
     }

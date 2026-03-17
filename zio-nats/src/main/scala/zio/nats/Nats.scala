@@ -48,32 +48,21 @@ trait Nats {
   ): IO[NatsError, Unit]
 
   // -------------------------------------------------------------------------
-  // Raw request/reply
-  // -------------------------------------------------------------------------
-
-  /**
-   * Send a request with raw bytes and await a single reply within `timeout`.
-   *
-   * Uses the NATS built-in request-reply mechanism (auto-generated reply-to
-   * inbox).
-   */
-  def request(
-    subject: Subject,
-    payload: Chunk[Byte],
-    timeout: Duration = 2.seconds
-  ): IO[NatsError, NatsMessage]
-
-  // -------------------------------------------------------------------------
   // Typed request/reply
   // -------------------------------------------------------------------------
 
   /**
    * Encode `request` as `A`, send it, await the reply, then decode it as `B`.
    *
+   * Returns an [[Envelope]] containing both the decoded response and the raw
+   * [[NatsMessage]] (so headers and other metadata remain accessible).
+   *
    * Use the [[Nats]] companion accessor for a version with a default `timeout`:
    * {{{
    *   Nats.request[A, B](subject, value)   // 2-second timeout is used
    * }}}
+   *
+   * Pass `Chunk[Byte]` for `A` and/or `B` to use the identity codec (raw bytes).
    *
    * Decode failures are surfaced as [[NatsError.DecodingError]].
    */
@@ -81,7 +70,7 @@ trait Nats {
     subject: Subject,
     request: A,
     timeout: Duration
-  ): IO[NatsError, B]
+  ): IO[NatsError, Envelope[B]]
 
   // -------------------------------------------------------------------------
   // Subscribe
@@ -109,10 +98,15 @@ trait Nats {
   /**
    * Subscribe and automatically decode each message payload.
    *
+   * Returns a stream of [[Envelope]]s so callers have access to both the
+   * decoded value and the raw [[NatsMessage]] (headers, subject, reply-to).
+   *
+   * Pass `Chunk[Byte]` to use the identity codec (raw bytes).
+   *
    * Decode failures are converted to [[NatsError.DecodingError]] and propagated
    * through the stream's error channel.
    */
-  def subscribe[A: NatsCodec](subject: Subject): ZStream[Any, NatsError, A]
+  def subscribe[A: NatsCodec](subject: Subject): ZStream[Any, NatsError, Envelope[A]]
 
   // -------------------------------------------------------------------------
   // Utility
@@ -180,13 +174,6 @@ object Nats {
   ): ZIO[Nats, NatsError, Unit] =
     ZIO.serviceWithZIO[Nats](_.publish[A](subject, value, params))
 
-  def request(
-    subject: Subject,
-    payload: Chunk[Byte],
-    timeout: Duration = 2.seconds
-  ): ZIO[Nats, NatsError, NatsMessage] =
-    ZIO.serviceWithZIO[Nats](_.request(subject, payload, timeout))
-
   /**
    * Typed request with explicit timeout (mirrors the trait method).
    */
@@ -194,7 +181,7 @@ object Nats {
     subject: Subject,
     request: A,
     timeout: Duration
-  ): ZIO[Nats, NatsError, B] =
+  ): ZIO[Nats, NatsError, Envelope[B]] =
     ZIO.serviceWithZIO[Nats](_.request[A, B](subject, request, timeout))
 
   /**
@@ -207,7 +194,7 @@ object Nats {
   def request[A: NatsCodec, B: NatsCodec](
     subject: Subject,
     request: A
-  ): ZIO[Nats, NatsError, B] =
+  ): ZIO[Nats, NatsError, Envelope[B]] =
     ZIO.serviceWithZIO[Nats](_.request[A, B](subject, request, 2.seconds))
 
   /**
@@ -226,7 +213,7 @@ object Nats {
   ): ZStream[Nats, NatsError, NatsMessage] =
     ZStream.serviceWithStream[Nats](_.subscribe(subject, queue))
 
-  def subscribe[A: NatsCodec](subject: Subject): ZStream[Nats, NatsError, A] =
+  def subscribe[A: NatsCodec](subject: Subject): ZStream[Nats, NatsError, Envelope[A]] =
     ZStream.serviceWithStream[Nats](_.subscribe[A](subject))
 
   def flush(timeout: Duration = 1.second): ZIO[Nats, NatsError, Unit] =
@@ -306,29 +293,20 @@ private[nats] final class NatsLive(conn: JConnection) extends Nats {
     }
   }
 
-  override def request(
-    subject: Subject,
-    payload: Chunk[Byte],
-    timeout: Duration
-  ): IO[NatsError, NatsMessage] =
-    ZIO
-      .fromCompletionStage(
-        conn.requestWithTimeout(subject.value, payload.toArray, timeout.asJava)
-      )
-      .mapBoth(NatsError.fromThrowable, NatsMessage.fromJava)
-
   override def request[A: NatsCodec, B: NatsCodec](
     subject: Subject,
     request: A,
     timeout: Duration
-  ): IO[NatsError, B] = {
+  ): IO[NatsError, Envelope[B]] = {
     val bytes = NatsCodec[A].encode(request)
-    this
-      .request(subject, bytes, timeout)
-      .flatMap { msg =>
+    ZIO
+      .fromCompletionStage(conn.requestWithTimeout(subject.value, bytes.toArray, timeout.asJava))
+      .mapError(NatsError.fromThrowable)
+      .flatMap { jMsg =>
+        val msg = NatsMessage.fromJava(jMsg)
         ZIO
           .fromEither(msg.decode[B])
-          .mapError(e => NatsError.DecodingError(e.message, e))
+          .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
       }
   }
 
@@ -344,11 +322,11 @@ private[nats] final class NatsLive(conn: JConnection) extends Nats {
   ): ZStream[Any, NatsError, NatsMessage] =
     subscribeInternal(subject.value, Some(queue.value))
 
-  override def subscribe[A: NatsCodec](subject: Subject): ZStream[Any, NatsError, A] =
+  override def subscribe[A: NatsCodec](subject: Subject): ZStream[Any, NatsError, Envelope[A]] =
     subscribeInternal(subject.value, None).mapZIO { msg =>
       ZIO
         .fromEither(msg.decode[A])
-        .mapError(e => NatsError.DecodingError(e.message, e))
+        .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
     }
 
   /**

@@ -71,9 +71,9 @@ object NatsPubSubSpec extends ZIOSpecDefault {
                    .runDrain
                    .fork
         _     <- ZIO.sleep(500.millis)
-        reply <- nats.request(subject, Chunk.fromArray("ping".getBytes), 5.seconds)
+        reply <- nats.request[Chunk[Byte], String](subject, Chunk.fromArray("ping".getBytes), 5.seconds)
         _     <- fiber.interrupt
-      } yield assertTrue(reply.dataAsString == "pong")
+      } yield assertTrue(reply.value == "pong")
     },
 
     test("rtt returns a non-negative duration") {
