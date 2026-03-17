@@ -131,6 +131,24 @@ trait Nats {
   def serverInfo: IO[NatsError, NatsServerInfo]
 
   /**
+   * Measure round-trip time to the server. Sends a PING and waits for PONG.
+   * Fails with [[NatsError]] if the connection is closed or the ping times out.
+   */
+  def rtt: IO[NatsError, Duration]
+
+  /** URL of the server this connection is currently using, if connected. */
+  def connectedUrl: UIO[Option[String]]
+
+  /** Lifetime counters for this connection (messages in/out, reconnects, etc.). */
+  def statistics: UIO[ConnectionStats]
+
+  /** Number of messages waiting to be flushed to the server. */
+  def outgoingPendingMessageCount: UIO[Long]
+
+  /** Bytes waiting to be flushed to the server. */
+  def outgoingPendingBytes: UIO[Long]
+
+  /**
    * Escape hatch: access the raw jnats Connection for advanced or unsupported
    * use-cases.
    */
@@ -216,6 +234,21 @@ object Nats {
 
   def status: URIO[Nats, ConnectionStatus] =
     ZIO.serviceWithZIO[Nats](_.status)
+
+  def rtt: ZIO[Nats, NatsError, Duration] =
+    ZIO.serviceWithZIO[Nats](_.rtt)
+
+  def connectedUrl: URIO[Nats, Option[String]] =
+    ZIO.serviceWithZIO[Nats](_.connectedUrl)
+
+  def statistics: URIO[Nats, ConnectionStats] =
+    ZIO.serviceWithZIO[Nats](_.statistics)
+
+  def outgoingPendingMessageCount: URIO[Nats, Long] =
+    ZIO.serviceWithZIO[Nats](_.outgoingPendingMessageCount)
+
+  def outgoingPendingBytes: URIO[Nats, Long] =
+    ZIO.serviceWithZIO[Nats](_.outgoingPendingBytes)
 
   // -------------------------------------------------------------------------
   // Layer construction
@@ -363,6 +396,21 @@ private[nats] final class NatsLive(conn: JConnection) extends Nats {
     ZIO
       .attempt(conn.getServerInfo)
       .mapBoth(NatsError.fromThrowable, NatsServerInfo.fromJava)
+
+  override def rtt: IO[NatsError, Duration] =
+    ZIO.attemptBlocking(conn.RTT()).mapBoth(NatsError.fromThrowable, d => Duration.fromJava(d))
+
+  override def connectedUrl: UIO[Option[String]] =
+    ZIO.succeed(Option(conn.getConnectedUrl))
+
+  override def statistics: UIO[ConnectionStats] =
+    ZIO.succeed(ConnectionStats.fromJava(conn.getStatistics))
+
+  override def outgoingPendingMessageCount: UIO[Long] =
+    ZIO.succeed(conn.outgoingPendingMessageCount())
+
+  override def outgoingPendingBytes: UIO[Long] =
+    ZIO.succeed(conn.outgoingPendingBytes())
 
   override def underlying: JConnection = conn
 }

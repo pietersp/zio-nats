@@ -76,6 +76,37 @@ object NatsPubSubSpec extends ZIOSpecDefault {
       } yield assertTrue(reply.dataAsString == "pong")
     },
 
+    test("rtt returns a non-negative duration") {
+      for {
+        nats <- ZIO.service[Nats]
+        d    <- nats.rtt
+      } yield assertTrue(d.toNanos >= 0)
+    },
+
+    test("connectedUrl is set while connected") {
+      for {
+        nats <- ZIO.service[Nats]
+        url  <- nats.connectedUrl
+      } yield assertTrue(url.isDefined)
+    },
+
+    test("statistics tracks outgoing messages") {
+      for {
+        nats   <- ZIO.service[Nats]
+        before <- nats.statistics
+        _      <- nats.publish(Subject("stats.test"), Chunk.fromArray("x".getBytes))
+        after  <- nats.statistics
+      } yield assertTrue(after.outMsgs > before.outMsgs)
+    },
+
+    test("outgoingPendingMessageCount and bytes are non-negative") {
+      for {
+        nats <- ZIO.service[Nats]
+        msgs <- nats.outgoingPendingMessageCount
+        bytes <- nats.outgoingPendingBytes
+      } yield assertTrue(msgs >= 0, bytes >= 0)
+    },
+
     test("queue group delivers to exactly one subscriber") {
       val subject = Subject("test.queue")
       for {
