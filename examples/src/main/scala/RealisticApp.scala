@@ -59,23 +59,23 @@ object RealisticApp extends ZIOAppDefault {
       // --- Consume the orders as a ZStream, ack each one ---
       consumer <- js.consumer("ORDERS", "order-processor")
       _        <- consumer
-             .fetch(FetchOptions(maxMessages = 5, expiresIn = 5.seconds))
+              .fetch[String](FetchOptions(maxMessages = 5, expiresIn = 5.seconds))
              .mapZIO { msg =>
                for {
-                 _     <- Console.printLine(s"Processing: ${msg.dataAsString}").orDie
-                 _     <- msg.ack
-                 entry <- kv.get("processed")
-                 count  = entry.map(_.valueAsString.toInt).getOrElse(0)
+                 _     <- Console.printLine(s"Processing: ${msg}").orDie
+                 _     <- msg.message.ack
+                 entry <- kv.get[String]("processed")
+                 count  = entry.map(_.value.toInt).getOrElse(0)
                  _     <- kv.put("processed", (count + 1).toString)
                } yield ()
              }
              .runDrain
 
       // --- Report final count from KV ---
-      finalEntry <- kv.get("processed")
+      finalEntry <- kv.get[String]("processed")
       _          <- Console
              .printLine(
-               s"Done. Processed: ${finalEntry.map(_.valueAsString).getOrElse("0")} orders"
+               s"Done. Processed: ${finalEntry.map(_.value).getOrElse("0")} orders"
              )
              .orDie
     } yield ()

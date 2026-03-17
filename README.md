@@ -11,7 +11,7 @@ A ZIO 2 wrapper for the [jnats](https://github.com/nats-io/nats.java) NATS clien
 - `ZStream`-based subscriptions and consumers — no callbacks in user code
 - Typed error model (`NatsError` sealed ADT)
 - Type-safe serialization with [zio-blocks Schema](https://zio.dev/zio-blocks)
-- Zero raw jnats types in user code — `import zio.nats._` is all you need
+- Zero raw jnats types in user code — `import zio.nats.*` is all you need
 - Scala 3
 
 ## Installation
