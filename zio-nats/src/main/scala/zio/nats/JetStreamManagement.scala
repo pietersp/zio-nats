@@ -7,36 +7,90 @@ import zio.nats.configuration.{ConsumerConfig, StreamConfig}
 
 import scala.jdk.CollectionConverters.*
 
-/** Service for managing JetStream streams and consumers (admin operations). */
+/**
+ * Service for managing JetStream streams and consumers (admin operations).
+ *
+ * Provides CRUD operations for streams and consumers, as well as stream
+ * purging, message-level access, consumer pause/resume, and account statistics.
+ *
+ * Obtain an instance via [[JetStreamManagement.live]] (requires [[Nats]] in scope).
+ * For publishing and consuming messages see [[JetStream]] and [[Consumer]].
+ */
 trait JetStreamManagement {
 
   // --- Stream CRUD ---
+
+  /** Create a new stream with the given configuration. */
   def addStream(config: StreamConfig): IO[NatsError, StreamSummary]
+
+  /** Update the configuration of an existing stream. */
   def updateStream(config: StreamConfig): IO[NatsError, StreamSummary]
+
+  /** Delete a stream and all its messages. Returns true if deleted. */
   def deleteStream(streamName: String): IO[NatsError, Boolean]
+
+  /** Get metadata and state for a stream. */
   def getStreamInfo(streamName: String): IO[NatsError, StreamSummary]
+
+  /** Delete all messages from a stream without removing the stream itself. */
   def purgeStream(streamName: String): IO[NatsError, PurgeSummary]
+
+  /**
+   * Purge messages matching `subject` from the stream.
+   *
+   * @param keepLast
+   *   If provided, keep the last N matching messages and delete the rest.
+   */
   def purgeStream(streamName: String, subject: String, keepLast: Option[Long] = None): IO[NatsError, PurgeSummary]
+
+  /** List the names of all streams on this server. */
   def getStreamNames: IO[NatsError, List[String]]
+
+  /** List all streams with their summaries. */
   def getStreams: IO[NatsError, List[StreamSummary]]
 
   // --- Consumer CRUD ---
+
+  /** Create or update a consumer on the given stream. */
   def addOrUpdateConsumer(streamName: String, config: ConsumerConfig): IO[NatsError, ConsumerSummary]
+
+  /** Delete a consumer from a stream. Returns true if deleted. */
   def deleteConsumer(streamName: String, consumerName: String): IO[NatsError, Boolean]
+
+  /** Get metadata and state for a named consumer. */
   def getConsumerInfo(streamName: String, consumerName: String): IO[NatsError, ConsumerSummary]
+
+  /** List the names of all consumers on a stream. */
   def getConsumerNames(streamName: String): IO[NatsError, List[String]]
+
+  /** List all consumers on a stream with their summaries. */
   def getConsumers(streamName: String): IO[NatsError, List[ConsumerSummary]]
 
   // --- Consumer pause / resume ---
+
+  /**
+   * Pause a consumer until a specified point in time.
+   * Paused consumers do not deliver messages until `pauseUntil` is reached.
+   */
   def pauseConsumer(streamName: String, consumerName: String, pauseUntil: java.time.ZonedDateTime): IO[NatsError, ConsumerPauseInfo]
+
+  /** Resume a previously paused consumer immediately. Returns true on success. */
   def resumeConsumer(streamName: String, consumerName: String): IO[NatsError, Boolean]
 
   // --- Message access ---
+
+  /** Retrieve a specific message by stream sequence number. */
   def getMessage(streamName: String, seq: Long): IO[NatsError, MessageInfo]
+
+  /** Retrieve the last message stored on a subject within a stream. */
   def getLastMessage(streamName: String, subject: String): IO[NatsError, MessageInfo]
+
+  /** Hard-delete a message by sequence number. Returns true if deleted. */
   def deleteMessage(streamName: String, seq: Long): IO[NatsError, Boolean]
 
   // --- Account info ---
+
+  /** Retrieve account-level JetStream statistics (storage, memory, stream counts, etc.). */
   def getAccountStatistics: IO[NatsError, AccountStatistics]
 }
 

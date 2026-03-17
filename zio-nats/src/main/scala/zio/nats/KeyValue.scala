@@ -8,13 +8,34 @@ import zio.stream.*
 
 import scala.jdk.CollectionConverters.*
 
-/** Service for key-value operations on a single NATS KV bucket. */
+/**
+ * Service for key-value operations on a single NATS KV bucket.
+ *
+ * NATS KV is built on JetStream and provides compare-and-swap writes,
+ * revisioned history, and change-watch streams.
+ *
+ * Obtain an instance via [[KeyValue.bucket]] (requires a [[Nats]] connection
+ * in scope). Use [[KeyValueManagement]] to create or delete buckets.
+ *
+ * ==Example==
+ * {{{
+ * for {
+ *   kv  <- KeyValue.bucket("settings")
+ *   _   <- kv.put("timeout", "30s")
+ *   opt <- kv.get("timeout")
+ * } yield opt.map(_.valueAsString)
+ * }}}
+ */
 trait KeyValue {
 
+  /** The name of the KV bucket this service is bound to. */
   def bucketName: String
 
   // --- Get ---
+  /** Retrieve the latest entry for `key`. Returns None if the key does not exist. */
   def get(key: String): IO[NatsError, Option[KeyValueEntry]]
+
+  /** Retrieve the entry for `key` at the specified stream `revision`. Returns None if not found. */
   def get(key: String, revision: Long): IO[NatsError, Option[KeyValueEntry]]
 
   // --- Put ---
@@ -86,17 +107,36 @@ trait KeyValue {
    */
   def consumeKeys(filters: List[String] = Nil): ZStream[Any, NatsError, String]
 
+  /** Return the full revision history for `key`, from oldest to newest. */
   def history(key: String): IO[NatsError, List[KeyValueEntry]]
+
+  /** Return the current status and configuration of this bucket. */
   def getStatus: IO[NatsError, KeyValueBucketStatus]
 }
 
-/** Service for managing Key-Value buckets. */
+/**
+ * Service for managing Key-Value buckets.
+ *
+ * Provides administrative operations to create, update, and delete KV buckets.
+ * Obtain an instance via [[KeyValueManagement.live]] (requires [[Nats]] in scope).
+ */
 trait KeyValueManagement {
+  /** Create a new KV bucket with the given configuration. */
   def create(config: KeyValueConfig): IO[NatsError, KeyValueBucketStatus]
+
+  /** Update an existing KV bucket's configuration. */
   def update(config: KeyValueConfig): IO[NatsError, KeyValueBucketStatus]
+
+  /** Delete a KV bucket and all its entries. */
   def delete(bucketName: String): IO[NatsError, Unit]
+
+  /** List the names of all KV buckets on this server. */
   def getBucketNames: IO[NatsError, List[String]]
+
+  /** Get the current status and configuration for a named bucket. */
   def getStatus(bucketName: String): IO[NatsError, KeyValueBucketStatus]
+
+  /** Get status information for all KV buckets. */
   def getStatuses: IO[NatsError, List[KeyValueBucketStatus]]
 }
 

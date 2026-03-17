@@ -9,9 +9,29 @@ import zio.stream.*
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, PipedInputStream, PipedOutputStream}
 import scala.jdk.CollectionConverters.*
 
-/** Service for object store operations on a single NATS OS bucket. */
+/**
+ * Service for object store operations on a single NATS OS bucket.
+ *
+ * NATS ObjectStore is built on JetStream and is optimised for storing large,
+ * named blobs. Objects are chunked automatically on the server side.
+ * Use [[putStream]] / [[getStream]] for very large objects to avoid loading
+ * them fully into memory.
+ *
+ * Obtain an instance via [[ObjectStore.bucket]] (requires a [[Nats]] connection
+ * in scope). Use [[ObjectStoreManagement]] to create or delete buckets.
+ *
+ * ==Example==
+ * {{{
+ * for {
+ *   os      <- ObjectStore.bucket("assets")
+ *   summary <- os.put("logo.png", pngBytes)
+ *   _       <- Console.printLine(s"Stored ${summary.size} bytes in ${summary.chunks} chunks")
+ * } yield ()
+ * }}}
+ */
 trait ObjectStore {
 
+  /** The name of the Object Store bucket this service is bound to. */
   def bucketName: String
 
   private[nats] def underlying: JObjectStore
@@ -102,12 +122,26 @@ trait ObjectStore {
   def watch(options: ObjectStoreWatchOptions = ObjectStoreWatchOptions.default): ZStream[Any, NatsError, ObjectSummary]
 }
 
-/** Service for managing Object Store buckets. */
+/**
+ * Service for managing Object Store buckets.
+ *
+ * Provides administrative operations to create and delete OS buckets.
+ * Obtain an instance via [[ObjectStoreManagement.live]] (requires [[Nats]] in scope).
+ */
 trait ObjectStoreManagement {
+  /** Create a new Object Store bucket with the given configuration. */
   def create(config: ObjectStoreConfig): IO[NatsError, ObjectStoreBucketStatus]
+
+  /** Delete an Object Store bucket and all its objects. */
   def delete(bucketName: String): IO[NatsError, Unit]
+
+  /** List the names of all Object Store buckets on this server. */
   def getBucketNames: IO[NatsError, List[String]]
+
+  /** Get the current status and configuration for a named bucket. */
   def getStatus(bucketName: String): IO[NatsError, ObjectStoreBucketStatus]
+
+  /** Get status information for all Object Store buckets. */
   def getStatuses: IO[NatsError, List[ObjectStoreBucketStatus]]
 }
 

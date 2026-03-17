@@ -4,7 +4,24 @@ import io.nats.client.{JetStream as JJetStream, StreamContext as JStreamContext}
 import zio.nats.configuration.OrderedConsumerConfig
 import zio.*
 
-/** JetStream publishing service. */
+/**
+ * JetStream publishing service.
+ *
+ * JetStream is NATS's built-in persistence layer. Messages published through
+ * this service are stored in server-side streams and can be replayed,
+ * acknowledged, and consumed by durable consumers.
+ *
+ * Obtain an instance via [[JetStream.live]] (requires a [[Nats]] connection in
+ * scope). Use [[JetStreamManagement]] for stream and consumer administration.
+ *
+ * ==Example==
+ * {{{
+ * for {
+ *   ack <- JetStream.publish(Subject("orders.created"), order)
+ *   _   <- Console.printLine(s"Stored at seq ${ack.seqno}")
+ * } yield ()
+ * }}}
+ */
 trait JetStream {
 
   /**

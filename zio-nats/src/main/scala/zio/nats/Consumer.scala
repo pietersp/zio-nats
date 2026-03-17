@@ -4,17 +4,59 @@ import io.nats.client.{BaseConsumerContext as JBaseConsumerContext, ConsumerCont
 import zio.*
 import zio.stream.*
 
-/** High-level consumer handle returned by [[JetStream.consumer]]. */
+/**
+ * High-level consumer handle returned by [[JetStream.consumer]].
+ *
+ * Provides four consumption strategies suited to different use cases:
+ *
+ *   - [[fetch]] — bounded pull: retrieve up to N messages then complete.
+ *   - [[consume]] — unbounded push: messages are delivered continuously until the stream is interrupted.
+ *   - [[iterate]] — long-running pull: polls the server periodically.
+ *   - [[next]] — single message with timeout.
+ *
+ * Each message must be explicitly ack'd, nak'd, or termed via
+ * [[JetStreamMessage]] methods.
+ */
 trait Consumer {
+  /** The name of the stream this consumer is bound to. */
   def streamName: String
+
+  /** The durable consumer name. */
   def consumerName: String
 
+  /**
+   * Fetch a bounded batch of messages.
+   *
+   * The returned stream completes after the batch is fulfilled or
+   * [[FetchOptions.expiresIn]] elapses.
+   */
   def fetch(options: FetchOptions = FetchOptions.default): ZStream[Any, NatsError, JetStreamMessage]
+
+  /**
+   * Consume messages indefinitely via server-push.
+   *
+   * The stream never completes on its own — interrupt it to stop consuming.
+   * Uses efficient server-side push delivery with back-pressure handled by
+   * [[ConsumeOptions.batchSize]].
+   */
   def consume(options: ConsumeOptions = ConsumeOptions.default): ZStream[Any, NatsError, JetStreamMessage]
+
+  /**
+   * Pull messages one at a time using a long-running iterable consumer.
+   *
+   * Each poll waits up to `pollTimeout` for the next message. When no message
+   * arrives within that window the poll retries automatically (the stream
+   * continues). Interrupt the stream to stop.
+   */
   def iterate(
     options: ConsumeOptions = ConsumeOptions.default,
     pollTimeout: Duration = 5.seconds
   ): ZStream[Any, NatsError, JetStreamMessage]
+
+  /**
+   * Retrieve a single message, waiting up to `timeout`.
+   * Returns None if no message is available within the timeout.
+   */
   def next(timeout: Duration = 5.seconds): IO[NatsError, Option[JetStreamMessage]]
 
   /**

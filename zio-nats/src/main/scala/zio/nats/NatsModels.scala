@@ -93,6 +93,18 @@ private[nats] object ConnectionStats {
 // JetStream publish types
 // ---------------------------------------------------------------------------
 
+/**
+ * Acknowledgment returned by the server after a JetStream publish.
+ *
+ * @param stream
+ *   The name of the stream that stored the message.
+ * @param seqno
+ *   The stream sequence number assigned to the message.
+ * @param isDuplicate
+ *   True if the message was detected as a duplicate (same message ID).
+ * @param domain
+ *   The JetStream domain, if the server is configured with one.
+ */
 final case class PublishAck(stream: String, seqno: Long, isDuplicate: Boolean, domain: Option[String])
 
 private[nats] object PublishAck {
@@ -104,6 +116,24 @@ private[nats] object PublishAck {
   )
 }
 
+/**
+ * Idempotence and expected-state guards for a JetStream publish.
+ *
+ * All fields are optional; omit the ones you don't need.
+ *
+ * @param messageId
+ *   A client-assigned ID used for duplicate detection. If the server has
+ *   already stored a message with this ID in the stream's duplicate window,
+ *   the publish is acknowledged but [[PublishAck.isDuplicate]] will be true.
+ * @param expectedStream
+ *   Fail the publish if the subject does not route to this stream.
+ * @param expectedLastMsgId
+ *   Fail if the last message stored in the stream had a different message ID.
+ * @param expectedLastSeqno
+ *   Fail if the stream's last sequence number is not this value.
+ * @param expectedLastSubjectSeqno
+ *   Fail if the last sequence on the specific subject is not this value.
+ */
 final case class PublishOptions(
   messageId: Option[String] = None,
   expectedStream: Option[String] = None,
@@ -126,6 +156,14 @@ final case class PublishOptions(
 // JetStream publish params
 // ---------------------------------------------------------------------------
 
+/**
+ * Optional parameters for a JetStream publish operation.
+ *
+ * @param headers
+ *   Optional NATS headers to attach to the message.
+ * @param options
+ *   Optional [[PublishOptions]] for idempotence and expected-state guards.
+ */
 final case class JsPublishParams(
   headers: Headers = Headers.empty,
   options: Option[PublishOptions] = None
@@ -139,6 +177,17 @@ object JsPublishParams {
 // Consumer fetch / consume options
 // ---------------------------------------------------------------------------
 
+/**
+ * Options for a bounded [[Consumer.fetch]] operation.
+ *
+ * @param maxMessages
+ *   Maximum number of messages to fetch in a single batch (default: 100).
+ * @param maxBytes
+ *   Maximum total bytes to fetch. Ignored when set to -1 (default).
+ * @param expiresIn
+ *   How long to wait for messages before the fetch expires (default: 5 seconds).
+ *   The stream completes when the batch is full or this timeout elapses.
+ */
 final case class FetchOptions(
   maxMessages: Int = 100,
   maxBytes: Long = -1,
@@ -158,6 +207,19 @@ object FetchOptions {
   val default: FetchOptions = FetchOptions()
 }
 
+/**
+ * Options for an unbounded [[Consumer.consume]] or [[Consumer.iterate]] operation.
+ *
+ * @param batchSize
+ *   Number of messages the server sends per credit replenishment (default: 512).
+ *   Ignored when `batchBytes` is set.
+ * @param batchBytes
+ *   Maximum bytes per credit replenishment. Takes precedence over `batchSize`
+ *   when set to a positive value. Ignored when -1 (default).
+ * @param expiresIn
+ *   How long each server-side subscription credit lasts before renewal
+ *   (default: 30 seconds).
+ */
 final case class ConsumeOptions(
   batchSize: Int = 512,
   batchBytes: Long = -1,
@@ -181,6 +243,15 @@ object ConsumeOptions {
 // JetStream management return types
 // ---------------------------------------------------------------------------
 
+/**
+ * Snapshot of a JetStream stream's configuration and current state.
+ *
+ * @param name          The stream name.
+ * @param subjects      Subjects this stream captures.
+ * @param messageCount  Number of messages currently stored in the stream.
+ * @param byteCount     Total bytes currently stored in the stream.
+ * @param consumerCount Number of consumers attached to the stream.
+ */
 final case class StreamSummary(
   name: String,
   subjects: List[String],
@@ -203,6 +274,15 @@ private[nats] object StreamSummary {
   }
 }
 
+/**
+ * Snapshot of a JetStream consumer's state.
+ *
+ * @param name          The consumer name.
+ * @param streamName    The stream this consumer is bound to.
+ * @param numPending    Messages available in the stream that have not yet been delivered.
+ * @param numAckPending Delivered messages waiting for an acknowledgment.
+ * @param redelivered   Number of messages that have been redelivered.
+ */
 final case class ConsumerSummary(
   name: String,
   streamName: String,
@@ -221,6 +301,11 @@ private[nats] object ConsumerSummary {
   )
 }
 
+/**
+ * Result of a stream purge operation.
+ *
+ * @param purgedCount The number of messages removed from the stream.
+ */
 final case class PurgeSummary(purgedCount: Long)
 
 private[nats] object PurgeSummary {
@@ -231,6 +316,17 @@ private[nats] object PurgeSummary {
 // Key-Value return type
 // ---------------------------------------------------------------------------
 
+/**
+ * A single entry in a NATS KV bucket, as returned by [[KeyValue.get]],
+ * [[KeyValue.history]], and watch streams.
+ *
+ * @param key       The entry key.
+ * @param value     Raw payload bytes. Empty for delete/purge markers.
+ * @param revision  The stream sequence number of this entry (monotonically increasing).
+ * @param operation Whether this entry is a [[KeyValueOperation.Put]], [[KeyValueOperation.Delete]],
+ *                  or [[KeyValueOperation.Purge]] marker.
+ * @param bucketName The bucket this entry belongs to.
+ */
 final case class KeyValueEntry(
   key: String,
   value: Chunk[Byte],
@@ -276,6 +372,15 @@ private[nats] object KeyValueEntry {
  */
 final case class ObjectData[+A](value: A, summary: ObjectSummary)
 
+/**
+ * Metadata for a stored object in a NATS Object Store bucket.
+ *
+ * @param name        The object name (unique within the bucket).
+ * @param size        Total size of the object in bytes.
+ * @param chunks      Number of chunks the object was split into for storage.
+ * @param description Optional human-readable description.
+ * @param isDeleted   True if the object has been soft-deleted.
+ */
 final case class ObjectSummary(
   name: String,
   size: Long,
@@ -298,6 +403,13 @@ private[nats] object ObjectSummary {
 // Consumer pause response
 // ---------------------------------------------------------------------------
 
+/**
+ * Result of a [[JetStreamManagement.pauseConsumer]] or [[JetStreamManagement.resumeConsumer]] call.
+ *
+ * @param isPaused       Whether the consumer is currently paused.
+ * @param pauseUntil     The time at which the consumer will automatically resume, if paused.
+ * @param pauseRemaining Time remaining until the consumer resumes, if paused.
+ */
 final case class ConsumerPauseInfo(
   isPaused: Boolean,
   pauseUntil: Option[java.time.ZonedDateTime],
@@ -350,6 +462,20 @@ object KeyValueWatchOptions {
 // Key-Value bucket status
 // ---------------------------------------------------------------------------
 
+/**
+ * Current status and configuration of a NATS KV bucket.
+ *
+ * @param bucketName       The bucket name.
+ * @param description      Optional description.
+ * @param entryCount       Number of live entries in the bucket.
+ * @param byteCount        Total bytes stored in the bucket.
+ * @param maxHistoryPerKey Maximum revisions to keep per key (-1 = unlimited).
+ * @param maxBucketSize    Maximum total bytes for the bucket (-1 = unlimited).
+ * @param storageType      File or Memory storage.
+ * @param replicas         Number of server replicas.
+ * @param isCompressed     Whether values are compressed on the server.
+ * @param ttl              Default TTL for entries, if configured.
+ */
 final case class KeyValueBucketStatus(
   bucketName: String,
   description: Option[String],
@@ -411,6 +537,18 @@ object ObjectStoreWatchOptions {
 // Object Store bucket status
 // ---------------------------------------------------------------------------
 
+/**
+ * Current status and configuration of a NATS Object Store bucket.
+ *
+ * @param bucketName    The bucket name.
+ * @param description   Optional description.
+ * @param size          Total bytes stored across all objects.
+ * @param maxBucketSize Maximum allowed bytes (-1 = unlimited).
+ * @param storageType   File or Memory storage.
+ * @param replicas      Number of server replicas.
+ * @param isSealed      True if the bucket has been sealed (read-only).
+ * @param isCompressed  Whether objects are compressed on the server.
+ */
 final case class ObjectStoreBucketStatus(
   bucketName: String,
   description: Option[String],

@@ -6,9 +6,29 @@ import zio.*
 /**
  * Configuration for a NATS connection.
  *
- * Provides a Scala-friendly API over io.nats.client.Options.Builder. For
+ * Provides a Scala-friendly API over `io.nats.client.Options.Builder`. For
  * advanced configuration not covered by this case class, use
  * `optionsCustomizer` to access the raw builder directly.
+ *
+ * @param servers                 List of NATS server URLs (default: `nats://localhost:4222`).
+ * @param connectionName          Optional client name shown in server logs and monitoring.
+ * @param connectionTimeout       Maximum time to wait for the initial connection (default: 2s).
+ * @param reconnectWait           Delay between reconnect attempts (default: 2s).
+ * @param maxReconnects           Maximum reconnect attempts before giving up (default: 60; -1 = unlimited).
+ * @param pingInterval            Interval between client-initiated PING messages (default: 2m).
+ * @param requestCleanupInterval  How often stale request inboxes are swept (default: 5s).
+ * @param bufferSize              Size of the outbound message buffer in bytes (default: 64 KiB).
+ * @param noEcho                  If true, messages published by this connection are not echoed back
+ *                                to its own subscriptions (default: false).
+ * @param utf8Support             Enable UTF-8 subject support (default: false).
+ * @param inboxPrefix             Prefix for auto-generated reply-to inboxes (default: `_INBOX.`).
+ * @param authHandler             Custom authentication handler (NKey, JWT, etc.).
+ * @param token                   Authentication token.
+ * @param username                Username for user/password authentication.
+ * @param password                Password for user/password authentication.
+ * @param credentialPath          Path to a `.creds` file for NKey/JWT authentication.
+ * @param optionsCustomizer       Escape hatch: apply any additional `Options.Builder` settings
+ *                                not covered by the fields above.
  */
 final case class NatsConfig(
   servers: List[String] = List("nats://localhost:4222"),

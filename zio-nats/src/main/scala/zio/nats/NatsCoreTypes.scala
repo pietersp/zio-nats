@@ -161,6 +161,13 @@ object PublishParams {
 // KeyValueOperation
 // ---------------------------------------------------------------------------
 
+/**
+ * The type of operation that produced a [[KeyValueEntry]].
+ *
+ *   - `Put`    — a value was written.
+ *   - `Delete` — a soft-delete marker was placed (history preserved).
+ *   - `Purge`  — all history for the key was erased (tombstone written).
+ */
 enum KeyValueOperation { case Put, Delete, Purge }
 
 object KeyValueOperation {
@@ -175,6 +182,12 @@ object KeyValueOperation {
 // StorageType
 // ---------------------------------------------------------------------------
 
+/**
+ * Storage backend for JetStream streams, KV buckets, and Object Store buckets.
+ *
+ *   - `File`   — persisted to disk (survives server restarts).
+ *   - `Memory` — stored in RAM only (lost on server restart; higher throughput).
+ */
 enum StorageType {
   case File, Memory
 
@@ -195,6 +208,16 @@ object StorageType {
 // ObjectMeta
 // ---------------------------------------------------------------------------
 
+/**
+ * Custom metadata for an Object Store entry.
+ *
+ * Pass to [[ObjectStore.put]] or [[ObjectStore.putStream]] to attach a
+ * description or headers alongside the stored object.
+ *
+ * @param name        The object name (unique within the bucket).
+ * @param description Optional human-readable description.
+ * @param headers     Optional NATS headers to store with the object.
+ */
 final case class ObjectMeta(
   name: String,
   description: Option[String] = None,
