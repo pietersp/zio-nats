@@ -6,7 +6,7 @@ import zio.*
 import zio.nats.configuration.ObjectStoreConfig
 import zio.stream.*
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, PipedInputStream, PipedOutputStream}
 import scala.jdk.CollectionConverters.*
 
 /** Service for object store operations on a single NATS OS bucket. */
@@ -34,8 +34,27 @@ trait ObjectStore {
    * Retrieve and decode an object to type A.
    *
    * Use `get[Chunk[Byte]](name)` to retrieve raw bytes.
+   * For very large objects prefer [[getStream]] to avoid loading the full
+   * object into memory.
    */
   def get[A: NatsCodec](objectName: String): IO[NatsError, A]
+
+  /**
+   * Store raw bytes from a ZStream without buffering the full content in
+   * memory. Suitable for large objects. The stream is consumed exactly once.
+   */
+  def putStream(objectName: String, data: ZStream[Any, Nothing, Byte]): IO[NatsError, ObjectSummary]
+
+  /**
+   * Store raw bytes from a ZStream with custom metadata.
+   */
+  def putStream(meta: ObjectMeta, data: ZStream[Any, Nothing, Byte]): IO[NatsError, ObjectSummary]
+
+  /**
+   * Retrieve an object as a lazy byte stream. Bytes are delivered as they
+   * arrive from the server — the full object is never held in memory at once.
+   */
+  def getStream(objectName: String): ZStream[Any, NatsError, Byte]
 
   /** Retrieve metadata for an object (without downloading data). */
   def getInfo(objectName: String): IO[NatsError, ObjectSummary]
@@ -152,6 +171,52 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
         case Right(value) => ZIO.succeed(value)
         case Left(err)    => ZIO.fail(NatsError.DecodingError(err.message, err))
       }
+    }
+
+  private val PipeBufferSize = 65536
+
+  override def putStream(objectName: String, data: ZStream[Any, Nothing, Byte]): IO[NatsError, ObjectSummary] =
+    putStreamInternal(Left(objectName), data)
+
+  override def putStream(meta: ObjectMeta, data: ZStream[Any, Nothing, Byte]): IO[NatsError, ObjectSummary] =
+    putStreamInternal(Right(meta), data)
+
+  private def putStreamInternal(
+    target: Either[String, ObjectMeta],
+    data: ZStream[Any, Nothing, Byte]
+  ): IO[NatsError, ObjectSummary] =
+    ZIO.scoped {
+      for {
+        in     <- ZIO.succeed(new PipedInputStream(PipeBufferSize))
+        out    <- ZIO.succeed(new PipedOutputStream(in))
+        // Pump ZStream data into the pipe concurrently; close pipe when done
+        _      <- data.chunks
+                    .runForeach(chunk => ZIO.attemptBlocking(out.write(chunk.toArray)))
+                    .ensuring(ZIO.attempt(out.close()).ignoreLogged)
+                    .forkScoped
+        // jnats reads from the pipe on this (blocking) thread
+        result <- ZIO.attemptBlocking(target match {
+                    case Left(name) => os.put(name, in)
+                    case Right(m)   => os.put(m.toJava, in)
+                  }).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
+      } yield result
+    }
+
+  override def getStream(objectName: String): ZStream[Any, NatsError, Byte] =
+    ZStream.unwrapScoped {
+      for {
+        out <- ZIO.succeed(new PipedOutputStream())
+        in  <- ZIO.succeed(new PipedInputStream(out, PipeBufferSize))
+        // jnats writes to the pipe on a background fiber; close pipe when done
+        dl  <- ZIO.attemptBlocking(os.get(objectName, out))
+                 .ensuring(ZIO.attempt(out.close()).ignoreLogged)
+                 .mapError(NatsError.fromThrowable)
+                 .forkScoped
+      } yield ZStream
+                .fromInputStream(in, PipeBufferSize)
+                .mapError(NatsError.fromThrowable)
+                // append a zero-element effect that propagates any download error
+                .concat(ZStream.fromZIO(dl.join.unit).drain)
     }
 
   override def getInfo(objectName: String): IO[NatsError, ObjectSummary] =

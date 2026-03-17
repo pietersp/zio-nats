@@ -2,6 +2,7 @@ package zio.nats
 
 import zio.*
 import zio.nats.testkit.NatsTestLayers
+import zio.stream.ZStream
 import zio.test.*
 import zio.test.TestAspect.*
 
@@ -123,6 +124,23 @@ object ObjectStoreSpec extends ZIOSpecDefault {
                       .map(_.getOrElse(Chunk.empty))
         _        <- osm.delete("os-watch-del")
       } yield assertTrue(entries.forall(!_.isDeleted))
+    },
+
+    test("putStream and getStream round-trip a large object without full in-memory buffering") {
+      for {
+        osm     <- ZIO.service[ObjectStoreManagement]
+        _       <- osm.create(ObjectStoreConfig(name = "os-stream", storageType = StorageType.Memory))
+        os      <- ObjectStore.bucket("os-stream")
+        bigData  = Chunk.fromArray(Array.fill(512 * 1024)(99.toByte))
+        src      = ZStream.fromChunk(bigData)
+        info    <- os.putStream("streamed-obj", src)
+        got     <- os.getStream("streamed-obj").runCollect
+        _       <- osm.delete("os-stream")
+      } yield assertTrue(
+        info.name == "streamed-obj",
+        info.size == 512L * 1024,
+        got == bigData
+      )
     },
 
     test("watch emits object changes") {
