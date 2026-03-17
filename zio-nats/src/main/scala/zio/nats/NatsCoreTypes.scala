@@ -3,6 +3,8 @@ package zio.nats
 import io.nats.client.{Connection => JConnection}
 import zio.Chunk
 
+import scala.jdk.CollectionConverters._
+
 /**
  * An opaque type alias for NATS subject strings.
  *
@@ -153,6 +155,63 @@ object PublishParams {
 
   /** Default (empty) params: no headers, no reply-to. */
   val empty: PublishParams = PublishParams()
+}
+
+// ---------------------------------------------------------------------------
+// KeyValueOperation
+// ---------------------------------------------------------------------------
+
+enum KeyValueOperation { case Put, Delete, Purge }
+
+object KeyValueOperation {
+  private[nats] def fromJava(op: io.nats.client.api.KeyValueOperation): KeyValueOperation = op match {
+    case io.nats.client.api.KeyValueOperation.PUT   => Put
+    case io.nats.client.api.KeyValueOperation.DELETE => Delete
+    case io.nats.client.api.KeyValueOperation.PURGE => Purge
+  }
+}
+
+// ---------------------------------------------------------------------------
+// StorageType
+// ---------------------------------------------------------------------------
+
+enum StorageType {
+  case File, Memory
+
+  private[nats] def toJava: io.nats.client.api.StorageType = this match {
+    case File   => io.nats.client.api.StorageType.File
+    case Memory => io.nats.client.api.StorageType.Memory
+  }
+}
+
+object StorageType {
+  private[nats] def fromJava(st: io.nats.client.api.StorageType): StorageType = st match {
+    case io.nats.client.api.StorageType.File   => File
+    case io.nats.client.api.StorageType.Memory => Memory
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ObjectMeta
+// ---------------------------------------------------------------------------
+
+final case class ObjectMeta(
+  name: String,
+  description: Option[String] = None,
+  headers: Headers = Headers.empty
+) {
+  private[nats] def toJava: io.nats.client.api.ObjectMeta = {
+    val b = io.nats.client.api.ObjectMeta.builder(name)
+    description.foreach(b.description)
+    if (headers.nonEmpty) {
+      val jHeaders = new io.nats.client.impl.Headers()
+      headers.values.foreach { case (key, values) =>
+        jHeaders.add(key, values.toList.asJava)
+      }
+      b.headers(jHeaders)
+    }
+    b.build()
+  }
 }
 
 // ---------------------------------------------------------------------------

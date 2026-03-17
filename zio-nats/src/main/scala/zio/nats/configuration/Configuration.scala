@@ -8,13 +8,13 @@ import io.nats.client.api.{
   Mirror,
   ReplayPolicy,
   Source,
-  StorageType,
   ConsumerConfiguration as JConsumerConfiguration,
   KeyValueConfiguration as JKeyValueConfiguration,
   ObjectStoreConfiguration as JObjectStoreConfiguration,
   StreamConfiguration as JStreamConfiguration
 }
 import zio.Duration
+import zio.nats.StorageType
 
 import scala.jdk.CollectionConverters.*
 
@@ -60,7 +60,7 @@ object StreamConfig {
     val builder = JStreamConfiguration
       .builder()
       .name(config.name)
-      .storageType(config.storageType)
+      .storageType(config.storageType.toJava)
       .discardPolicy(config.discardPolicy)
       .retentionPolicy(config.retentionPolicy)
       .compressionOption(config.compressionOption)
@@ -175,7 +175,7 @@ object KeyValueConfig {
     val builder = JKeyValueConfiguration
       .builder()
       .name(config.name)
-      .storageType(config.storageType)
+      .storageType(config.storageType.toJava)
       .compression(config.compression)
       .replicas(config.numberOfReplicas)
 
@@ -204,7 +204,7 @@ object ObjectStoreConfig {
     val builder = JObjectStoreConfiguration
       .builder()
       .name(config.name)
-      .storageType(config.storageType)
+      .storageType(config.storageType.toJava)
 
     config.description.foreach(d => builder.description(d))
     if (config.maxBucketSize > 0) builder.maxBucketSize(config.maxBucketSize)

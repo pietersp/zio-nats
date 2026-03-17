@@ -103,11 +103,6 @@ object RealisticApp extends ZIOAppDefault {
         val events     = result._1
         val customizer = result._2
 
-        val logEvents = events
-          .tap(e => Console.printLine(s"[nats-event] $e").orDie)
-          .runDrain
-          .fork
-
         val customConfig = NatsConfig.default.copy(optionsCustomizer = customizer)
 
         val layer =
@@ -117,7 +112,15 @@ object RealisticApp extends ZIOAppDefault {
             JetStreamManagement.live >+>
             KeyValueManagement.live
 
-        logEvents *> program.provide(layer)
+        for {
+          fiber <- events
+                     .tap(e => Console.printLine(s"[nats-event] $e").orDie)
+                     .takeUntil(_ == NatsEvent.Closed)
+                     .runDrain
+                     .fork
+          _     <- program.provide(layer)
+          _     <- fiber.join
+        } yield ()
       }
     }.mapError(e => new RuntimeException(e.getMessage))
 }

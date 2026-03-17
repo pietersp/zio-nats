@@ -20,6 +20,7 @@ trait KeyValue {
   // --- Put ---
   def put(key: String, value: Chunk[Byte]): IO[NatsError, Long]
   def put(key: String, value: String): IO[NatsError, Long]
+  def put[A: NatsCodec](key: String, value: A): IO[NatsError, Long]
 
   // --- Conditional writes ---
   /**
@@ -27,11 +28,13 @@ trait KeyValue {
    * JetStreamApiError).
    */
   def create(key: String, value: Chunk[Byte]): IO[NatsError, Long]
+  def create[A: NatsCodec](key: String, value: A): IO[NatsError, Long]
 
   /**
    * Compare-and-swap: update only if current revision matches expectedRevision.
    */
   def update(key: String, value: Chunk[Byte], expectedRevision: Long): IO[NatsError, Long]
+  def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): IO[NatsError, Long]
 
   // --- Delete / Purge ---
   /** Soft-delete: places a delete marker. History is preserved. */
@@ -75,6 +78,15 @@ object KeyValue {
         .attempt(nats.underlying.keyValue(bucketName))
         .mapBoth(NatsError.fromThrowable, new KeyValueLive(_))
     }
+
+  def put[A: NatsCodec](key: String, value: A): ZIO[KeyValue, NatsError, Long] =
+    ZIO.serviceWithZIO[KeyValue](_.put(key, value))
+
+  def create[A: NatsCodec](key: String, value: A): ZIO[KeyValue, NatsError, Long] =
+    ZIO.serviceWithZIO[KeyValue](_.create(key, value))
+
+  def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): ZIO[KeyValue, NatsError, Long] =
+    ZIO.serviceWithZIO[KeyValue](_.update(key, value, expectedRevision))
 }
 
 object KeyValueManagement {
@@ -116,11 +128,20 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
   override def put(key: String, value: String): IO[NatsError, Long] =
     ZIO.attemptBlocking(kv.put(key, value)).mapError(NatsError.fromThrowable)
 
+  override def put[A: NatsCodec](key: String, value: A): IO[NatsError, Long] =
+    put(key, NatsCodec[A].encode(value))
+
   override def create(key: String, value: Chunk[Byte]): IO[NatsError, Long] =
     ZIO.attemptBlocking(kv.create(key, value.toArray)).mapError(NatsError.fromThrowable)
 
+  override def create[A: NatsCodec](key: String, value: A): IO[NatsError, Long] =
+    create(key, NatsCodec[A].encode(value))
+
   override def update(key: String, value: Chunk[Byte], expectedRevision: Long): IO[NatsError, Long] =
     ZIO.attemptBlocking(kv.update(key, value.toArray, expectedRevision)).mapError(NatsError.fromThrowable)
+
+  override def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): IO[NatsError, Long] =
+    update(key, NatsCodec[A].encode(value), expectedRevision)
 
   override def delete(key: String): IO[NatsError, Unit] =
     ZIO.attemptBlocking(kv.delete(key)).mapError(NatsError.fromThrowable)

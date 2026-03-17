@@ -26,20 +26,12 @@ package object nats {
   // that `StorageType.Memory` works without any io.nats.client.* imports.
   // ---------------------------------------------------------------------------
 
-  type StorageType       = io.nats.client.api.StorageType
   type AckPolicy         = io.nats.client.api.AckPolicy
   type DeliverPolicy     = io.nats.client.api.DeliverPolicy
   type ReplayPolicy      = io.nats.client.api.ReplayPolicy
   type DiscardPolicy     = io.nats.client.api.DiscardPolicy
   type RetentionPolicy   = io.nats.client.api.RetentionPolicy
   type CompressionOption = io.nats.client.api.CompressionOption
-  type KeyValueOperation = io.nats.client.api.KeyValueOperation
-
-  object StorageType {
-    val File: StorageType   = io.nats.client.api.StorageType.File
-    val Memory: StorageType = io.nats.client.api.StorageType.Memory
-  }
-
   object AckPolicy {
     val Explicit: AckPolicy = io.nats.client.api.AckPolicy.Explicit
     val All: AckPolicy      = io.nats.client.api.AckPolicy.All
@@ -75,13 +67,6 @@ package object nats {
     val None: CompressionOption = io.nats.client.api.CompressionOption.None
     val S2: CompressionOption   = io.nats.client.api.CompressionOption.S2
   }
-
-  object KeyValueOperation {
-    val PUT: KeyValueOperation    = io.nats.client.api.KeyValueOperation.PUT
-    val DELETE: KeyValueOperation = io.nats.client.api.KeyValueOperation.DELETE
-    val PURGE: KeyValueOperation  = io.nats.client.api.KeyValueOperation.PURGE
-  }
-
 
   // --- Config class re-exports (users don't need zio.nats.configuration._) ---
   type StreamConfig = configuration.StreamConfig

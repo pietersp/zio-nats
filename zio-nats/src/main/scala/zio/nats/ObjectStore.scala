@@ -1,6 +1,6 @@
 package zio.nats
 
-import io.nats.client.api.{ObjectMeta, ObjectInfo as JObjectInfo, ObjectStoreWatcher as JObjectStoreWatcher}
+import io.nats.client.api.{ObjectInfo as JObjectInfo, ObjectStoreWatcher as JObjectStoreWatcher}
 import io.nats.client.{ObjectStore as JObjectStore, ObjectStoreManagement as JObjectStoreManagement}
 import zio.*
 import zio.nats.configuration.ObjectStoreConfig
@@ -23,8 +23,17 @@ trait ObjectStore {
   /** Store bytes with custom metadata. */
   def put(meta: ObjectMeta, data: Chunk[Byte]): IO[NatsError, ObjectSummary]
 
+  /** Encode `data` and store under objectName. */
+  def put[A: NatsCodec](objectName: String, data: A): IO[NatsError, ObjectSummary]
+
+  /** Encode `data` and store with custom metadata. */
+  def put[A: NatsCodec](meta: ObjectMeta, data: A): IO[NatsError, ObjectSummary]
+
   /** Retrieve the bytes for an object. */
   def get(objectName: String): IO[NatsError, Chunk[Byte]]
+
+  /** Retrieve and decode an object to type A. */
+  def get[A: NatsCodec](objectName: String): IO[NatsError, A]
 
   /** Retrieve metadata for an object (without downloading data). */
   def getInfo(objectName: String): IO[NatsError, ObjectSummary]
@@ -98,8 +107,14 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
 
   override def put(meta: ObjectMeta, data: Chunk[Byte]): IO[NatsError, ObjectSummary] =
     ZIO
-      .attemptBlocking(os.put(meta, new ByteArrayInputStream(data.toArray)))
+      .attemptBlocking(os.put(meta.toJava, new ByteArrayInputStream(data.toArray)))
       .mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
+
+  override def put[A: NatsCodec](objectName: String, data: A): IO[NatsError, ObjectSummary] =
+    put(objectName, NatsCodec[A].encode(data))
+
+  override def put[A: NatsCodec](meta: ObjectMeta, data: A): IO[NatsError, ObjectSummary] =
+    put(meta, NatsCodec[A].encode(data))
 
   override def get(objectName: String): IO[NatsError, Chunk[Byte]] =
     ZIO.attemptBlocking {
@@ -108,6 +123,18 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
       Chunk.fromArray(baos.toByteArray)
     }.mapError(NatsError.fromThrowable)
 
+  override def get[A: NatsCodec](objectName: String): IO[NatsError, A] =
+    ZIO.attemptBlocking {
+      val baos = new ByteArrayOutputStream()
+      os.get(objectName, baos)
+      Chunk.fromArray(baos.toByteArray)
+    }.mapError(NatsError.fromThrowable).flatMap { bytes =>
+      NatsCodec[A].decode(bytes) match {
+        case Right(value) => ZIO.succeed(value)
+        case Left(err)    => ZIO.fail(NatsError.DecodingError(err.message, err))
+      }
+    }
+
   override def getInfo(objectName: String): IO[NatsError, ObjectSummary] =
     ZIO.attemptBlocking(os.getInfo(objectName)).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
 
@@ -115,7 +142,7 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
     ZIO.attemptBlocking(os.delete(objectName)).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
 
   override def updateMeta(objectName: String, meta: ObjectMeta): IO[NatsError, ObjectSummary] =
-    ZIO.attemptBlocking(os.updateMeta(objectName, meta)).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
+    ZIO.attemptBlocking(os.updateMeta(objectName, meta.toJava)).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
 
   override def list: IO[NatsError, List[ObjectSummary]] =
     ZIO.attemptBlocking(os.getList.asScala.toList).mapBoth(NatsError.fromThrowable, _.map(ObjectSummary.fromJava))

@@ -80,7 +80,7 @@ object JetStreamSpec extends ZIOSpecDefault {
           jsm  <- ZIO.service[JetStreamManagement]
           js   <- ZIO.service[JetStream]
           _    <- createStream(jsm, "dedup-stream", "dedup.>")
-          opts  = PublishOptions(messageId = Some("msg-1"))
+          opts  = JsPublishParams(options = Some(PublishOptions(messageId = Some("msg-1"))))
           ack1 <- js.publish(Subject("dedup.test"), Chunk.fromArray("first".getBytes), opts)
           ack2 <- js.publish(Subject("dedup.test"), Chunk.fromArray("first".getBytes), opts)
           _    <- jsm.deleteStream("dedup-stream")

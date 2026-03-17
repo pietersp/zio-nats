@@ -23,7 +23,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         entry.isDefined,
         entry.get.value.toArray.sameElements("hello".getBytes),
         // After delete, entry exists with DELETE operation marker
-        after.forall(_.operation == KeyValueOperation.DELETE)
+        after.forall(_.operation == KeyValueOperation.Delete)
       )
     },
 
@@ -51,7 +51,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         kv       <- KeyValue.bucket("kv-watch")
         received <- Promise.make[Nothing, KeyValueEntry]
         fiber    <- kv.watch("watch-key")
-                   .filter(_.operation == KeyValueOperation.PUT)
+                   .filter(_.operation == KeyValueOperation.Put)
                    .tap(e => received.succeed(e))
                    .take(1)
                    .runDrain

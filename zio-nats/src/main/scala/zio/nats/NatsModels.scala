@@ -1,8 +1,6 @@
 package zio.nats
 
 import io.nats.client.api.{
-  KeyValueOperation,
-  StorageType,
   ConsumerInfo as JConsumerInfo,
   KeyValueEntry as JKeyValueEntry,
   KeyValueStatus as JKeyValueStatus,
@@ -48,6 +46,19 @@ final case class PublishOptions(
     expectedLastSubjectSeqno.foreach(b.expectedLastSubjectSequence)
     b.build()
   }
+}
+
+// ---------------------------------------------------------------------------
+// JetStream publish params
+// ---------------------------------------------------------------------------
+
+final case class JsPublishParams(
+  headers: Headers = Headers.empty,
+  options: Option[PublishOptions] = None
+)
+
+object JsPublishParams {
+  val empty: JsPublishParams = JsPublishParams()
 }
 
 // ---------------------------------------------------------------------------
@@ -154,6 +165,7 @@ final case class KeyValueEntry(
   bucketName: String
 ) {
   def valueAsString: String = new String(value.toArray, java.nio.charset.StandardCharsets.UTF_8)
+  def decode[A: NatsCodec]: Either[NatsDecodeError, A] = NatsCodec[A].decode(value)
 }
 
 private[nats] object KeyValueEntry {
@@ -161,7 +173,7 @@ private[nats] object KeyValueEntry {
     key = e.getKey,
     value = Chunk.fromArray(e.getValue),
     revision = e.getRevision,
-    operation = e.getOperation,
+    operation = KeyValueOperation.fromJava(e.getOperation),
     bucketName = e.getBucket
   )
 }
@@ -212,7 +224,7 @@ private[nats] object KeyValueBucketStatus {
     byteCount = s.getByteCount,
     maxHistoryPerKey = s.getMaxHistoryPerKey,
     maxBucketSize = s.getMaxBucketSize,
-    storageType = s.getStorageType,
+    storageType = StorageType.fromJava(s.getStorageType),
     replicas = s.getReplicas,
     isCompressed = s.isCompressed
   )
@@ -239,7 +251,7 @@ private[nats] object ObjectStoreBucketStatus {
     description = Option(s.getDescription),
     size = s.getSize,
     maxBucketSize = s.getMaxBucketSize,
-    storageType = s.getStorageType,
+    storageType = StorageType.fromJava(s.getStorageType),
     replicas = s.getReplicas,
     isSealed = s.isSealed,
     isCompressed = s.isCompressed

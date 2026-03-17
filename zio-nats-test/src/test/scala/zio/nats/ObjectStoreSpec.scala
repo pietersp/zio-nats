@@ -14,7 +14,7 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         _       <- osm.create(ObjectStoreConfig(name = "os-basic", storageType = StorageType.Memory))
         os      <- ObjectStore.bucket("os-basic")
         info    <- os.put("my-object", Chunk.fromArray("hello-object".getBytes))
-        data    <- os.get("my-object")
+        data    <- os.get[Chunk[Byte]]("my-object")
         objInfo <- os.getInfo("my-object")
         _       <- os.delete("my-object")
         _       <- osm.delete("os-basic")
@@ -45,7 +45,7 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         os     <- ObjectStore.bucket("os-large")
         bigData = Chunk.fromArray(Array.fill(128 * 1024)(42.toByte))
         _      <- os.put("big-obj", bigData)
-        got    <- os.get("big-obj")
+        got    <- os.get[Chunk[Byte]]("big-obj")
         _      <- osm.delete("os-large")
       } yield assertTrue(got == bigData)
     },
