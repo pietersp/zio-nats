@@ -5,6 +5,8 @@ import zio._
 import zio.nats.config.NatsConfig
 import zio.stream._
 
+import java.util.concurrent.LinkedBlockingQueue
+
 /**
  * Core NATS service: publish, subscribe, and request-reply.
  *
@@ -256,38 +258,43 @@ object Nats {
    */
   def make(config: NatsConfig): ZIO[Scope, NatsError, Nats] =
     for {
-      hub     <- Hub.unbounded[NatsEvent]
-      runtime <- ZIO.runtime[Any]
-      conn    <- ZIO.acquireRelease(
-                   ZIO
-                     .attemptBlocking {
-                       def publish(event: NatsEvent): Unit =
-                         Unsafe.unsafe { implicit u => runtime.unsafe.run(hub.publish(event)) }
-                       val options = config.toOptionsBuilder
-                         .connectionListener { (conn: JConnection, eventType: ConnectionListener.Events) =>
-                           val url   = Option(conn.getConnectedUrl).getOrElse("unknown")
-                           val event = eventType match {
-                             case ConnectionListener.Events.CONNECTED          => NatsEvent.Connected(url)
-                             case ConnectionListener.Events.DISCONNECTED       => NatsEvent.Disconnected(url)
-                             case ConnectionListener.Events.RECONNECTED        => NatsEvent.Reconnected(url)
-                             case ConnectionListener.Events.CLOSED             => NatsEvent.Closed
-                             case ConnectionListener.Events.LAME_DUCK          => NatsEvent.LameDuckMode
-                             case ConnectionListener.Events.RESUBSCRIBED       => NatsEvent.Reconnected(url)
-                             case ConnectionListener.Events.DISCOVERED_SERVERS => NatsEvent.ServersDiscovered(url)
-                           }
-                           publish(event)
-                         }
-                         .errorListener(new ErrorListener {
-                           override def errorOccurred(conn: JConnection, error: String): Unit =
-                             publish(NatsEvent.Error(error))
-                           override def exceptionOccurred(conn: JConnection, exp: Exception): Unit =
-                             publish(NatsEvent.ExceptionOccurred(exp))
-                         })
-                         .build()
-                       io.nats.client.Nats.connect(options)
-                     }
-                     .mapError(NatsError.fromThrowable)
-                 )(conn => ZIO.attemptBlocking(conn.close()).ignoreLogged)
+      hub    <- Hub.unbounded[NatsEvent]
+      jQueue  = new LinkedBlockingQueue[NatsEvent]()
+      conn   <- ZIO.acquireRelease(
+                  ZIO
+                    .attemptBlocking {
+                      val options = config.toOptionsBuilder
+                        .connectionListener { (conn: JConnection, eventType: ConnectionListener.Events) =>
+                          val url   = Option(conn.getConnectedUrl).getOrElse("unknown")
+                          val event = eventType match {
+                            case ConnectionListener.Events.CONNECTED          => NatsEvent.Connected(url)
+                            case ConnectionListener.Events.DISCONNECTED       => NatsEvent.Disconnected(url)
+                            case ConnectionListener.Events.RECONNECTED        => NatsEvent.Reconnected(url)
+                            case ConnectionListener.Events.CLOSED             => NatsEvent.Closed
+                            case ConnectionListener.Events.LAME_DUCK          => NatsEvent.LameDuckMode
+                            case ConnectionListener.Events.RESUBSCRIBED       => NatsEvent.Reconnected(url)
+                            case ConnectionListener.Events.DISCOVERED_SERVERS => NatsEvent.ServersDiscovered(url)
+                          }
+                          jQueue.put(event)
+                        }
+                        .errorListener(new ErrorListener {
+                          override def errorOccurred(conn: JConnection, error: String): Unit =
+                            jQueue.put(NatsEvent.Error(error))
+                          override def exceptionOccurred(conn: JConnection, exp: Exception): Unit =
+                            jQueue.put(NatsEvent.ExceptionOccurred(exp))
+                        })
+                        .build()
+                      io.nats.client.Nats.connect(options)
+                    }
+                    .mapError(NatsError.fromThrowable)
+                )(conn => ZIO.attemptBlocking(conn.close()).ignoreLogged)
+      _      <- ZStream
+                  .repeatZIOOption(
+                    ZIO.attemptBlockingInterrupt(jQueue.take())
+                      .mapError(_ => None)
+                  )
+                  .runForeach(hub.publish)
+                  .forkScoped
     } yield new NatsLive(conn, hub)
 
   /** ZLayer that reads [[NatsConfig]] from the environment. */
