@@ -118,6 +118,91 @@ object KeyValueSpec extends ZIOSpecDefault {
         e   <- kv.get("ttl-key")
         _   <- kvm.delete("kv-entry-ttl")
       } yield assertTrue(rev == 1L, e.exists(_.valueAsString == "hello"))
+    },
+
+    test("watch with IGNORE_DELETE filters out delete markers") {
+      for {
+        kvm     <- ZIO.service[KeyValueManagement]
+        _       <- kvm.create(KeyValueConfig(name = "kv-watch-del", storageType = StorageType.Memory))
+        kv      <- KeyValue.bucket("kv-watch-del")
+        _       <- kv.put("d", "v1")
+        _       <- kv.delete("d")
+        entries <- kv
+                     .watch("d", KeyValueWatchOptions(ignoreDeletes = true, includeHistory = true))
+                     .take(2)
+                     .runCollect
+                     .timeout(5.seconds)
+                     .map(_.getOrElse(Chunk.empty))
+        _       <- kvm.delete("kv-watch-del")
+      } yield assertTrue(
+        entries.forall(_.operation == KeyValueOperation.Put)
+      )
+    },
+
+    test("watch fromRevision replays from a specific point") {
+      for {
+        kvm  <- ZIO.service[KeyValueManagement]
+        _    <- kvm.create(
+                  KeyValueConfig(name = "kv-watch-rev", storageType = StorageType.Memory, maxHistoryPerKey = 10)
+                )
+        kv   <- KeyValue.bucket("kv-watch-rev")
+        rev1 <- kv.put("r", "v1")
+        _    <- kv.put("r", "v2")
+        _    <- kv.put("r", "v3")
+        // replay only from rev2 onwards
+        entries <- kv
+                     .watch("r", KeyValueWatchOptions(fromRevision = Some(rev1 + 1)))
+                     .take(2)
+                     .runCollect
+                     .timeout(5.seconds)
+                     .map(_.getOrElse(Chunk.empty))
+        _       <- kvm.delete("kv-watch-rev")
+      } yield assertTrue(
+        entries.size == 2,
+        entries.map(_.valueAsString).toList == List("v2", "v3")
+      )
+    },
+
+    test("watch multiple keys delivers events for each key") {
+      for {
+        kvm      <- ZIO.service[KeyValueManagement]
+        _        <- kvm.create(KeyValueConfig(name = "kv-watch-multi", storageType = StorageType.Memory))
+        kv       <- KeyValue.bucket("kv-watch-multi")
+        received <- Ref.make(List.empty[String])
+        fiber    <- kv
+                      .watch(List("x", "y"), KeyValueWatchOptions(updatesOnly = true))
+                      .tap(e => received.update(e.key :: _))
+                      .take(2)
+                      .runDrain
+                      .fork
+        _        <- ZIO.sleep(300.millis)
+        _        <- kv.put("x", "1")
+        _        <- kv.put("y", "2")
+        _        <- fiber.join.timeout(5.seconds)
+        keys     <- received.get
+        _        <- kvm.delete("kv-watch-multi")
+      } yield assertTrue(keys.toSet == Set("x", "y"))
+    },
+
+    test("watchAll with UPDATES_ONLY skips existing values") {
+      for {
+        kvm      <- ZIO.service[KeyValueManagement]
+        _        <- kvm.create(KeyValueConfig(name = "kv-watch-upd", storageType = StorageType.Memory))
+        kv       <- KeyValue.bucket("kv-watch-upd")
+        _        <- kv.put("existing", "old")
+        received <- Promise.make[Nothing, KeyValueEntry]
+        fiber    <- kv
+                      .watchAll(KeyValueWatchOptions(updatesOnly = true))
+                      .tap(e => received.succeed(e))
+                      .take(1)
+                      .runDrain
+                      .fork
+        _        <- ZIO.sleep(300.millis)
+        _        <- kv.put("new-key", "fresh")
+        entry    <- received.await
+        _        <- fiber.interrupt
+        _        <- kvm.delete("kv-watch-upd")
+      } yield assertTrue(entry.key == "new-key")
     }
   ).provideShared(
     NatsTestLayers.nats,

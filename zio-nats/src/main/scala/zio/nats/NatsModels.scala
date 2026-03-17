@@ -4,6 +4,7 @@ import io.nats.client.api.{
   ConsumerInfo as JConsumerInfo,
   KeyValueEntry as JKeyValueEntry,
   KeyValueStatus as JKeyValueStatus,
+  KeyValueWatchOption as JKeyValueWatchOption,
   ObjectInfo as JObjectInfo,
   ObjectStoreStatus as JObjectStoreStatus,
   PublishAck as JPublishAck,
@@ -198,6 +199,40 @@ private[nats] object ObjectSummary {
     description = Option(info.getDescription),
     isDeleted = info.isDeleted
   )
+}
+
+// ---------------------------------------------------------------------------
+// Key-Value watch options
+// ---------------------------------------------------------------------------
+
+/**
+ * Options that control which entries a KV watch delivers.
+ *
+ * @param ignoreDeletes  Skip delete and purge markers (default: include them).
+ * @param metaOnly       Receive only metadata; omit value bytes (default: include values).
+ * @param includeHistory Start from the first entry per key instead of the last (default: last per key).
+ * @param updatesOnly    Start only from new entries written after the watch begins (default: last per key).
+ * @param fromRevision   Resume from a specific stream revision (overrides the deliver-policy flags above).
+ */
+case class KeyValueWatchOptions(
+  ignoreDeletes: Boolean = false,
+  metaOnly: Boolean = false,
+  includeHistory: Boolean = false,
+  updatesOnly: Boolean = false,
+  fromRevision: Option[Long] = None
+)
+
+object KeyValueWatchOptions {
+  val default: KeyValueWatchOptions = KeyValueWatchOptions()
+
+  private[nats] def toJava(opts: KeyValueWatchOptions): Array[JKeyValueWatchOption] = {
+    val buf = scala.collection.mutable.ArrayBuffer.empty[JKeyValueWatchOption]
+    if (opts.ignoreDeletes) buf += JKeyValueWatchOption.IGNORE_DELETE
+    if (opts.metaOnly) buf += JKeyValueWatchOption.META_ONLY
+    if (opts.includeHistory) buf += JKeyValueWatchOption.INCLUDE_HISTORY
+    if (opts.updatesOnly) buf += JKeyValueWatchOption.UPDATES_ONLY
+    buf.toArray
+  }
 }
 
 // ---------------------------------------------------------------------------

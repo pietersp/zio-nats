@@ -52,8 +52,17 @@ trait KeyValue {
   /** Stream changes for a specific key. Never completes unless interrupted. */
   def watch(key: String): ZStream[Any, NatsError, KeyValueEntry]
 
+  /** Stream changes for a specific key with watch options (filtering, start position). */
+  def watch(key: String, options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry]
+
+  /** Stream changes for multiple keys with watch options. */
+  def watch(keys: List[String], options: KeyValueWatchOptions = KeyValueWatchOptions.default): ZStream[Any, NatsError, KeyValueEntry]
+
   /** Stream changes for all keys in the bucket. */
   def watchAll: ZStream[Any, NatsError, KeyValueEntry]
+
+  /** Stream changes for all keys in the bucket with watch options (filtering, start position). */
+  def watchAll(options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry]
 
   // --- Enumeration ---
   def keys: IO[NatsError, List[String]]
@@ -151,12 +160,28 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
     ZIO.attemptBlocking(kv.purge(key)).mapError(NatsError.fromThrowable)
 
   override def watch(key: String): ZStream[Any, NatsError, KeyValueEntry] =
-    watchInternal(Some(key))
+    watchInternal(WatchTarget.SingleKey(key), KeyValueWatchOptions.default)
+
+  override def watch(key: String, options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry] =
+    watchInternal(WatchTarget.SingleKey(key), options)
+
+  override def watch(keys: List[String], options: KeyValueWatchOptions = KeyValueWatchOptions.default): ZStream[Any, NatsError, KeyValueEntry] =
+    watchInternal(WatchTarget.MultiKey(keys), options)
 
   override def watchAll: ZStream[Any, NatsError, KeyValueEntry] =
-    watchInternal(None)
+    watchInternal(WatchTarget.All, KeyValueWatchOptions.default)
 
-  private def watchInternal(key: Option[String]): ZStream[Any, NatsError, KeyValueEntry] =
+  override def watchAll(options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry] =
+    watchInternal(WatchTarget.All, options)
+
+  private sealed trait WatchTarget
+  private object WatchTarget {
+    case class SingleKey(key: String)      extends WatchTarget
+    case class MultiKey(keys: List[String]) extends WatchTarget
+    case object All                         extends WatchTarget
+  }
+
+  private def watchInternal(target: WatchTarget, options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry] =
     ZStream.asyncScoped[Any, NatsError, KeyValueEntry] { emit =>
       ZIO.acquireRelease(
         ZIO.attemptBlocking {
@@ -165,9 +190,23 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
               emit(ZIO.succeed(Chunk.single(KeyValueEntry.fromJava(entry))))
             override def endOfData(): Unit = ()
           }
-          key match {
-            case Some(k) => kv.watch(k, watcher)
-            case None    => kv.watchAll(watcher)
+          val jOpts = KeyValueWatchOptions.toJava(options)
+          target match {
+            case WatchTarget.SingleKey(k) =>
+              options.fromRevision match {
+                case Some(rev) => kv.watch(k, watcher, rev, jOpts*)
+                case None      => kv.watch(k, watcher, jOpts*)
+              }
+            case WatchTarget.MultiKey(ks) =>
+              options.fromRevision match {
+                case Some(rev) => kv.watch(ks.asJava, watcher, rev, jOpts*)
+                case None      => kv.watch(ks.asJava, watcher, jOpts*)
+              }
+            case WatchTarget.All =>
+              options.fromRevision match {
+                case Some(rev) => kv.watchAll(watcher, rev, jOpts*)
+                case None      => kv.watchAll(watcher, jOpts*)
+              }
           }
         }.mapError(NatsError.fromThrowable)
       )(sub => ZIO.attemptBlocking(sub.unsubscribe()).ignoreLogged)
