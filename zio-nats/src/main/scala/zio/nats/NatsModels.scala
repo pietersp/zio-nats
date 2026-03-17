@@ -495,7 +495,9 @@ private[nats] object ConsumerPauseInfo {
 /**
  * Options that control which entries a KV watch delivers.
  *
- * @param ignoreDeletes  Skip delete and purge markers (default: include them).
+ * @param ignoreDeletes  Tell the server not to transmit delete and purge markers.
+ *                       The typed `watch`/`watchAll` API always omits these entries
+ *                       regardless, so this is purely a bandwidth optimisation.
  * @param metaOnly       Receive only metadata; omit value bytes (default: include values).
  * @param includeHistory Start from the first entry per key instead of the last (default: last per key).
  * @param updatesOnly    Start only from new entries written after the watch begins (default: last per key).

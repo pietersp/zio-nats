@@ -16,8 +16,8 @@ import scala.jdk.CollectionConverters.*
  *
  * All read operations are generic `[A: NatsCodec]` and return [[KvEnvelope]]s
  * that bundle the decoded value with server-side metadata (key, revision,
- * operation, bucket name). Delete and purge marker entries are automatically
- * filtered — pass `Chunk[Byte]` to skip decoding and receive raw bytes.
+ * operation, and bucket name). Pass `Chunk[Byte]` as `A` to skip decoding
+ * and receive raw bytes.
  *
  * Obtain an instance via [[KeyValue.bucket]] (requires a [[Nats]] connection
  * in scope). Use [[KeyValueManagement]] to create or delete buckets.
@@ -40,8 +40,7 @@ trait KeyValue {
 
   /**
    * Decode the value for `key` as `A`. Returns [[None]] if the key does not
-   * exist or has been deleted/purged. Delete and purge markers are silently
-   * filtered. Pass `Chunk[Byte]` as `A` to retrieve raw bytes.
+   * exist or its current state is a delete or purge marker.
    *
    * @param revision when [[Some]], retrieves the entry at that specific stream
    *                 revision; when [[None]] (default) retrieves the latest value.
@@ -94,9 +93,14 @@ trait KeyValue {
    * Stream decoded values for one or more keys.
    *
    * Pass a single-element list to watch one key, or multiple keys to watch
-   * all of them in a single subscription. Emits a [[KvEnvelope]] for each Put
-   * operation; delete and purge markers are silently filtered. The stream
-   * never completes on its own — interrupt it to stop watching.
+   * all of them in a single subscription. The stream never completes on its
+   * own — interrupt it to stop watching.
+   *
+   * Because delete and purge markers carry no decodable value, they are always
+   * excluded from the stream regardless of [[KeyValueWatchOptions.ignoreDeletes]].
+   * Setting `ignoreDeletes = true` is a server-side bandwidth optimisation that
+   * prevents those entries from being transmitted at all, but has no effect on
+   * what the stream emits.
    */
   def watch[A: NatsCodec](
     keys: List[String],
@@ -106,7 +110,8 @@ trait KeyValue {
   /**
    * Stream decoded values for all keys in the bucket.
    *
-   * Only Put operations are emitted; delete and purge markers are filtered.
+   * Delete and purge markers carry no decodable value and are always excluded.
+   * See [[watch]] for details on `ignoreDeletes` as a bandwidth optimisation.
    */
   def watchAll[A: NatsCodec](
     options: KeyValueWatchOptions = KeyValueWatchOptions.default
@@ -116,7 +121,7 @@ trait KeyValue {
 
   /**
    * Return decoded values from the revision history of `key`, oldest to newest.
-   * Delete and purge marker entries are silently omitted.
+   * Delete and purge marker entries carry no decodable value and are omitted.
    */
   def history[A: NatsCodec](key: String): IO[NatsError, List[KvEnvelope[A]]]
 
