@@ -50,6 +50,18 @@ object ObjectStoreSpec extends ZIOSpecDefault {
       } yield assertTrue(got == bigData)
     },
 
+    test("ObjectStoreManagement.getStatuses returns status for all buckets") {
+      for {
+        osm      <- ZIO.service[ObjectStoreManagement]
+        _        <- osm.create(ObjectStoreConfig(name = "os-stat-a", storageType = StorageType.Memory))
+        _        <- osm.create(ObjectStoreConfig(name = "os-stat-b", storageType = StorageType.Memory))
+        statuses <- osm.getStatuses
+        names     = statuses.map(_.bucketName).toSet
+        _        <- osm.delete("os-stat-a")
+        _        <- osm.delete("os-stat-b")
+      } yield assertTrue(names.contains("os-stat-a"), names.contains("os-stat-b"))
+    },
+
     test("watch emits object changes") {
       for {
         osm      <- ZIO.service[ObjectStoreManagement]

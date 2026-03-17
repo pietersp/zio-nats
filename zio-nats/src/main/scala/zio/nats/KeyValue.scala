@@ -1,6 +1,6 @@
 package zio.nats
 
-import io.nats.client.api.{KeyValueEntry as JKeyValueEntry, KeyValueWatcher as JKeyValueWatcher}
+import io.nats.client.api.{KeyValueEntry as JKeyValueEntry, KeyValuePurgeOptions, KeyValueWatcher as JKeyValueWatcher}
 import io.nats.client.{KeyValue as JKeyValue, KeyValueManagement as JKeyValueManagement, MessageTtl}
 import zio.*
 import zio.nats.configuration.KeyValueConfig
@@ -64,8 +64,29 @@ trait KeyValue {
   /** Stream changes for all keys in the bucket with watch options (filtering, start position). */
   def watchAll(options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry]
 
+  // --- Delete / tombstone cleanup ---
+  /**
+   * Remove all tombstone (delete/purge marker) entries older than the default
+   * threshold (30 minutes). Use [[purgeDeletes(threshold)]] to override.
+   */
+  def purgeDeletes(): IO[NatsError, Unit]
+
+  /**
+   * Remove tombstone entries older than `threshold`. Pass `Duration.Zero` to
+   * use the server default (30 minutes); pass a negative duration to remove
+   * ALL markers regardless of age.
+   */
+  def purgeDeletes(threshold: Duration): IO[NatsError, Unit]
+
   // --- Enumeration ---
   def keys: IO[NatsError, List[String]]
+
+  /** List keys matching a subject filter (e.g. "foo.*"). */
+  def keys(filter: String): IO[NatsError, List[String]]
+
+  /** List keys matching any of the given subject filters. */
+  def keys(filters: List[String]): IO[NatsError, List[String]]
+
   def history(key: String): IO[NatsError, List[KeyValueEntry]]
   def getStatus: IO[NatsError, KeyValueBucketStatus]
 }
@@ -77,6 +98,7 @@ trait KeyValueManagement {
   def delete(bucketName: String): IO[NatsError, Unit]
   def getBucketNames: IO[NatsError, List[String]]
   def getStatus(bucketName: String): IO[NatsError, KeyValueBucketStatus]
+  def getStatuses: IO[NatsError, List[KeyValueBucketStatus]]
 }
 
 object KeyValue {
@@ -212,8 +234,24 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
       )(sub => ZIO.attemptBlocking(sub.unsubscribe()).ignoreLogged)
     }
 
+  override def purgeDeletes(): IO[NatsError, Unit] =
+    ZIO.attemptBlocking(kv.purgeDeletes()).mapError(NatsError.fromThrowable)
+
+  override def purgeDeletes(threshold: Duration): IO[NatsError, Unit] = {
+    val opts = KeyValuePurgeOptions.builder()
+      .deleteMarkersThreshold(threshold.toMillis)
+      .build()
+    ZIO.attemptBlocking(kv.purgeDeletes(opts)).mapError(NatsError.fromThrowable)
+  }
+
   override def keys: IO[NatsError, List[String]] =
     ZIO.attemptBlocking(kv.keys().asScala.toList).mapError(NatsError.fromThrowable)
+
+  override def keys(filter: String): IO[NatsError, List[String]] =
+    ZIO.attemptBlocking(kv.keys(filter).asScala.toList).mapError(NatsError.fromThrowable)
+
+  override def keys(filters: List[String]): IO[NatsError, List[String]] =
+    ZIO.attemptBlocking(kv.keys(filters.asJava).asScala.toList).mapError(NatsError.fromThrowable)
 
   override def history(key: String): IO[NatsError, List[KeyValueEntry]] =
     ZIO
@@ -248,4 +286,9 @@ private[nats] final class KeyValueManagementLive(kvm: JKeyValueManagement) exten
     ZIO
       .attemptBlocking(kvm.getStatus(bucketName))
       .mapBoth(NatsError.fromThrowable, KeyValueBucketStatus.fromJava)
+
+  override def getStatuses: IO[NatsError, List[KeyValueBucketStatus]] =
+    ZIO
+      .attemptBlocking(kvm.getStatuses().asScala.toList)
+      .mapBoth(NatsError.fromThrowable, _.map(KeyValueBucketStatus.fromJava))
 }

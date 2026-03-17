@@ -173,7 +173,7 @@ final case class KeyValueEntry(
 private[nats] object KeyValueEntry {
   def fromJava(e: JKeyValueEntry): KeyValueEntry = KeyValueEntry(
     key = e.getKey,
-    value = Chunk.fromArray(e.getValue),
+    value = Option(e.getValue).fold(Chunk.empty[Byte])(Chunk.fromArray),
     revision = e.getRevision,
     operation = KeyValueOperation.fromJava(e.getOperation),
     bucketName = e.getBucket

@@ -184,6 +184,57 @@ object KeyValueSpec extends ZIOSpecDefault {
       } yield assertTrue(keys.toSet == Set("x", "y"))
     },
 
+    test("purgeDeletes removes tombstone entries") {
+      for {
+        kvm <- ZIO.service[KeyValueManagement]
+        _   <- kvm.create(KeyValueConfig(name = "kv-purgdel", storageType = StorageType.Memory, maxHistoryPerKey = 5))
+        kv  <- KeyValue.bucket("kv-purgdel")
+        _   <- kv.put("pd", "v1")
+        _   <- kv.delete("pd")
+        _   <- kv.purgeDeletes(-1.millis) // negative = remove ALL markers regardless of age
+        hist <- kv.history("pd")
+        _    <- kvm.delete("kv-purgdel")
+      } yield assertTrue(hist.forall(_.operation != KeyValueOperation.Delete))
+    },
+
+    test("keys with filter returns matching keys only") {
+      for {
+        kvm <- ZIO.service[KeyValueManagement]
+        _   <- kvm.create(KeyValueConfig(name = "kv-keyfilter", storageType = StorageType.Memory))
+        kv  <- KeyValue.bucket("kv-keyfilter")
+        _   <- kv.put("foo.1", "a")
+        _   <- kv.put("foo.2", "b")
+        _   <- kv.put("bar.1", "c")
+        ks  <- kv.keys("foo.*")
+        _   <- kvm.delete("kv-keyfilter")
+      } yield assertTrue(ks.toSet == Set("foo.1", "foo.2"))
+    },
+
+    test("keys with multiple filters returns union of matches") {
+      for {
+        kvm <- ZIO.service[KeyValueManagement]
+        _   <- kvm.create(KeyValueConfig(name = "kv-keyfilters", storageType = StorageType.Memory))
+        kv  <- KeyValue.bucket("kv-keyfilters")
+        _   <- kv.put("foo.1", "a")
+        _   <- kv.put("bar.1", "b")
+        _   <- kv.put("baz.1", "c")
+        ks  <- kv.keys(List("foo.*", "bar.*"))
+        _   <- kvm.delete("kv-keyfilters")
+      } yield assertTrue(ks.toSet == Set("foo.1", "bar.1"))
+    },
+
+    test("KeyValueManagement.getStatuses returns status for all buckets") {
+      for {
+        kvm      <- ZIO.service[KeyValueManagement]
+        _        <- kvm.create(KeyValueConfig(name = "kv-stat-a", storageType = StorageType.Memory))
+        _        <- kvm.create(KeyValueConfig(name = "kv-stat-b", storageType = StorageType.Memory))
+        statuses <- kvm.getStatuses
+        names     = statuses.map(_.bucketName).toSet
+        _        <- kvm.delete("kv-stat-a")
+        _        <- kvm.delete("kv-stat-b")
+      } yield assertTrue(names.contains("kv-stat-a"), names.contains("kv-stat-b"))
+    },
+
     test("watchAll with UPDATES_ONLY skips existing values") {
       for {
         kvm      <- ZIO.service[KeyValueManagement]

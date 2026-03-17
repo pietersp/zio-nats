@@ -63,6 +63,7 @@ trait ObjectStoreManagement {
   def delete(bucketName: String): IO[NatsError, Unit]
   def getBucketNames: IO[NatsError, List[String]]
   def getStatus(bucketName: String): IO[NatsError, ObjectStoreBucketStatus]
+  def getStatuses: IO[NatsError, List[ObjectStoreBucketStatus]]
 }
 
 object ObjectStore {
@@ -169,4 +170,9 @@ private[nats] final class ObjectStoreManagementLive(osm: JObjectStoreManagement)
     ZIO
       .attemptBlocking(osm.getStatus(bucketName))
       .mapBoth(NatsError.fromThrowable, ObjectStoreBucketStatus.fromJava)
+
+  override def getStatuses: IO[NatsError, List[ObjectStoreBucketStatus]] =
+    ZIO
+      .attemptBlocking(osm.getStatuses().asScala.toList)
+      .mapBoth(NatsError.fromThrowable, _.map(ObjectStoreBucketStatus.fromJava))
 }
