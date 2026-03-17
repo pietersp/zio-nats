@@ -6,7 +6,7 @@ import zio.nats.config.NatsConfig
  * Realistic zio-nats example.
  *
  * Demonstrates idiomatic ZIO service + ZLayer composition:
- *   - NatsConnectionEvents wired before connect
+ *   - Nats.lifecycleEvents to observe connection lifecycle
  *   - JetStreamManagement to create a stream and durable consumer
  *   - JetStream to publish messages
  *   - Consumer.fetch to consume as a ZStream, ack each message
@@ -84,43 +84,24 @@ object RealisticApp extends ZIOAppDefault {
   // Layer wiring — compose Nats → JetStream / JetStreamManagement / KV
   // ---------------------------------------------------------------------------
 
-  val natsLayer: ZLayer[Any, NatsError, Nats] =
-    ZLayer.succeed(NatsConfig.default) >>> Nats.live
-
   val appLayer: ZLayer[Any, NatsError, Nats & JetStream & JetStreamManagement & KeyValueManagement] =
-    natsLayer >+>
+    ZLayer.succeed(NatsConfig.default) >>> Nats.live >+>
       JetStream.live >+>
       JetStreamManagement.live >+>
       KeyValueManagement.live
 
   // ---------------------------------------------------------------------------
-  // Entry point — wire connection events before connecting
+  // Entry point
   // ---------------------------------------------------------------------------
 
   val run: ZIO[Any, Throwable, Unit] =
-    ZIO.scoped {
-      NatsConnectionEvents.make.flatMap { result =>
-        val events     = result._1
-        val customizer = result._2
-
-        val customConfig = NatsConfig.default.copy(optionsCustomizer = customizer)
-
-        val layer =
-          ZLayer.succeed(customConfig) >>>
-            Nats.live >+>
-            JetStream.live >+>
-            JetStreamManagement.live >+>
-            KeyValueManagement.live
-
-        for {
-          fiber <- events
-                     .tap(e => Console.printLine(s"[nats-event] $e").orDie)
-                     .takeUntil(_ == NatsEvent.Closed)
-                     .runDrain
-                     .fork
-          _     <- program.provide(layer)
-          _     <- fiber.join
-        } yield ()
-      }
-    }.mapError(e => new RuntimeException(e.getMessage))
+    (for {
+      fiber <- Nats.lifecycleEvents
+                 .tap(e => Console.printLine(s"[nats-event] $e").orDie)
+                 .takeUntil(_ == NatsEvent.Closed)
+                 .runDrain
+                 .fork
+      _     <- program
+      _     <- fiber.join
+    } yield ()).provide(appLayer).mapError(e => new RuntimeException(e.getMessage))
 }
