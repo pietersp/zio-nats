@@ -6,33 +6,25 @@ import zio.*
 /** JetStream publishing service. */
 trait JetStream {
 
-  /** Publish raw bytes to a JetStream subject (synchronous server ack). */
-  def publish(subject: Subject, data: Chunk[Byte], params: JsPublishParams = JsPublishParams.empty): IO[NatsError, PublishAck]
-
   /**
    * Encode `data` using the implicit [[NatsCodec]] and publish to `subject`.
    *
-   * Use the [[JetStream]] companion accessor for the common case with no
-   * custom params:
-   * {{{
-   *   JetStream.publish(subject, value)
-   * }}}
+   * Pass `Chunk[Byte]` to use the identity codec (raw bytes).
+   *
+   * @param params
+   *   Optional [[JsPublishParams]] (defaults to [[JsPublishParams.empty]]).
    */
-  def publish[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): IO[NatsError, PublishAck]
-
-  /** Publish raw bytes asynchronously (returns a Task that resolves to the ack). */
-  def publishAsync(subject: Subject, data: Chunk[Byte], params: JsPublishParams = JsPublishParams.empty): IO[NatsError, Task[PublishAck]]
+  def publish[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams = JsPublishParams.empty): IO[NatsError, PublishAck]
 
   /**
-   * Encode `data` and publish asynchronously.
+   * Encode `data` and publish asynchronously (returns a Task resolving to the ack).
    *
-   * Use the [[JetStream]] companion accessor for the common case with no
-   * custom params:
-   * {{{
-   *   JetStream.publishAsync(subject, value)
-   * }}}
+   * Pass `Chunk[Byte]` to use the identity codec (raw bytes).
+   *
+   * @param params
+   *   Optional [[JsPublishParams]] (defaults to [[JsPublishParams.empty]]).
    */
-  def publishAsync[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): IO[NatsError, Task[PublishAck]]
+  def publishAsync[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams = JsPublishParams.empty): IO[NatsError, Task[PublishAck]]
 
   /** Get a [[Consumer]] handle for a named durable consumer. */
   def consumer(streamName: String, consumerName: String): IO[NatsError, Consumer]
@@ -40,27 +32,11 @@ trait JetStream {
 
 object JetStream {
 
-  def publish(subject: Subject, data: Chunk[Byte], params: JsPublishParams = JsPublishParams.empty): ZIO[JetStream, NatsError, PublishAck] =
+  def publish[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams = JsPublishParams.empty): ZIO[JetStream, NatsError, PublishAck] =
     ZIO.serviceWithZIO[JetStream](_.publish(subject, data, params))
 
-  /** Typed publish with explicit params. */
-  def publish[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): ZIO[JetStream, NatsError, PublishAck] =
-    ZIO.serviceWithZIO[JetStream](_.publish(subject, data, params))
-
-  /** Typed publish — convenience overload with [[JsPublishParams.empty]]. */
-  def publish[T: NatsCodec](subject: Subject, data: T): ZIO[JetStream, NatsError, PublishAck] =
-    ZIO.serviceWithZIO[JetStream](_.publish(subject, data, JsPublishParams.empty))
-
-  def publishAsync(subject: Subject, data: Chunk[Byte], params: JsPublishParams = JsPublishParams.empty): ZIO[JetStream, NatsError, Task[PublishAck]] =
+  def publishAsync[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams = JsPublishParams.empty): ZIO[JetStream, NatsError, Task[PublishAck]] =
     ZIO.serviceWithZIO[JetStream](_.publishAsync(subject, data, params))
-
-  /** Typed publishAsync with explicit params. */
-  def publishAsync[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): ZIO[JetStream, NatsError, Task[PublishAck]] =
-    ZIO.serviceWithZIO[JetStream](_.publishAsync(subject, data, params))
-
-  /** Typed publishAsync — convenience overload with [[JsPublishParams.empty]]. */
-  def publishAsync[T: NatsCodec](subject: Subject, data: T): ZIO[JetStream, NatsError, Task[PublishAck]] =
-    ZIO.serviceWithZIO[JetStream](_.publishAsync(subject, data, JsPublishParams.empty))
 
   def consumer(
     streamName: String,
@@ -82,42 +58,40 @@ object JetStream {
 
 private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
 
-  override def publish(subject: Subject, data: Chunk[Byte], params: JsPublishParams): IO[NatsError, PublishAck] =
+  override def publish[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): IO[NatsError, PublishAck] = {
+    val bytes = NatsCodec[T].encode(data)
     (params.headers.nonEmpty, params.options) match {
       case (false, None) =>
         ZIO
-          .attemptBlocking(js.publish(subject.value, data.toArray))
+          .attemptBlocking(js.publish(subject.value, bytes.toArray))
           .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
       case (true, None) =>
-        val msg = NatsMessage.toJava(subject.value, data, headers = params.headers)
+        val msg = NatsMessage.toJava(subject.value, bytes, headers = params.headers)
         ZIO
           .attemptBlocking(js.publish(msg))
           .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
       case (false, Some(opts)) =>
         ZIO
-          .attemptBlocking(js.publish(subject.value, data.toArray, opts.toJava))
+          .attemptBlocking(js.publish(subject.value, bytes.toArray, opts.toJava))
           .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
       case (true, Some(opts)) =>
-        val msg = NatsMessage.toJava(subject.value, data, headers = params.headers)
+        val msg = NatsMessage.toJava(subject.value, bytes, headers = params.headers)
         ZIO
           .attemptBlocking(js.publish(msg, opts.toJava))
           .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
     }
+  }
 
-  override def publish[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): IO[NatsError, PublishAck] =
-    publish(subject, NatsCodec[T].encode(data), params)
-
-  override def publishAsync(subject: Subject, data: Chunk[Byte], params: JsPublishParams): IO[NatsError, Task[PublishAck]] =
+  override def publishAsync[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): IO[NatsError, Task[PublishAck]] = {
+    val bytes = NatsCodec[T].encode(data)
     ZIO.attempt {
       val future = params.options match {
-        case None       => js.publishAsync(subject.value, data.toArray)
-        case Some(opts) => js.publishAsync(subject.value, data.toArray, opts.toJava)
+        case None       => js.publishAsync(subject.value, bytes.toArray)
+        case Some(opts) => js.publishAsync(subject.value, bytes.toArray, opts.toJava)
       }
       ZIO.fromCompletionStage(future).map(PublishAck.fromJava)
     }.mapError(NatsError.fromThrowable)
-
-  override def publishAsync[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): IO[NatsError, Task[PublishAck]] =
-    publishAsync(subject, NatsCodec[T].encode(data), params)
+  }
 
   override def consumer(streamName: String, consumerName: String): IO[NatsError, Consumer] =
     ZIO

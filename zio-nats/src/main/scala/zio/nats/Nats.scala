@@ -29,41 +29,22 @@ import zio.stream._
 trait Nats {
 
   // -------------------------------------------------------------------------
-  // Raw publish
-  // -------------------------------------------------------------------------
-
-  /**
-   * Publish raw bytes to `subject`.
-   *
-   * @param params
-   *   Optional [[PublishParams]] for headers and reply-to (defaults to
-   *   [[PublishParams.empty]]).
-   */
-  def publish(
-    subject: Subject,
-    payload: Chunk[Byte],
-    params: PublishParams = PublishParams.empty
-  ): IO[NatsError, Unit]
-
-  // -------------------------------------------------------------------------
   // Typed publish
   // -------------------------------------------------------------------------
 
   /**
    * Encode `value` with the implicit [[NatsCodec]] and publish to `subject`.
    *
-   * Use the [[Nats]] companion accessor for a version with a default `params`:
-   * {{{
-   *   Nats.publish(subject, value)   // PublishParams.empty is used
-   * }}}
+   * Pass `Chunk[Byte]` to use the identity codec (raw bytes).
    *
    * @param params
-   *   [[PublishParams]] for headers and reply-to.
+   *   Optional [[PublishParams]] for headers and reply-to (defaults to
+   *   [[PublishParams.empty]]).
    */
   def publish[A: NatsCodec](
     subject: Subject,
     value: A,
-    params: PublishParams
+    params: PublishParams = PublishParams.empty
   ): IO[NatsError, Unit]
 
   // -------------------------------------------------------------------------
@@ -174,36 +155,12 @@ object Nats {
   // Accessor methods for use in the ZIO environment
   // -------------------------------------------------------------------------
 
-  def publish(
-    subject: Subject,
-    payload: Chunk[Byte],
-    params: PublishParams = PublishParams.empty
-  ): ZIO[Nats, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats](_.publish(subject, payload, params))
-
-  /**
-   * Typed publish with explicit params (mirrors the trait method). Prefer the
-   * 2-arg overload below for the common case (no custom params).
-   */
   def publish[A: NatsCodec](
     subject: Subject,
     value: A,
-    params: PublishParams
+    params: PublishParams = PublishParams.empty
   ): ZIO[Nats, NatsError, Unit] =
     ZIO.serviceWithZIO[Nats](_.publish[A](subject, value, params))
-
-  /**
-   * Typed publish — convenience overload with [[PublishParams.empty]].
-   *
-   * {{{
-   *   Nats.publish(subject, UserCreated("1"))
-   * }}}
-   */
-  def publish[A: NatsCodec](
-    subject: Subject,
-    value: A
-  ): ZIO[Nats, NatsError, Unit] =
-    ZIO.serviceWithZIO[Nats](_.publish[A](subject, value, PublishParams.empty))
 
   def request(
     subject: Subject,
@@ -297,30 +254,23 @@ object Nats {
 
 private[nats] final class NatsLive(conn: JConnection) extends Nats {
 
-  override def publish(
-    subject: Subject,
-    payload: Chunk[Byte],
-    params: PublishParams
-  ): IO[NatsError, Unit] =
-    if (params.headers.isEmpty && params.replyTo.isEmpty)
-      ZIO.attempt(conn.publish(subject.value, payload.toArray)).mapError(NatsError.fromThrowable)
-    else {
-      val msg = NatsMessage.toJava(
-        subject = subject.value,
-        data = payload,
-        replyTo = params.replyTo.map(_.value),
-        headers = params.headers
-      )
-      ZIO.attempt(conn.publish(msg)).mapError(NatsError.fromThrowable)
-    }
-
   override def publish[A: NatsCodec](
     subject: Subject,
     value: A,
     params: PublishParams
   ): IO[NatsError, Unit] = {
     val bytes = NatsCodec[A].encode(value)
-    publish(subject, bytes, params)
+    if (params.headers.isEmpty && params.replyTo.isEmpty)
+      ZIO.attempt(conn.publish(subject.value, bytes.toArray)).mapError(NatsError.fromThrowable)
+    else {
+      val msg = NatsMessage.toJava(
+        subject = subject.value,
+        data = bytes,
+        replyTo = params.replyTo.map(_.value),
+        headers = params.headers
+      )
+      ZIO.attempt(conn.publish(msg)).mapError(NatsError.fromThrowable)
+    }
   }
 
   override def request(
