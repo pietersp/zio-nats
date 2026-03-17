@@ -90,38 +90,38 @@ trait KeyValue {
   // --- Watch ---
 
   /**
-   * Stream decoded values for one or more keys.
+   * Stream events for one or more keys as [[KvEvent]] values.
    *
    * Pass a single-element list to watch one key, or multiple keys to watch
    * all of them in a single subscription. The stream never completes on its
    * own — interrupt it to stop watching.
    *
-   * Because delete and purge markers carry no decodable value, they are always
-   * excluded from the stream regardless of [[KeyValueWatchOptions.ignoreDeletes]].
-   * Setting `ignoreDeletes = true` is a server-side bandwidth optimisation that
-   * prevents those entries from being transmitted at all, but has no effect on
-   * what the stream emits.
+   * Emits [[KvEvent.Put]] for writes, [[KvEvent.Delete]] for soft-deletes, and
+   * [[KvEvent.Purge]] for purges. Set [[KeyValueWatchOptions.ignoreDeletes]] to
+   * suppress Delete and Purge events at the server side.
    */
   def watch[A: NatsCodec](
     keys: List[String],
     options: KeyValueWatchOptions = KeyValueWatchOptions.default
-  ): ZStream[Any, NatsError, KvEnvelope[A]]
+  ): ZStream[Any, NatsError, KvEvent[A]]
 
   /**
-   * Stream decoded values for all keys in the bucket.
+   * Stream events for all keys in the bucket as [[KvEvent]] values.
    *
-   * Delete and purge markers carry no decodable value and are always excluded.
-   * See [[watch]] for details on `ignoreDeletes` as a bandwidth optimisation.
+   * Emits [[KvEvent.Put]] for writes, [[KvEvent.Delete]] for soft-deletes, and
+   * [[KvEvent.Purge]] for purges. Set [[KeyValueWatchOptions.ignoreDeletes]] to
+   * suppress Delete and Purge events at the server side.
    */
   def watchAll[A: NatsCodec](
     options: KeyValueWatchOptions = KeyValueWatchOptions.default
-  ): ZStream[Any, NatsError, KvEnvelope[A]]
+  ): ZStream[Any, NatsError, KvEvent[A]]
 
   // --- History ---
 
   /**
    * Return decoded values from the revision history of `key`, oldest to newest.
-   * Delete and purge marker entries carry no decodable value and are omitted.
+   * Delete and purge marker entries have no decodable value and are omitted;
+   * use [[watch]] with [[KeyValueWatchOptions.includeHistory]] to observe them.
    */
   def history[A: NatsCodec](key: String): IO[NatsError, List[KvEnvelope[A]]]
 
@@ -239,15 +239,20 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
           .mapBoth(err => NatsError.DecodingError(err.message, err), v => Some(KvEnvelope(v, e)))
     }
 
-  private def decodeStream[A: NatsCodec](
+  private def toEvents[A: NatsCodec](
     raw: ZStream[Any, NatsError, KeyValueEntry]
-  ): ZStream[Any, NatsError, KvEnvelope[A]] =
-    raw
-      .filter(_.operation == KeyValueOperation.Put)
-      .mapZIO { e =>
-        ZIO.fromEither(e.decode[A])
-          .mapBoth(err => NatsError.DecodingError(err.message, err), KvEnvelope(_, e))
+  ): ZStream[Any, NatsError, KvEvent[A]] =
+    raw.mapZIO { e =>
+      e.operation match {
+        case KeyValueOperation.Put =>
+          ZIO.fromEither(e.decode[A])
+            .mapBoth(err => NatsError.DecodingError(err.message, err), v => KvEvent.Put(KvEnvelope(v, e)))
+        case KeyValueOperation.Delete =>
+          ZIO.succeed(KvEvent.Delete(e))
+        case KeyValueOperation.Purge =>
+          ZIO.succeed(KvEvent.Purge(e))
       }
+    }
 
   // ---------------------------------------------------------------------------
   // Get
@@ -309,13 +314,13 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
   override def watch[A: NatsCodec](
     keys: List[String],
     options: KeyValueWatchOptions = KeyValueWatchOptions.default
-  ): ZStream[Any, NatsError, KvEnvelope[A]] =
-    decodeStream(watchInternal(WatchTarget.Keys(keys), options))
+  ): ZStream[Any, NatsError, KvEvent[A]] =
+    toEvents(watchInternal(WatchTarget.Keys(keys), options))
 
   override def watchAll[A: NatsCodec](
     options: KeyValueWatchOptions = KeyValueWatchOptions.default
-  ): ZStream[Any, NatsError, KvEnvelope[A]] =
-    decodeStream(watchInternal(WatchTarget.All, options))
+  ): ZStream[Any, NatsError, KvEvent[A]] =
+    toEvents(watchInternal(WatchTarget.All, options))
 
   private enum WatchTarget {
     case Keys(keys: List[String])

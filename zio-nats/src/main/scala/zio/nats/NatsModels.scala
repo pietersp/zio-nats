@@ -378,22 +378,8 @@ private[nats] object KeyValueEntry {
 /**
  * A decoded Key-Value entry paired with its server-side [[KeyValueEntry]] metadata.
  *
- * Returned by [[KeyValue.get]], [[KeyValue.watch]], and [[KeyValue.history]] so
- * callers have access to both the decoded payload and the entry metadata
- * (key, revision, operation, bucket name).
- *
- * Delete and purge marker entries are never emitted as [[KvEnvelope]]s —
- * they are silently filtered by the library. Pass `Chunk[Byte]` as the type
- * parameter to skip decoding and receive raw bytes.
- *
- * {{{
- * kv.watch[UserProfile](List("user.42")).map { env =>
- *   // env.value    — the decoded UserProfile
- *   // env.key      — the KV key ("user.42")
- *   // env.revision — the stream sequence number
- *   // env.entry    — full KeyValueEntry with raw bytes and operation
- * }
- * }}}
+ * Returned by [[KeyValue.get]] and [[KeyValue.history]], which only ever yield
+ * Put entries. Pass `Chunk[Byte]` as `A` to skip decoding and receive raw bytes.
  *
  * @param value   The decoded payload.
  * @param entry   The raw [[KeyValueEntry]] containing metadata and raw bytes.
@@ -405,11 +391,60 @@ final case class KvEnvelope[+A](value: A, entry: KeyValueEntry) {
   /** The stream sequence revision of this entry (monotonically increasing). */
   def revision: Long = entry.revision
 
-  /** The KV operation. Always [[KeyValueOperation.Put]] for typed results. */
-  def operation: KeyValueOperation = entry.operation
-
   /** The bucket this entry belongs to. */
   def bucketName: String = entry.bucketName
+}
+
+/**
+ * An event emitted by a [[KeyValue.watch]] or [[KeyValue.watchAll]] stream.
+ *
+ *  - [[KvEvent.Put]] carries a decoded value for each successful write.
+ *  - [[KvEvent.Delete]] signals that the key was soft-deleted (history preserved).
+ *  - [[KvEvent.Purge]] signals that all history for the key was erased.
+ *
+ * All three cases expose [[key]], [[revision]], and [[bucketName]].
+ *
+ * Set [[KeyValueWatchOptions.ignoreDeletes]] to suppress [[KvEvent.Delete]] and
+ * [[KvEvent.Purge]] at the server side when you only care about [[KvEvent.Put]].
+ *
+ * {{{
+ * kv.watch[UserProfile](List("user.42")).map {
+ *   case KvEvent.Put(env)    => handleUpdate(env.value)
+ *   case KvEvent.Delete(e)   => handleDelete(e.key)
+ *   case KvEvent.Purge(e)    => handlePurge(e.key)
+ * }
+ * }}}
+ */
+enum KvEvent[+A] {
+  /** A value was stored under the key. */
+  case Put(envelope: KvEnvelope[A])
+
+  /** The key was soft-deleted; its history is still accessible. */
+  case Delete(entry: KeyValueEntry)
+
+  /** All history for the key was purged. */
+  case Purge(entry: KeyValueEntry)
+
+  /** The key this event refers to. */
+  def key: String = this match {
+    case Put(env)  => env.key
+    case Delete(e) => e.key
+    case Purge(e)  => e.key
+  }
+
+  /** The stream revision at which this event occurred. */
+  def revision: Long = this match {
+    case Put(env)  => env.revision
+    case Delete(e) => e.revision
+    case Purge(e)  => e.revision
+  }
+
+  /** The bucket this event belongs to. */
+  def bucketName: String = this match {
+    case Put(env)  => env.bucketName
+    case Delete(e) => e.bucketName
+    case Purge(e)  => e.bucketName
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -495,9 +530,9 @@ private[nats] object ConsumerPauseInfo {
 /**
  * Options that control which entries a KV watch delivers.
  *
- * @param ignoreDeletes  Tell the server not to transmit delete and purge markers.
- *                       The typed `watch`/`watchAll` API always omits these entries
- *                       regardless, so this is purely a bandwidth optimisation.
+ * @param ignoreDeletes  Suppress [[KvEvent.Delete]] and [[KvEvent.Purge]] events.
+ *                       When `true` the server does not transmit these entries,
+ *                       so the watch stream emits only [[KvEvent.Put]] events.
  * @param metaOnly       Receive only metadata; omit value bytes (default: include values).
  * @param includeHistory Start from the first entry per key instead of the last (default: last per key).
  * @param updatesOnly    Start only from new entries written after the watch begins (default: last per key).

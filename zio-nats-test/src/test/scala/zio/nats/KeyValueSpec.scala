@@ -49,7 +49,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         kvm      <- ZIO.service[KeyValueManagement]
         _        <- kvm.create(KeyValueConfig(name = "kv-watch", storageType = StorageType.Memory))
         kv       <- KeyValue.bucket("kv-watch")
-        received <- Promise.make[Nothing, KvEnvelope[String]]
+        received <- Promise.make[Nothing, KvEvent[String]]
         fiber    <- kv.watch[String](List("watch-key"))
                    .tap(e => received.succeed(e))
                    .take(1)
@@ -57,10 +57,10 @@ object KeyValueSpec extends ZIOSpecDefault {
                    .fork
         _     <- ZIO.sleep(300.millis)
         _     <- kv.put("watch-key", "watched")
-        entry <- received.await
+        event <- received.await
         _     <- fiber.interrupt
         _     <- kvm.delete("kv-watch")
-      } yield assertTrue(entry.value == "watched")
+      } yield assertTrue(event match { case KvEvent.Put(env) => env.value == "watched"; case _ => false })
     },
 
     test("list keys in bucket") {
@@ -122,29 +122,46 @@ object KeyValueSpec extends ZIOSpecDefault {
       } yield assertTrue(rev == 1L, e.exists(_.value == "hello"))
     },
 
-    test("watch with IGNORE_DELETE filters out delete markers") {
+    test("watch delivers delete events and ignoreDeletes suppresses them") {
       for {
-        kvm      <- ZIO.service[KeyValueManagement]
-        _        <- kvm.create(KeyValueConfig(name = "kv-watch-del", storageType = StorageType.Memory))
-        kv       <- KeyValue.bucket("kv-watch-del")
-        received <- Ref.make(List.empty[KvEnvelope[String]])
-        // Watch with updatesOnly so we control exactly which events are delivered
-        fiber    <- kv
-                      .watch[String](List("d"), KeyValueWatchOptions(ignoreDeletes = true, updatesOnly = true))
-                      .tap(e => received.update(_ :+ e))
-                      .runDrain
-                      .fork
-        _        <- ZIO.sleep(300.millis)
-        _        <- kv.put("d", "v1")   // should be delivered
-        _        <- ZIO.sleep(300.millis)
-        _        <- kv.delete("d")      // should be suppressed by ignoreDeletes
-        _        <- ZIO.sleep(300.millis)
-        _        <- fiber.interrupt
-        entries  <- received.get
-        _        <- kvm.delete("kv-watch-del")
+        kvm    <- ZIO.service[KeyValueManagement]
+        _      <- kvm.create(KeyValueConfig(name = "kv-watch-del", storageType = StorageType.Memory))
+        kv     <- KeyValue.bucket("kv-watch-del")
+        // Without ignoreDeletes: both Put and Delete are emitted
+        allRef <- Ref.make(List.empty[KvEvent[String]])
+        fiber1 <- kv
+                    .watch[String](List("d"), KeyValueWatchOptions(updatesOnly = true))
+                    .tap(e => allRef.update(_ :+ e))
+                    .runDrain
+                    .fork
+        _      <- ZIO.sleep(300.millis)
+        _      <- kv.put("d", "v1")
+        _      <- ZIO.sleep(300.millis)
+        _      <- kv.delete("d")
+        _      <- ZIO.sleep(300.millis)
+        _      <- fiber1.interrupt
+        all    <- allRef.get
+        // With ignoreDeletes: only Put is emitted
+        putRef <- Ref.make(List.empty[KvEvent[String]])
+        _      <- kv.put("d", "v2")
+        fiber2 <- kv
+                    .watch[String](List("d"), KeyValueWatchOptions(ignoreDeletes = true, updatesOnly = true))
+                    .tap(e => putRef.update(_ :+ e))
+                    .runDrain
+                    .fork
+        _      <- ZIO.sleep(300.millis)
+        _      <- kv.put("d", "v3")
+        _      <- ZIO.sleep(300.millis)
+        _      <- kv.delete("d")
+        _      <- ZIO.sleep(300.millis)
+        _      <- fiber2.interrupt
+        puts   <- putRef.get
+        _      <- kvm.delete("kv-watch-del")
       } yield assertTrue(
-        // Only the Put "v1" is received; the delete marker is suppressed by ignoreDeletes
-        entries.map(_.value) == List("v1")
+        all.exists { case KvEvent.Put(env) => env.value == "v1"; case _ => false },
+        all.exists { case KvEvent.Delete(_) => true; case _ => false },
+        puts.forall { case _: KvEvent.Put[?] => true; case _ => false },
+        puts.exists { case KvEvent.Put(env) => env.value == "v3"; case _ => false }
       )
     },
 
@@ -168,7 +185,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         _       <- kvm.delete("kv-watch-rev")
       } yield assertTrue(
         entries.size == 2,
-        entries.map(_.value).toList == List("v2", "v3")
+        entries.collect { case KvEvent.Put(env) => env.value }.toList == List("v2", "v3")
       )
     },
 
@@ -303,7 +320,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         _        <- kvm.create(KeyValueConfig(name = "kv-watch-upd", storageType = StorageType.Memory))
         kv       <- KeyValue.bucket("kv-watch-upd")
         _        <- kv.put("existing", "old")
-        received <- Promise.make[Nothing, KvEnvelope[String]]
+        received <- Promise.make[Nothing, KvEvent[String]]
         fiber    <- kv
                       .watchAll[String](KeyValueWatchOptions(updatesOnly = true))
                       .tap(e => received.succeed(e))
@@ -312,10 +329,10 @@ object KeyValueSpec extends ZIOSpecDefault {
                       .fork
         _        <- ZIO.sleep(300.millis)
         _        <- kv.put("new-key", "fresh")
-        entry    <- received.await
+        event    <- received.await
         _        <- fiber.interrupt
         _        <- kvm.delete("kv-watch-upd")
-      } yield assertTrue(entry.key == "new-key")
+      } yield assertTrue(event.key == "new-key")
     },
 
     test("get by revision returns the entry at that revision") {
