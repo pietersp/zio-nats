@@ -160,6 +160,125 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         _    <- fiber.interrupt
         _    <- osm.delete("os-watch")
       } yield assertTrue(info.name == "watched-obj")
+    },
+
+    test("put with ObjectMeta stores description and can be retrieved") {
+      for {
+        osm  <- ZIO.service[ObjectStoreManagement]
+        _    <- osm.create(ObjectStoreConfig(name = "os-meta-put", storageType = StorageType.Memory))
+        os   <- ObjectStore.bucket("os-meta-put")
+        meta  = ObjectMeta(name = "meta-obj", description = Some("my-desc"), headers = Headers("X-Tag" -> "tag1"))
+        info <- os.put(meta, Chunk.fromArray("meta-data".getBytes))
+        got  <- os.getInfo("meta-obj")
+        _    <- osm.delete("os-meta-put")
+      } yield assertTrue(
+        info.name == "meta-obj",
+        got.description.contains("my-desc")
+      )
+    },
+
+    test("putStream with ObjectMeta stores description and data correctly") {
+      for {
+        osm  <- ZIO.service[ObjectStoreManagement]
+        _    <- osm.create(ObjectStoreConfig(name = "os-meta-stream", storageType = StorageType.Memory))
+        os   <- ObjectStore.bucket("os-meta-stream")
+        meta  = ObjectMeta(name = "stream-meta-obj", description = Some("streamed"))
+        data  = ZStream.fromChunk(Chunk.fromArray("streamed-data".getBytes))
+        info <- os.putStream(meta, data)
+        got  <- os.getInfo("stream-meta-obj")
+        _    <- osm.delete("os-meta-stream")
+      } yield assertTrue(
+        info.name == "stream-meta-obj",
+        got.description.contains("streamed")
+      )
+    },
+
+    test("updateMeta changes the description of an existing object") {
+      for {
+        osm     <- ZIO.service[ObjectStoreManagement]
+        _       <- osm.create(ObjectStoreConfig(name = "os-updmeta", storageType = StorageType.Memory))
+        os      <- ObjectStore.bucket("os-updmeta")
+        _       <- os.put("upd-obj", Chunk.fromArray("data".getBytes))
+        newMeta  = ObjectMeta(name = "upd-obj", description = Some("updated-desc"))
+        _       <- os.updateMeta("upd-obj", newMeta)
+        info    <- os.getInfo("upd-obj")
+        _       <- osm.delete("os-updmeta")
+      } yield assertTrue(info.description.contains("updated-desc"))
+    },
+
+    test("addBucketLink creates a cross-bucket link") {
+      for {
+        osm  <- ZIO.service[ObjectStoreManagement]
+        _    <- osm.create(ObjectStoreConfig(name = "os-blink-src", storageType = StorageType.Memory))
+        _    <- osm.create(ObjectStoreConfig(name = "os-blink-dst", storageType = StorageType.Memory))
+        src  <- ObjectStore.bucket("os-blink-src")
+        dst  <- ObjectStore.bucket("os-blink-dst")
+        _    <- src.put("src-obj", Chunk.fromArray("data".getBytes))
+        link <- dst.addBucketLink("src-link", src)
+        _    <- osm.delete("os-blink-src")
+        _    <- osm.delete("os-blink-dst")
+      } yield assertTrue(link.name == "src-link")
+    },
+
+    test("getInfo with includingDeleted=true returns deleted object summary") {
+      for {
+        osm     <- ZIO.service[ObjectStoreManagement]
+        _       <- osm.create(ObjectStoreConfig(name = "os-getinfo-del", storageType = StorageType.Memory))
+        os      <- ObjectStore.bucket("os-getinfo-del")
+        _       <- os.put("del-target", Chunk.fromArray("hello".getBytes))
+        _       <- os.delete("del-target")
+        deleted <- os.getInfo("del-target", includingDeleted = true)
+        _       <- osm.delete("os-getinfo-del")
+      } yield assertTrue(deleted.name == "del-target", deleted.isDeleted)
+    },
+
+    test("os.getStatus returns bucket status with correct name") {
+      for {
+        osm    <- ZIO.service[ObjectStoreManagement]
+        _      <- osm.create(ObjectStoreConfig(name = "os-status-inst", storageType = StorageType.Memory))
+        os     <- ObjectStore.bucket("os-status-inst")
+        status <- os.getStatus
+        _      <- osm.delete("os-status-inst")
+      } yield assertTrue(status.bucketName == "os-status-inst")
+    },
+
+    test("ObjectStoreManagement.getBucketNames returns list containing created bucket") {
+      for {
+        osm   <- ZIO.service[ObjectStoreManagement]
+        _     <- osm.create(ObjectStoreConfig(name = "os-bucketnames", storageType = StorageType.Memory))
+        names <- osm.getBucketNames
+        _     <- osm.delete("os-bucketnames")
+      } yield assertTrue(names.contains("os-bucketnames"))
+    },
+
+    test("ObjectStoreManagement.getStatus returns status for a named bucket") {
+      for {
+        osm    <- ZIO.service[ObjectStoreManagement]
+        _      <- osm.create(ObjectStoreConfig(name = "os-mgmt-status", storageType = StorageType.Memory))
+        status <- osm.getStatus("os-mgmt-status")
+        _      <- osm.delete("os-mgmt-status")
+      } yield assertTrue(status.bucketName == "os-mgmt-status")
+    },
+
+    test("watch with UPDATES_ONLY skips pre-existing objects") {
+      for {
+        osm      <- ZIO.service[ObjectStoreManagement]
+        _        <- osm.create(ObjectStoreConfig(name = "os-watch-upd", storageType = StorageType.Memory))
+        os       <- ObjectStore.bucket("os-watch-upd")
+        _        <- os.put("existing", Chunk.fromArray("old".getBytes))
+        received <- Promise.make[Nothing, ObjectSummary]
+        fiber    <- os
+                      .watch(ObjectStoreWatchOptions(updatesOnly = true))
+                      .tap(info => received.succeed(info))
+                      .take(1)
+                      .runDrain
+                      .fork
+        _        <- ZIO.sleep(300.millis)
+        _        <- os.put("new-obj", Chunk.fromArray("fresh".getBytes))
+        info     <- received.await
+        _        <- fiber.interrupt
+        _        <- osm.delete("os-watch-upd")
+      } yield assertTrue(info.name == "new-obj")
     }
   ).provideShared(
     NatsTestLayers.nats,

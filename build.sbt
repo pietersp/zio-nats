@@ -26,6 +26,7 @@ lazy val root = (project in file("."))
   )
 
 lazy val zioNats = (project in file("zio-nats"))
+  .enablePlugins(ScoverageSbtPlugin)
   .settings(
     name := "zio-nats",
     libraryDependencies ++= Seq(

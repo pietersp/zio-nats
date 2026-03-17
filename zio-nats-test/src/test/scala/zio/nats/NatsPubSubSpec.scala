@@ -107,6 +107,28 @@ object NatsPubSubSpec extends ZIOSpecDefault {
       } yield assertTrue(msgs >= 0, bytes >= 0)
     },
 
+    test("flush(timeout) completes without error after publishing") {
+      for {
+        nats <- ZIO.service[Nats]
+        _    <- nats.publish(Subject("flush.test"), Chunk.fromArray("x".getBytes))
+        _    <- nats.flush(5.seconds)
+      } yield assertCompletes
+    },
+
+    test("serverInfo returns a non-empty server name and version") {
+      for {
+        nats <- ZIO.service[Nats]
+        info <- nats.serverInfo
+      } yield assertTrue(info.version.nonEmpty, info.port > 0)
+    },
+
+    test("status returns Connected while the connection is active") {
+      for {
+        nats   <- ZIO.service[Nats]
+        status <- nats.status
+      } yield assertTrue(status == ConnectionStatus.Connected)
+    },
+
     test("queue group delivers to exactly one subscriber") {
       val subject = Subject("test.queue")
       for {
