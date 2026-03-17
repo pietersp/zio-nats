@@ -325,7 +325,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         kv   <- KeyValue.bucket("kv-get-rev")
         rev1 <- kv.put("k", "v1")
         _    <- kv.put("k", "v2")
-        got  <- kv.get[String]("k", rev1)
+        got  <- kv.get[String]("k", Some(rev1))
         _    <- kvm.delete("kv-get-rev")
       } yield assertTrue(got.exists(_.value == "v1"))
     },

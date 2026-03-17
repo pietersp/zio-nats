@@ -39,17 +39,14 @@ trait KeyValue {
   // --- Get ---
 
   /**
-   * Decode the latest value for `key` as `A`. Returns [[None]] if the key does
-   * not exist or has been deleted/purged. Delete and purge markers are silently
+   * Decode the value for `key` as `A`. Returns [[None]] if the key does not
+   * exist or has been deleted/purged. Delete and purge markers are silently
    * filtered. Pass `Chunk[Byte]` as `A` to retrieve raw bytes.
+   *
+   * @param revision when [[Some]], retrieves the entry at that specific stream
+   *                 revision; when [[None]] (default) retrieves the latest value.
    */
-  def get[A: NatsCodec](key: String): IO[NatsError, Option[KvEnvelope[A]]]
-
-  /**
-   * Decode the value for `key` at the specified stream `revision` as `A`.
-   * Returns [[None]] if not found or if the entry is a delete/purge marker.
-   */
-  def get[A: NatsCodec](key: String, revision: Long): IO[NatsError, Option[KvEnvelope[A]]]
+  def get[A: NatsCodec](key: String, revision: Option[Long] = None): IO[NatsError, Option[KvEnvelope[A]]]
 
   // --- Put ---
 
@@ -257,15 +254,12 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
   // Get
   // ---------------------------------------------------------------------------
 
-  override def get[A: NatsCodec](key: String): IO[NatsError, Option[KvEnvelope[A]]] =
+  override def get[A: NatsCodec](key: String, revision: Option[Long] = None): IO[NatsError, Option[KvEnvelope[A]]] =
     ZIO
-      .attemptBlocking(Option(kv.get(key)))
-      .mapBoth(NatsError.fromThrowable, _.map(KeyValueEntry.fromJava))
-      .flatMap(decodeOpt[A])
-
-  override def get[A: NatsCodec](key: String, revision: Long): IO[NatsError, Option[KvEnvelope[A]]] =
-    ZIO
-      .attemptBlocking(Option(kv.get(key, revision)))
+      .attemptBlocking(revision match {
+        case None      => Option(kv.get(key))
+        case Some(rev) => Option(kv.get(key, rev))
+      })
       .mapBoth(NatsError.fromThrowable, _.map(KeyValueEntry.fromJava))
       .flatMap(decodeOpt[A])
 
