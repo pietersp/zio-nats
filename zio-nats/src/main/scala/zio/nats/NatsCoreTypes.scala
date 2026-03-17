@@ -224,25 +224,25 @@ final case class ObjectMeta(
  * Mirrors [[io.nats.client.Connection.Status]] without exposing the Java type
  * in the public API.
  */
-sealed trait ConnectionStatus
-
-object ConnectionStatus {
+enum ConnectionStatus {
 
   /** The connection is fully established and ready for use. */
-  case object Connected extends ConnectionStatus
+  case Connected
 
   /** Performing the initial connection handshake. */
-  case object Connecting extends ConnectionStatus
+  case Connecting
 
   /** Attempting to reconnect after a disconnection. */
-  case object Reconnecting extends ConnectionStatus
+  case Reconnecting
 
   /** The connection has been dropped and is not reconnecting. */
-  case object Disconnected extends ConnectionStatus
+  case Disconnected
 
   /** The connection has been permanently closed. */
-  case object Closed extends ConnectionStatus
+  case Closed
+}
 
+object ConnectionStatus {
   private[nats] def fromJava(s: JConnection.Status): ConnectionStatus = s match {
     case JConnection.Status.CONNECTED    => Connected
     case JConnection.Status.CONNECTING   => Connecting

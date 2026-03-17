@@ -198,11 +198,10 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
   override def watchAll(options: KeyValueWatchOptions = KeyValueWatchOptions.default): ZStream[Any, NatsError, KeyValueEntry] =
     watchInternal(WatchTarget.All, options)
 
-  private sealed trait WatchTarget
-  private object WatchTarget {
-    case class SingleKey(key: String)      extends WatchTarget
-    case class MultiKey(keys: List[String]) extends WatchTarget
-    case object All                         extends WatchTarget
+  private enum WatchTarget {
+    case SingleKey(key: String)
+    case MultiKey(keys: List[String])
+    case All
   }
 
   private def watchInternal(target: WatchTarget, options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry] =

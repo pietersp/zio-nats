@@ -6,17 +6,16 @@ import zio.stream.*
 
 import java.util.concurrent.LinkedBlockingQueue
 
-/** ADT for NATS connection lifecycle events. */
-sealed trait NatsEvent
-object NatsEvent {
-  final case class Connected(url: String)           extends NatsEvent
-  final case class Disconnected(url: String)        extends NatsEvent
-  final case class Reconnected(url: String)         extends NatsEvent
-  final case class ServersDiscovered(url: String)   extends NatsEvent
-  case object Closed                                extends NatsEvent
-  case object LameDuckMode                          extends NatsEvent
-  final case class Error(message: String)           extends NatsEvent
-  final case class ExceptionOccurred(ex: Throwable) extends NatsEvent
+/** Enum for NATS connection lifecycle events. */
+enum NatsEvent {
+  case Connected(url: String)
+  case Disconnected(url: String)
+  case Reconnected(url: String)
+  case ServersDiscovered(url: String)
+  case Closed
+  case LameDuckMode
+  case Error(message: String)
+  case ExceptionOccurred(ex: Throwable)
 }
 
 /**
