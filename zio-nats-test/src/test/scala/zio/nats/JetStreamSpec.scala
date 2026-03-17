@@ -309,12 +309,12 @@ object JetStreamSpec extends ZIOSpecDefault {
           params    = JsPublishParams(headers = Headers("X-Custom" -> "my-value"))
           _        <- js.publish(Subject("hdrs.test"), Chunk.fromArray("payload".getBytes), params)
           consumer <- js.consumer("hdrs-stream", "hdrs-cons")
-          msg      <- consumer.next(5.seconds)
-          _        <- msg.map(_.ack).getOrElse(ZIO.unit)
+          msg      <- consumer.next[Chunk[Byte]](5.seconds)
+          _        <- msg.map(_.message.ack).getOrElse(ZIO.unit)
           _        <- jsm.deleteStream("hdrs-stream")
         } yield assertTrue(
           msg.isDefined,
-          msg.get.headers.get("X-Custom") == Chunk("my-value")
+          msg.get.message.headers.get("X-Custom") == Chunk("my-value")
         )
       },
 
@@ -357,12 +357,12 @@ object JetStreamSpec extends ZIOSpecDefault {
           _   <- js.publish(Subject("ord.3"), "c")
           oc  <- js.orderedConsumer("ord-stream", OrderedConsumerConfig())
           msgs <- oc
-                    .fetch(FetchOptions(maxMessages = 3, expiresIn = 5.seconds))
+                    .fetch[String](FetchOptions(maxMessages = 3, expiresIn = 5.seconds))
                     .runCollect
           _ <- jsm.deleteStream("ord-stream")
         } yield assertTrue(
           msgs.size == 3,
-          msgs.map(_.dataAsString).toList == List("a", "b", "c")
+          msgs.map(_.value).toList == List("a", "b", "c")
         )
       },
 
@@ -374,9 +374,9 @@ object JetStreamSpec extends ZIOSpecDefault {
           _   <- js.publish(Subject("ordf.x"), "x-msg")
           _   <- js.publish(Subject("ordf.y"), "y-msg")
           oc  <- js.orderedConsumer("ord-filter-stream", OrderedConsumerConfig(filterSubjects = List("ordf.x")))
-          msg <- oc.next(5.seconds)
+          msg <- oc.next[String](5.seconds)
           _   <- jsm.deleteStream("ord-filter-stream")
-        } yield assertTrue(msg.exists(_.dataAsString == "x-msg"))
+        } yield assertTrue(msg.exists(_.value == "x-msg"))
       }
     ),
 
@@ -395,8 +395,8 @@ object JetStreamSpec extends ZIOSpecDefault {
           _        <- js.publish(Subject("fetch.3"), Chunk.fromArray("c".getBytes))
           consumer <- js.consumer("fetch-stream", "fetch-cons")
           msgs     <- consumer
-                    .fetch(FetchOptions(maxMessages = 3, expiresIn = 5.seconds))
-                    .tap(_.ack)
+                    .fetch[Chunk[Byte]](FetchOptions(maxMessages = 3, expiresIn = 5.seconds))
+                    .tap(_.message.ack)
                     .runCollect
           _ <- jsm.deleteStream("fetch-stream")
         } yield assertTrue(msgs.size == 3)
@@ -413,12 +413,12 @@ object JetStreamSpec extends ZIOSpecDefault {
                )
           _        <- js.publish(Subject("next.test"), Chunk.fromArray("single".getBytes))
           consumer <- js.consumer("next-stream", "next-cons")
-          msg      <- consumer.next(5.seconds)
-          _        <- msg.map(_.ack).getOrElse(ZIO.unit)
+          msg      <- consumer.next[String](5.seconds)
+          _        <- msg.map(_.message.ack).getOrElse(ZIO.unit)
           _        <- jsm.deleteStream("next-stream")
         } yield assertTrue(
           msg.isDefined,
-          msg.get.dataAsString == "single"
+          msg.get.value == "single"
         )
       },
 
@@ -435,8 +435,8 @@ object JetStreamSpec extends ZIOSpecDefault {
           _        <- js.publish(Subject("consume.2"), Chunk.fromArray("y".getBytes))
           consumer <- js.consumer("consume-stream", "consume-cons")
           msgs     <- consumer
-                    .consume()
-                    .tap(_.ack)
+                    .consume[Chunk[Byte]]()
+                    .tap(_.message.ack)
                     .take(2)
                     .runCollect
           _ <- jsm.deleteStream("consume-stream")
@@ -457,8 +457,8 @@ object JetStreamSpec extends ZIOSpecDefault {
           _        <- js.publish(Subject("iter.3"), Chunk.fromArray("c".getBytes))
           consumer <- js.consumer("iter-stream", "iter-cons")
           msgs     <- consumer
-                        .iterate()
-                        .tap(_.ack)
+                        .iterate[Chunk[Byte]]()
+                        .tap(_.message.ack)
                         .take(3)
                         .runCollect
           _        <- jsm.deleteStream("iter-stream")
@@ -478,8 +478,8 @@ object JetStreamSpec extends ZIOSpecDefault {
           _        <- js.publish(Subject("iter2.2"), Chunk.fromArray("y".getBytes))
           consumer <- js.consumer("iter2-stream", "iter2-cons")
           msgs     <- consumer
-                        .iterate(ConsumeOptions(batchSize = 100), pollTimeout = 3.seconds)
-                        .tap(_.ack)
+                        .iterate[Chunk[Byte]](ConsumeOptions(batchSize = 100), pollTimeout = 3.seconds)
+                        .tap(_.message.ack)
                         .take(2)
                         .runCollect
           _        <- jsm.deleteStream("iter2-stream")
@@ -499,16 +499,16 @@ object JetStreamSpec extends ZIOSpecDefault {
                       )
           _        <- js.publish(Subject("nak.1"), "payload")
           consumer <- js.consumer("nak-stream", "nak-cons")
-          msg1     <- consumer.next(5.seconds)
-          _        <- msg1.map(_.nak).getOrElse(ZIO.unit)
-          msg2     <- consumer.next(5.seconds)
-          _        <- msg2.map(_.ack).getOrElse(ZIO.unit)
+          msg1     <- consumer.next[String](5.seconds)
+          _        <- msg1.map(_.message.nak).getOrElse(ZIO.unit)
+          msg2     <- consumer.next[String](5.seconds)
+          _        <- msg2.map(_.message.ack).getOrElse(ZIO.unit)
           _        <- jsm.deleteStream("nak-stream")
         } yield assertTrue(
           msg1.isDefined,
           msg2.isDefined,
-          msg1.get.dataAsString == "payload",
-          msg2.get.dataAsString == "payload"
+          msg1.get.value == "payload",
+          msg2.get.value == "payload"
         )
       },
 
@@ -523,12 +523,12 @@ object JetStreamSpec extends ZIOSpecDefault {
                       )
           _        <- js.publish(Subject("nakdelay.1"), "delayed")
           consumer <- js.consumer("nakdelay-stream", "nakdelay-cons")
-          msg1     <- consumer.next(5.seconds)
-          _        <- msg1.map(_.nakWithDelay(500.millis)).getOrElse(ZIO.unit)
-          msg2     <- consumer.next(5.seconds)
-          _        <- msg2.map(_.ack).getOrElse(ZIO.unit)
+          msg1     <- consumer.next[String](5.seconds)
+          _        <- msg1.map(_.message.nakWithDelay(500.millis)).getOrElse(ZIO.unit)
+          msg2     <- consumer.next[String](5.seconds)
+          _        <- msg2.map(_.message.ack).getOrElse(ZIO.unit)
           _        <- jsm.deleteStream("nakdelay-stream")
-        } yield assertTrue(msg1.isDefined, msg2.isDefined, msg2.get.dataAsString == "delayed")
+        } yield assertTrue(msg1.isDefined, msg2.isDefined, msg2.get.value == "delayed")
       },
 
       test("term() terminates a message and it is NOT redelivered") {
@@ -542,10 +542,10 @@ object JetStreamSpec extends ZIOSpecDefault {
                       )
           _        <- js.publish(Subject("term.1"), "terminal")
           consumer <- js.consumer("term-stream", "term-cons")
-          msg1     <- consumer.next(5.seconds)
-          _        <- msg1.map(_.term).getOrElse(ZIO.unit)
+          msg1     <- consumer.next[String](5.seconds)
+          _        <- msg1.map(_.message.term).getOrElse(ZIO.unit)
           // After term(), no redelivery should occur
-          msg2     <- consumer.next(2.seconds)
+          msg2     <- consumer.next[String](2.seconds)
           _        <- jsm.deleteStream("term-stream")
         } yield assertTrue(msg1.isDefined, msg2.isEmpty)
       },
@@ -561,9 +561,9 @@ object JetStreamSpec extends ZIOSpecDefault {
                       )
           _        <- js.publish(Subject("inprog.1"), "working")
           consumer <- js.consumer("inprog-stream", "inprog-cons")
-          msg      <- consumer.next(5.seconds)
-          _        <- msg.map(_.inProgress).getOrElse(ZIO.unit)
-          _        <- msg.map(_.ack).getOrElse(ZIO.unit)
+          msg      <- consumer.next[String](5.seconds)
+          _        <- msg.map(_.message.inProgress).getOrElse(ZIO.unit)
+          _        <- msg.map(_.message.ack).getOrElse(ZIO.unit)
           _        <- jsm.deleteStream("inprog-stream")
         } yield assertTrue(msg.isDefined)
       },
@@ -579,8 +579,8 @@ object JetStreamSpec extends ZIOSpecDefault {
                       )
           _        <- js.publish(Subject("acksync.1"), "sync-me")
           consumer <- js.consumer("acksync-stream", "acksync-cons")
-          msg      <- consumer.next(5.seconds)
-          _        <- msg.map(_.ackSync(5.seconds)).getOrElse(ZIO.unit)
+          msg      <- consumer.next[String](5.seconds)
+          _        <- msg.map(_.message.ackSync(5.seconds)).getOrElse(ZIO.unit)
           _        <- jsm.deleteStream("acksync-stream")
         } yield assertTrue(msg.isDefined)
       }

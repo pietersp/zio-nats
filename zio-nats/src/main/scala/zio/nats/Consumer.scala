@@ -14,8 +14,8 @@ import zio.stream.*
  *   - [[iterate]] — long-running pull: polls the server periodically.
  *   - [[next]] — single message with timeout.
  *
- * Each message must be explicitly ack'd, nak'd, or termed via
- * [[JetStreamMessage]] methods.
+ * Each message is decoded into a [[JsEnvelope]] containing the typed value
+ * and the raw [[JetStreamMessage]] for acknowledgement operations.
  */
 trait Consumer {
   /** The name of the stream this consumer is bound to. */
@@ -25,39 +25,40 @@ trait Consumer {
   def consumerName: String
 
   /**
-   * Fetch a bounded batch of messages.
+   * Fetch a bounded batch of messages, decoding each payload as `A`.
    *
    * The returned stream completes after the batch is fulfilled or
    * [[FetchOptions.expiresIn]] elapses.
    */
-  def fetch(options: FetchOptions = FetchOptions.default): ZStream[Any, NatsError, JetStreamMessage]
+  def fetch[A: NatsCodec](options: FetchOptions = FetchOptions.default): ZStream[Any, NatsError, JsEnvelope[A]]
 
   /**
-   * Consume messages indefinitely via server-push.
+   * Consume messages indefinitely via server-push, decoding each payload as `A`.
    *
    * The stream never completes on its own — interrupt it to stop consuming.
    * Uses efficient server-side push delivery with back-pressure handled by
    * [[ConsumeOptions.batchSize]].
    */
-  def consume(options: ConsumeOptions = ConsumeOptions.default): ZStream[Any, NatsError, JetStreamMessage]
+  def consume[A: NatsCodec](options: ConsumeOptions = ConsumeOptions.default): ZStream[Any, NatsError, JsEnvelope[A]]
 
   /**
-   * Pull messages one at a time using a long-running iterable consumer.
+   * Pull messages one at a time using a long-running iterable consumer,
+   * decoding each payload as `A`.
    *
    * Each poll waits up to `pollTimeout` for the next message. When no message
    * arrives within that window the poll retries automatically (the stream
    * continues). Interrupt the stream to stop.
    */
-  def iterate(
+  def iterate[A: NatsCodec](
     options: ConsumeOptions = ConsumeOptions.default,
     pollTimeout: Duration = 5.seconds
-  ): ZStream[Any, NatsError, JetStreamMessage]
+  ): ZStream[Any, NatsError, JsEnvelope[A]]
 
   /**
-   * Retrieve a single message, waiting up to `timeout`.
+   * Retrieve a single message decoded as `A`, waiting up to `timeout`.
    * Returns None if no message is available within the timeout.
    */
-  def next(timeout: Duration = 5.seconds): IO[NatsError, Option[JetStreamMessage]]
+  def next[A: NatsCodec](timeout: Duration = 5.seconds): IO[NatsError, Option[JsEnvelope[A]]]
 
   /**
    * Unpin this consumer from the specified priority group, allowing a
@@ -82,16 +83,24 @@ trait OrderedConsumer {
   /** The current server-side consumer name. Returns None until the first fetch/consume. */
   def currentConsumerName: Option[String]
 
-  def fetch(options: FetchOptions = FetchOptions.default): ZStream[Any, NatsError, JetStreamMessage]
-  def consume(options: ConsumeOptions = ConsumeOptions.default): ZStream[Any, NatsError, JetStreamMessage]
-  def iterate(
+  def fetch[A: NatsCodec](options: FetchOptions = FetchOptions.default): ZStream[Any, NatsError, JsEnvelope[A]]
+  def consume[A: NatsCodec](options: ConsumeOptions = ConsumeOptions.default): ZStream[Any, NatsError, JsEnvelope[A]]
+  def iterate[A: NatsCodec](
     options: ConsumeOptions = ConsumeOptions.default,
     pollTimeout: Duration = 5.seconds
-  ): ZStream[Any, NatsError, JetStreamMessage]
-  def next(timeout: Duration = 5.seconds): IO[NatsError, Option[JetStreamMessage]]
+  ): ZStream[Any, NatsError, JsEnvelope[A]]
+  def next[A: NatsCodec](timeout: Duration = 5.seconds): IO[NatsError, Option[JsEnvelope[A]]]
 
   /** Unpin this ordered consumer from the specified priority group. */
   def unpin(group: String): IO[NatsError, Boolean]
+}
+
+private[nats] object ConsumerDecode {
+  def decodeMsg[A: NatsCodec](msg: JetStreamMessage): IO[NatsError, JsEnvelope[A]] =
+    ZIO.fromEither(msg.decode[A]).mapBoth(e => NatsError.DecodingError(e.message, e), JsEnvelope(_, msg))
+
+  def decodeStream[A: NatsCodec](stream: ZStream[Any, NatsError, JetStreamMessage]): ZStream[Any, NatsError, JsEnvelope[A]] =
+    stream.mapZIO(decodeMsg[A])
 }
 
 private[nats] final class OrderedConsumerLive(
@@ -101,17 +110,20 @@ private[nats] final class OrderedConsumerLive(
 
   override def currentConsumerName: Option[String] = Option(ctx.getConsumerName)
 
-  def fetch(options: FetchOptions): ZStream[Any, NatsError, JetStreamMessage] =
-    JetStreamConsumer.fetch(ctx, options.toJava)
+  def fetch[A: NatsCodec](options: FetchOptions): ZStream[Any, NatsError, JsEnvelope[A]] =
+    ConsumerDecode.decodeStream(JetStreamConsumer.fetch(ctx, options.toJava))
 
-  def consume(options: ConsumeOptions): ZStream[Any, NatsError, JetStreamMessage] =
-    JetStreamConsumer.consume(ctx, Some(options.toJava))
+  def consume[A: NatsCodec](options: ConsumeOptions): ZStream[Any, NatsError, JsEnvelope[A]] =
+    ConsumerDecode.decodeStream(JetStreamConsumer.consume(ctx, Some(options.toJava)))
 
-  def iterate(options: ConsumeOptions, pollTimeout: Duration): ZStream[Any, NatsError, JetStreamMessage] =
-    JetStreamConsumer.iterate(ctx, Some(options.toJava), pollTimeout)
+  def iterate[A: NatsCodec](options: ConsumeOptions, pollTimeout: Duration): ZStream[Any, NatsError, JsEnvelope[A]] =
+    ConsumerDecode.decodeStream(JetStreamConsumer.iterate(ctx, Some(options.toJava), pollTimeout))
 
-  def next(timeout: Duration): IO[NatsError, Option[JetStreamMessage]] =
-    JetStreamConsumer.next(ctx, timeout)
+  def next[A: NatsCodec](timeout: Duration): IO[NatsError, Option[JsEnvelope[A]]] =
+    JetStreamConsumer.next(ctx, timeout).flatMap {
+      case None      => ZIO.none
+      case Some(msg) => ConsumerDecode.decodeMsg[A](msg).map(Some(_))
+    }
 
   def unpin(group: String): IO[NatsError, Boolean] =
     ZIO.attemptBlocking(ctx.unpin(group)).mapError(NatsError.fromThrowable)
@@ -123,17 +135,20 @@ private[nats] final class ConsumerLive(
   ctx: JBaseConsumerContext
 ) extends Consumer {
 
-  def fetch(options: FetchOptions): ZStream[Any, NatsError, JetStreamMessage] =
-    JetStreamConsumer.fetch(ctx, options.toJava)
+  def fetch[A: NatsCodec](options: FetchOptions): ZStream[Any, NatsError, JsEnvelope[A]] =
+    ConsumerDecode.decodeStream(JetStreamConsumer.fetch(ctx, options.toJava))
 
-  def consume(options: ConsumeOptions): ZStream[Any, NatsError, JetStreamMessage] =
-    JetStreamConsumer.consume(ctx, Some(options.toJava))
+  def consume[A: NatsCodec](options: ConsumeOptions): ZStream[Any, NatsError, JsEnvelope[A]] =
+    ConsumerDecode.decodeStream(JetStreamConsumer.consume(ctx, Some(options.toJava)))
 
-  def iterate(options: ConsumeOptions, pollTimeout: Duration): ZStream[Any, NatsError, JetStreamMessage] =
-    JetStreamConsumer.iterate(ctx, Some(options.toJava), pollTimeout)
+  def iterate[A: NatsCodec](options: ConsumeOptions, pollTimeout: Duration): ZStream[Any, NatsError, JsEnvelope[A]] =
+    ConsumerDecode.decodeStream(JetStreamConsumer.iterate(ctx, Some(options.toJava), pollTimeout))
 
-  def next(timeout: Duration): IO[NatsError, Option[JetStreamMessage]] =
-    JetStreamConsumer.next(ctx, timeout)
+  def next[A: NatsCodec](timeout: Duration): IO[NatsError, Option[JsEnvelope[A]]] =
+    JetStreamConsumer.next(ctx, timeout).flatMap {
+      case None      => ZIO.none
+      case Some(msg) => ConsumerDecode.decodeMsg[A](msg).map(Some(_))
+    }
 
   def unpin(group: String): IO[NatsError, Boolean] =
     ZIO.attemptBlocking(ctx.unpin(group)).mapError(NatsError.fromThrowable)

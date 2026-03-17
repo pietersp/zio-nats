@@ -44,6 +44,31 @@ import scala.jdk.CollectionConverters.*
 final case class Envelope[+A](value: A, message: NatsMessage)
 
 // ---------------------------------------------------------------------------
+// JsEnvelope — typed value + raw JetStreamMessage
+// ---------------------------------------------------------------------------
+
+/**
+ * A decoded JetStream message value paired with its raw [[JetStreamMessage]].
+ *
+ * Returned by [[Consumer]] and [[OrderedConsumer]] so callers have access to
+ * both the decoded payload and the full message for acknowledgement operations
+ * and metadata (headers, subject, reply-to).
+ *
+ * {{{
+ * consumer.fetch[Order]().map { env =>
+ *   // env.value   — the decoded Order
+ *   // env.message — the full JetStreamMessage (ack, nak, headers, etc.)
+ * }
+ * }}}
+ *
+ * @param value
+ *   The decoded payload.
+ * @param message
+ *   The raw [[JetStreamMessage]] that was received.
+ */
+final case class JsEnvelope[+A](value: A, message: JetStreamMessage)
+
+// ---------------------------------------------------------------------------
 // Connection statistics
 // ---------------------------------------------------------------------------
 

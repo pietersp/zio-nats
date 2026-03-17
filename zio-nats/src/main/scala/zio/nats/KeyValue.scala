@@ -22,8 +22,17 @@ import scala.jdk.CollectionConverters.*
  * for {
  *   kv  <- KeyValue.bucket("settings")
  *   _   <- kv.put("timeout", "30s")
- *   opt <- kv.get("timeout")
- * } yield opt.map(_.valueAsString)
+ *   opt <- kv.get[String]("timeout")  // typed — returns Option[String]
+ *   raw <- kv.get("timeout")          // raw    — returns Option[KeyValueEntry]
+ * } yield opt
+ * }}}
+ *
+ * Typed overloads (`get[A]`, `watch[A]`, `history[A]`) are available as
+ * extension methods — call them with an explicit type parameter to select them:
+ * {{{
+ *   kv.get[String]("key")
+ *   kv.watch[MyEvent]("stream.key")
+ *   kv.history[MyEvent]("key")
  * }}}
  */
 trait KeyValue {
@@ -114,6 +123,108 @@ trait KeyValue {
   def getStatus: IO[NatsError, KeyValueBucketStatus]
 }
 
+object KeyValue {
+
+  /**
+   * Create a KeyValue service bound to a specific bucket name.
+   *
+   * The bucket must already exist. Use KeyValueManagement.create to create it.
+   */
+  def bucket(bucketName: String): ZIO[Nats, NatsError, KeyValue] =
+    ZIO.serviceWithZIO[Nats] { nats =>
+      ZIO
+        .attempt(nats.underlying.keyValue(bucketName))
+        .mapBoth(NatsError.fromThrowable, new KeyValueLive(_))
+    }
+
+  def put[A: NatsCodec](key: String, value: A): ZIO[KeyValue, NatsError, Long] =
+    ZIO.serviceWithZIO[KeyValue](_.put(key, value))
+
+  def create[A: NatsCodec](key: String, value: A, ttl: Option[Duration] = None): ZIO[KeyValue, NatsError, Long] =
+    ZIO.serviceWithZIO[KeyValue](_.create(key, value, ttl))
+
+  def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): ZIO[KeyValue, NatsError, Long] =
+    ZIO.serviceWithZIO[KeyValue](_.update(key, value, expectedRevision))
+
+  // ---------------------------------------------------------------------------
+  // Typed extension methods
+  //
+  // These use extension methods to avoid Scala 3 overload ambiguity: calling
+  // `kv.get("key")` uses the instance method (returns Option[KeyValueEntry]);
+  // calling `kv.get[String]("key")` with an explicit type param finds the
+  // extension method (returns Option[String]).
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Decode the latest value for `key` as `A`. Returns None if the key does not
+   * exist or has been deleted/purged. Delete and purge markers are silently
+   * skipped.
+   *
+   * Usage: `kv.get[String]("key")`
+   */
+  extension (kv: KeyValue)
+    def get[A: NatsCodec](key: String): IO[NatsError, Option[A]] =
+      kv.get(key).flatMap(decodeOpt[A])
+
+  /**
+   * Decode the value for `key` at the specified stream `revision` as `A`.
+   * Returns None if not found or if the entry is a delete/purge marker.
+   *
+   * Usage: `kv.get[String]("key", revision)`
+   */
+  extension (kv: KeyValue)
+    def get[A: NatsCodec](key: String, revision: Long): IO[NatsError, Option[A]] =
+      kv.get(key, revision).flatMap(decodeOpt[A])
+
+  /**
+   * Stream decoded values for a specific key using default watch options.
+   * Delete and purge markers are silently filtered out; only Put entries are
+   * decoded and emitted.
+   *
+   * Usage: `kv.watch[MyEvent]("stream.key")`
+   */
+  extension (kv: KeyValue)
+    def watch[A: NatsCodec](key: String): ZStream[Any, NatsError, A] =
+      decodeWatch(kv.watch(key))
+
+  /**
+   * Stream decoded values for a specific key with explicit watch options.
+   * Delete and purge markers are silently filtered out; only Put entries are
+   * decoded and emitted.
+   *
+   * Usage: `kv.watch[MyEvent]("stream.key", KeyValueWatchOptions(includeHistory = true))`
+   */
+  extension (kv: KeyValue)
+    def watch[A: NatsCodec](key: String, options: KeyValueWatchOptions): ZStream[Any, NatsError, A] =
+      decodeWatch(kv.watch(key, options))
+
+  /**
+   * Return decoded values from the revision history of `key`, oldest to newest.
+   * Delete and purge marker entries are silently omitted.
+   *
+   * Usage: `kv.history[MyEvent]("key")`
+   */
+  extension (kv: KeyValue)
+    def history[A: NatsCodec](key: String): IO[NatsError, List[A]] =
+      kv.history(key).flatMap { entries =>
+        ZIO.foreach(entries.filter(_.operation == KeyValueOperation.Put)) { e =>
+          ZIO.fromEither(e.decode[A]).mapError(err => NatsError.DecodingError(err.message, err))
+        }
+      }
+
+  private def decodeOpt[A: NatsCodec](opt: Option[KeyValueEntry]): IO[NatsError, Option[A]] = opt match {
+    case None                                            => ZIO.none
+    case Some(e) if e.operation != KeyValueOperation.Put => ZIO.none
+    case Some(e) =>
+      ZIO.fromEither(e.decode[A]).mapBoth(err => NatsError.DecodingError(err.message, err), Some(_))
+  }
+
+  private def decodeWatch[A: NatsCodec](raw: ZStream[Any, NatsError, KeyValueEntry]): ZStream[Any, NatsError, A] =
+    raw
+      .filter(_.operation == KeyValueOperation.Put)
+      .mapZIO(e => ZIO.fromEither(e.decode[A]).mapError(err => NatsError.DecodingError(err.message, err)))
+}
+
 /**
  * Service for managing Key-Value buckets.
  *
@@ -138,30 +249,6 @@ trait KeyValueManagement {
 
   /** Get status information for all KV buckets. */
   def getStatuses: IO[NatsError, List[KeyValueBucketStatus]]
-}
-
-object KeyValue {
-
-  /**
-   * Create a KeyValue service bound to a specific bucket name.
-   *
-   * The bucket must already exist. Use KeyValueManagement.create to create it.
-   */
-  def bucket(bucketName: String): ZIO[Nats, NatsError, KeyValue] =
-    ZIO.serviceWithZIO[Nats] { nats =>
-      ZIO
-        .attempt(nats.underlying.keyValue(bucketName))
-        .mapBoth(NatsError.fromThrowable, new KeyValueLive(_))
-    }
-
-  def put[A: NatsCodec](key: String, value: A): ZIO[KeyValue, NatsError, Long] =
-    ZIO.serviceWithZIO[KeyValue](_.put(key, value))
-
-  def create[A: NatsCodec](key: String, value: A, ttl: Option[Duration] = None): ZIO[KeyValue, NatsError, Long] =
-    ZIO.serviceWithZIO[KeyValue](_.create(key, value, ttl))
-
-  def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): ZIO[KeyValue, NatsError, Long] =
-    ZIO.serviceWithZIO[KeyValue](_.update(key, value, expectedRevision))
 }
 
 object KeyValueManagement {

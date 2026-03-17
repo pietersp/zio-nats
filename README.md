@@ -345,25 +345,29 @@ for {
   js       <- ZIO.service[JetStream]
   consumer <- js.consumer("ORDERS", "processor")
 
-  // Bounded fetch (completes after N messages or timeout)
-  _ <- consumer.fetch(FetchOptions(maxMessages = 10, expiresIn = 5.seconds))
-         .mapZIO(msg => process(msg) *> msg.ack)
+  // Bounded fetch — each env.value is a decoded Order; env.message holds ack ops
+  _ <- consumer.fetch[Order](FetchOptions(maxMessages = 10, expiresIn = 5.seconds))
+         .mapZIO(env => process(env.value) *> env.message.ack)
          .runDrain
 
   // Indefinite push-style consume
-  _ <- consumer.consume()
-         .mapZIO(msg => process(msg) *> msg.ack)
+  _ <- consumer.consume[Order]()
+         .mapZIO(env => process(env.value) *> env.message.ack)
          .runDrain
 
   // Pull-based iterate (retries on empty polls)
-  _ <- consumer.iterate()
-         .mapZIO(msg => process(msg) *> msg.ack)
+  _ <- consumer.iterate[Order]()
+         .mapZIO(env => process(env.value) *> env.message.ack)
          .runDrain
 
   // Single next message (returns None if no message within timeout)
-  msg <- consumer.next(5.seconds)
+  env <- consumer.next[Order](5.seconds)
 } yield ()
 ```
+
+All four methods are generic `[A: NatsCodec]` and return `JsEnvelope[A]`, which bundles:
+- `env.value` — the decoded domain type
+- `env.message` — the raw `JetStreamMessage` for ack/nak/term/inProgress and metadata
 
 ### Consuming — OrderedConsumer
 
@@ -376,13 +380,13 @@ for {
                filterSubjects = List("events.>"),
                deliverPolicy  = Some(DeliverPolicy.All)
              ))
-  _ <- ordered.consume()
-         .tap(msg => ZIO.debug(msg.dataAsString))
+  _ <- ordered.consume[MyEvent]()
+         .tap(env => ZIO.debug(env.value.toString))
          .runDrain
 } yield ()
 ```
 
-`OrderedConsumer` exposes the same `fetch` / `consume` / `iterate` / `next` methods as `Consumer`.
+`OrderedConsumer` exposes the same `fetch[A]` / `consume[A]` / `iterate[A]` / `next[A]` methods as `Consumer`.
 
 #### Ack methods on `JetStreamMessage`
 
