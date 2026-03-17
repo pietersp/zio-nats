@@ -8,7 +8,7 @@ import zio.*
 trait JetStream {
 
   /**
-   * Encode `data` using the implicit [[NatsCodec]] and publish to `subject`.
+   * Encode `data` using the given [[NatsCodec]] and publish to `subject`.
    *
    * Pass `Chunk[Byte]` to use the identity codec (raw bytes).
    *

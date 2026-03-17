@@ -16,12 +16,10 @@ package object nats {
   type JetStreamIO[+A] = ZIO[JetStream, NatsError, A]
 
   /** Implicit conversion: String -> Chunk[Byte] (UTF-8). */
-  implicit class StringOps(private val s: String) extends AnyVal {
-
+  extension (s: String)
     /** Encode this string as a UTF-8 byte Chunk suitable for NATS publish. */
     def toNatsData: Chunk[Byte] =
       Chunk.fromArray(s.getBytes(java.nio.charset.StandardCharsets.UTF_8))
-  }
 
   // ---------------------------------------------------------------------------
   // Enum type aliases — the companion objects below provide value access so

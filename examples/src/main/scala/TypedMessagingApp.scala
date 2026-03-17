@@ -10,12 +10,12 @@ import zio.blocks.schema.json.JsonFormat
 
 case class User(name: String, age: Int)
 object User {
-  implicit val schema: Schema[User] = Schema.derived
+  given schema: Schema[User] = Schema.derived
 }
 
 case class Order(id: String, amount: Double, userId: String)
 object Order {
-  implicit val schema: Schema[Order] = Schema.derived
+  given schema: Schema[Order] = Schema.derived
 }
 
 /**

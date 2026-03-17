@@ -41,9 +41,9 @@ object NatsRpc {
    * @param handler
    *   A function from decoded request `A` to effect producing `B`.
    * @tparam A
-   *   The request type — requires [[NatsCodec]][A] in implicit scope.
+   *   The request type — requires [[NatsCodec]][A] in given scope.
    * @tparam B
-   *   The response type — requires [[NatsCodec]][B] in implicit scope.
+   *   The response type — requires [[NatsCodec]][B] in given scope.
    * @return
    *   A scoped effect that manages the subscription lifecycle.
    */

@@ -38,7 +38,7 @@ final class JetStreamMessage(
   def message: NatsMessage = NatsMessage(subject, replyTo, headers, payload)
 
   /** Decode the payload using the given [[NatsCodec]]. */
-  def decode[A](implicit codec: NatsCodec[A]): Either[NatsDecodeError, A] =
+  def decode[A](using codec: NatsCodec[A]): Either[NatsDecodeError, A] =
     codec.decode(payload)
 
   /** UTF-8 string representation of the payload. */

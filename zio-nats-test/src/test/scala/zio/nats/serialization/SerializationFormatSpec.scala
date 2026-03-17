@@ -9,7 +9,7 @@ import zio.test.Assertion.*
 
 case class Person(name: String, age: Int)
 object Person {
-  implicit val schema: Schema[Person] = Schema.derived
+  given schema: Schema[Person] = Schema.derived
 }
 
 object SerializationFormatSpec extends ZIOSpecDefault {

@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets
 /**
  * Typeclass for encoding and decoding NATS message payloads.
  *
- * Instances are resolved at compile time via Scala's implicit/given mechanism
+ * Instances are resolved at compile time via Scala's `given`/`using` mechanism
  * and can be derived from any [[zio.blocks.schema.codec.Format]] paired with a
  * [[zio.blocks.schema.Schema]].
  *
@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets
  * ==Overriding per type==
  *
  * {{{
- * implicit val auditCodec: NatsCodec[AuditEvent] =
+ * given auditCodec: NatsCodec[AuditEvent] =
  *   NatsCodec.fromFormat(BsonFormat).derived[AuditEvent]
  * }}}
  *
@@ -49,7 +49,7 @@ trait NatsCodec[A] {
 object NatsCodec {
 
   /** Summon a [[NatsCodec]] instance for type A. */
-  def apply[A](implicit codec: NatsCodec[A]): NatsCodec[A] = codec
+  def apply[A](using codec: NatsCodec[A]): NatsCodec[A] = codec
 
   /**
    * Create a [[Builder]] that derives [[NatsCodec]] instances from the given
@@ -69,7 +69,7 @@ object NatsCodec {
    * Derive a codec directly from a format.
    *
    * {{{
-   * implicit val codec: NatsCodec[Person] = NatsCodec.derived[Person](JsonFormat)
+   * given codec: NatsCodec[Person] = NatsCodec.derived[Person](JsonFormat)
    * }}}
    */
   def derived[A: Schema](format: Format): NatsCodec[A] = fromFormat(format).derived[A]
@@ -79,13 +79,13 @@ object NatsCodec {
   // ---------------------------------------------------------------------------
 
   /** Identity codec for raw byte payloads. */
-  implicit val bytesCodec: NatsCodec[Chunk[Byte]] = new NatsCodec[Chunk[Byte]] {
+  given bytesCodec: NatsCodec[Chunk[Byte]] = new NatsCodec[Chunk[Byte]] {
     def encode(value: Chunk[Byte]): Chunk[Byte]                          = value
     def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, Chunk[Byte]] = Right(bytes)
   }
 
   /** UTF-8 string codec. */
-  implicit val stringCodec: NatsCodec[String] = new NatsCodec[String] {
+  given stringCodec: NatsCodec[String] = new NatsCodec[String] {
     def encode(value: String): Chunk[Byte] =
       Chunk.fromArray(value.getBytes(StandardCharsets.UTF_8))
     def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, String] =
@@ -99,9 +99,8 @@ object NatsCodec {
   /**
    * Derives [[NatsCodec]] instances from a [[Format]].
    *
-   * Import `builder.derived` (or `builder._` in Scala 2.13 / `builder.*` in
-   * Scala 3) to bring a default codec for all Schema-annotated types into
-   * implicit scope.
+   * Import `builder.derived` to bring a default codec for all Schema-annotated
+   * types into scope.
    *
    * {{{
    * val codecs = NatsCodec.fromFormat(JsonFormat)
@@ -115,12 +114,11 @@ object NatsCodec {
      * Derive a [[NatsCodec]] for type A using this builder's format.
      *
      * Import this method to make [[NatsCodec]] available for all types that
-     * have an implicit/given [[zio.blocks.schema.Schema]].
+     * have a given [[zio.blocks.schema.Schema]].
      *
-     *   - Scala 3: `import builder.derived`
-     *   - Scala 2.13: `import builder.derived` or `import builder._`
+     *   `import builder.derived`
      */
-    implicit def derived[A: Schema]: NatsCodec[A] = new NatsCodec[A] {
+    given derived[A: Schema]: NatsCodec[A] = new NatsCodec[A] {
 
       def encode(value: A): Chunk[Byte] =
         NatsSerializer.encode(value, format) match {

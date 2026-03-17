@@ -2,7 +2,6 @@
 
 A ZIO 2 wrapper for the [jnats](https://github.com/nats-io/nats.java) NATS client.
 
-![Scala 2.13](https://img.shields.io/badge/scala-2.13-blue)
 ![Scala 3](https://img.shields.io/badge/scala-3-blue)
 ![ZIO 2](https://img.shields.io/badge/ZIO-2-red)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green)
@@ -13,7 +12,7 @@ A ZIO 2 wrapper for the [jnats](https://github.com/nats-io/nats.java) NATS clien
 - Typed error model (`NatsError` sealed ADT)
 - Type-safe serialization with [zio-blocks Schema](https://zio.dev/zio-blocks)
 - Zero raw jnats types in user code — `import zio.nats._` is all you need
-- Cross-compiled for Scala 2.13 and Scala 3
+- Scala 3
 
 ## Installation
 
@@ -35,30 +34,31 @@ Requires a running NATS server (`nats-server`).
 import zio._
 import zio.nats._
 import zio.nats.config.NatsConfig
-import zio.nats.subject.Subject
 
 object Main extends ZIOAppDefault {
-  val run =
-    ZIO.scoped {
-      for {
-        nats  <- Nats.make(NatsConfig.default)
-        fiber <- nats.subscribe(Subject("greetings"))
-                   .take(3)
-                   .tap(msg => Console.printLine(msg.dataAsString))
-                   .runDrain
-                   .fork
-        _     <- ZIO.sleep(100.millis)
-        _     <- ZIO.foreach(1 to 3)(i =>
-                   nats.publish(Subject("greetings"), s"hello $i".toNatsData)
-                 )
-        _     <- fiber.join
-      } yield ()
-    }.mapError(e => new RuntimeException(e.getMessage))
+  val program: ZIO[Nats, NatsError, Unit] =
+    for {
+      fiber <- Nats.subscribeRaw(Subject("greetings"))
+                 .take(3)
+                 .tap(msg => Console.printLine(s"Received: ${msg.dataAsString}").orDie)
+                 .runDrain
+                 .fork
+      _     <- ZIO.sleep(200.millis)
+      _     <- ZIO.foreachDiscard(1 to 3) { i =>
+                 Nats.publish(Subject("greetings"), s"Hello #$i")
+               }
+      _     <- fiber.join
+    } yield ()
+
+  val run: ZIO[Any, Throwable, Unit] =
+    program
+      .provide(ZLayer.succeed(NatsConfig.default), Nats.live)
+      .mapError(e => new RuntimeException(e.getMessage))
 }
 ```
 
-> `toNatsData` is a string extension provided by `import zio.nats._`.
-> `Nats.make` returns a managed connection — it is closed automatically when the `Scope` ends.
+> `Subject` and `QueueGroup` are opaque types from `import zio.nats._` — no additional import needed.
+> `Nats.subscribeRaw` is the unambiguous name for raw subscriptions; `Nats.subscribe[A]` is the typed overload.
 
 ## Core concepts
 
@@ -91,24 +91,42 @@ val appLayer =
 ### Publish
 
 ```scala
-import zio.nats.subject.Subject
+// UTF-8 string (built-in NatsCodec[String])
+Nats.publish(Subject("events.user"), "payload")
 
-// Plain bytes
-nats.publish(Subject("events.user"), bytes)
-
-// UTF-8 string (via toNatsData extension)
-nats.publish(Subject("events.user"), "payload".toNatsData)
+// Raw bytes (built-in NatsCodec[Chunk[Byte]])
+Nats.publish(Subject("events.user"), bytes)
 
 // With headers
-nats.publish(Subject("events.user"), bytes, Map("Content-Type" -> List("application/json")))
+Nats.publish(
+  Subject("events.user"),
+  bytes,
+  PublishParams(headers = Headers("Content-Type" -> "application/json"))
+)
+
+// With reply-to
+Nats.publish(
+  Subject("events.user"),
+  bytes,
+  PublishParams(replyTo = Some(Subject("_INBOX.reply")))
+)
+```
+
+`Headers` supports multi-value headers and merging:
+
+```scala
+val h = Headers("X-Trace" -> "abc", "Content-Type" -> "application/json")
+h.get("X-Trace")        // Chunk("abc")
+h.add("X-Trace", "def") // Headers with Chunk("abc", "def") for X-Trace
 ```
 
 ### Subscribe
 
-`subscribe` returns a `ZStream`. The underlying jnats `Dispatcher` is created when the stream is consumed and closed automatically when the stream is interrupted.
+`subscribe` / `subscribeRaw` return a `ZStream`. The underlying jnats `Dispatcher` is created when the stream is consumed and closed automatically when the stream is interrupted.
 
 ```scala
-nats.subscribe(Subject("events.>"))
+// Raw messages — use subscribeRaw to avoid ambiguity with the typed overload
+Nats.subscribeRaw(Subject("events.>"))
   .tap(msg => ZIO.debug(s"${msg.subject}: ${msg.dataAsString}"))
   .runDrain
 ```
@@ -118,65 +136,87 @@ nats.subscribe(Subject("events.>"))
 Messages are load-balanced across all subscribers in the same queue group:
 
 ```scala
-nats.subscribe(Subject("work.queue"), Subject("workers"))
+Nats.subscribe(Subject("work.queue"), QueueGroup("workers"))
+  .tap(msg => process(msg))
+  .runDrain
 ```
 
 ### Request-Reply
 
 ```scala
-val reply: IO[NatsError, NatsMessage] =
-  nats.request(Subject("rpc.add"), payload, timeout = 5.seconds)
+// Returns Envelope[B] — decoded value + raw NatsMessage metadata
+val reply: IO[NatsError, Envelope[Chunk[Byte]]] =
+  nats.request[Chunk[Byte], Chunk[Byte]](Subject("rpc.add"), payload, timeout = 5.seconds)
+
+// .payload strips the Envelope wrapper, returning only the decoded value
+val value: IO[NatsError, Chunk[Byte]] =
+  nats.request[Chunk[Byte], Chunk[Byte]](Subject("rpc.add"), payload, timeout = 5.seconds).payload
 ```
 
 ## Type-Safe Serialization (zio-blocks)
 
-zio-nats supports type-safe publish/subscribe using [zio-blocks Schema](https://zio.dev/zio-blocks). Provide an implicit `Schema[T]` and the library handles serialization automatically.
+zio-nats supports type-safe publish/subscribe using [zio-blocks Schema](https://zio.dev/zio-blocks). Provide a `given Schema[T]` and a `NatsCodec` derived from a format, and the library handles serialization automatically.
 
 ### Setup
 
-Add zio-blocks-schema dependency:
+Add the zio-blocks-schema dependency (JSON is the default):
 
 ```scala
 libraryDependencies += "dev.zio" %% "zio-blocks-schema" % "0.0.29"
 ```
 
-Define schemas for your types:
+Define schemas for your types and install a codec builder:
 
 ```scala
 import zio.blocks.schema.Schema
+import zio.blocks.schema.json.JsonFormat
 
 case class Person(name: String, age: Int)
 object Person {
-  implicit val schema: Schema[Person] = Schema.derived
+  given schema: Schema[Person] = Schema.derived
 }
 
-case class Order(id: String, amount: Double)
-object Order {
-  implicit val schema: Schema[Order] = Schema.derived
-}
+// Install a default NatsCodec for all Schema-annotated types:
+val codecs = NatsCodec.fromFormat(JsonFormat)
+import codecs.derived  // NatsCodec[Person] is now in scope
 ```
 
 ### Type-Safe Publish
 
 ```scala
-// Publish typed data - automatically serialized to JSON
-nats.publish(Subject("users"), Person("Alice", 30))
-
-// With headers
-nats.publish(Subject("orders"), Order("ord-123", 99.99),
-  headers = Map("Content-Type" -> List("application/json")))
+// Publish typed data — automatically serialized with the in-scope NatsCodec
+Nats.publish(Subject("users"), Person("Alice", 30))
 ```
 
 ### Type-Safe Subscribe
 
-```scala
-// Subscribe and deserialize to typed data
-Nats.subscribeAs[Person](Subject("users")).runForeach { person =>
-  ZIO.debug(s"Got: ${person.name}")
-}
+`subscribe[A]` returns a `ZStream` of `Envelope[A]`. Each `Envelope` holds the decoded value and the raw `NatsMessage` (headers, subject, reply-to).
 
-// With queue group
-Nats.subscribeAs[Order](Subject("orders"), Subject("processors")).runDrain
+```scala
+// Access decoded value via .value
+Nats.subscribe[Person](Subject("users"))
+  .map(_.value)
+  .tap(person => ZIO.debug(s"Got: ${person.name}"))
+  .runDrain
+
+// Or use the .payload extension to strip the Envelope from the whole stream
+Nats.subscribe[Person](Subject("users")).payload
+  .tap(person => ZIO.debug(s"Got: ${person.name}"))
+  .runDrain
+
+// Keep the full Envelope for header access
+Nats.subscribe[Person](Subject("users"))
+  .tap(env => ZIO.debug(s"Headers: ${env.message.headers}, Person: ${env.value}"))
+  .runDrain
+```
+
+For queue-group load balancing with typed messages, subscribe raw and decode manually:
+
+```scala
+Nats.subscribe(Subject("orders"), QueueGroup("processors"))
+  .mapZIO(msg => ZIO.fromEither(msg.decode[Order]).mapError(e => NatsError.DecodingError(e.message, e)))
+  .tap(order => ZIO.debug(s"order: ${order.id}"))
+  .runDrain
 ```
 
 ### JetStream Type-Safe Publish
@@ -185,13 +225,22 @@ Nats.subscribeAs[Order](Subject("orders"), Subject("processors")).runDrain
 js.publish(Subject("events"), Event("click", timestamp))
 ```
 
-### Configuration
+### Per-type codec override
 
-The `format` field in `NatsConfig` accepts any [zio-blocks](https://zio.dev/zio-blocks) `Format` directly. The default is `JsonFormat`. Add the corresponding zio-blocks artifact for the format you need:
+Multiple formats can coexist. Override for a specific type with a plain `given`:
+
+```scala
+given auditCodec: NatsCodec[AuditEvent] =
+  NatsCodec.fromFormat(BsonFormat).derived[AuditEvent]
+```
+
+### Available formats
+
+Add the corresponding zio-blocks artifact for the format you need:
 
 ```scala
 // build.sbt — pick one (or more)
-libraryDependencies += "dev.zio" %% "zio-blocks-schema"          % "0.0.29" // JSON (included by default)
+libraryDependencies += "dev.zio" %% "zio-blocks-schema"          % "0.0.29" // JSON
 libraryDependencies += "dev.zio" %% "zio-blocks-schema-avro"     % "0.0.29"
 libraryDependencies += "dev.zio" %% "zio-blocks-schema-toon"     % "0.0.29"
 libraryDependencies += "dev.zio" %% "zio-blocks-schema-msgpack"  % "0.0.29"
@@ -200,13 +249,12 @@ libraryDependencies += "dev.zio" %% "zio-blocks-schema-bson"     % "0.0.29"
 ```
 
 ```scala
-import zio.blocks.schema.json.JsonFormat       // default, already on classpath
-import zio.blocks.schema.avro.AvroFormat       // after adding zio-blocks-schema-avro
-import zio.blocks.schema.toon.ToonFormat       // after adding zio-blocks-schema-toon
+import zio.blocks.schema.json.JsonFormat
+import zio.blocks.schema.avro.AvroFormat
+import zio.blocks.schema.toon.ToonFormat
 
-NatsConfig.default                             // uses JsonFormat
-NatsConfig.default.copy(format = AvroFormat)   // switch to Avro
-NatsConfig.default.copy(format = ToonFormat)   // switch to Toon
+val jsonCodecs  = NatsCodec.fromFormat(JsonFormat)
+val avroCodecs  = NatsCodec.fromFormat(AvroFormat)
 ```
 
 ## JetStream
@@ -226,14 +274,32 @@ val publish =
   } yield ()
 ```
 
-Publish with duplicate detection via message ID:
+Publish with duplicate detection via message ID, using `JsPublishParams`:
 
 ```scala
 val ack = js.publish(
   Subject("orders.new"),
   order.toNatsData,
-  PublishOptions(messageId = Some("order-42"))
+  JsPublishParams(options = Some(PublishOptions(messageId = Some("order-42"))))
 )
+```
+
+Publish with headers:
+
+```scala
+val ack = js.publish(
+  Subject("orders.new"),
+  order.toNatsData,
+  JsPublishParams(headers = Headers("X-Source" -> "checkout"))
+)
+```
+
+Publish asynchronously (fire-and-forget, collect acks later):
+
+```scala
+// Returns IO[NatsError, Task[PublishAck]] — the inner Task resolves when the server acks
+val futureAck: IO[NatsError, Task[PublishAck]] =
+  js.publishAsync(Subject("orders.new"), order.toNatsData)
 ```
 
 ### Management
@@ -264,7 +330,7 @@ val setup = for {
 } yield ()
 ```
 
-### Consuming
+### Consuming — durable Consumer
 
 Get a `Consumer` handle from `JetStream.consumer`, then use its methods directly:
 
@@ -293,7 +359,26 @@ for {
 } yield ()
 ```
 
-#### Ack methods on `NatsMessage`
+### Consuming — OrderedConsumer
+
+An ordered consumer guarantees strict in-order delivery and automatically re-creates itself on reconnect or sequence gaps. Unlike a durable consumer it requires no server-side state.
+
+```scala
+for {
+  js      <- ZIO.service[JetStream]
+  ordered <- js.orderedConsumer("EVENTS", OrderedConsumerConfig(
+               filterSubjects = List("events.>"),
+               deliverPolicy  = Some(DeliverPolicy.All)
+             ))
+  _ <- ordered.consume()
+         .tap(msg => ZIO.debug(msg.dataAsString))
+         .runDrain
+} yield ()
+```
+
+`OrderedConsumer` exposes the same `fetch` / `consume` / `iterate` / `next` methods as `Consumer`.
+
+#### Ack methods on `JetStreamMessage`
 
 | Method                 | Effect                                        |
 |------------------------|-----------------------------------------------|
@@ -303,6 +388,8 @@ for {
 | `msg.nakWithDelay(d)`  | Request redelivery after delay                |
 | `msg.term`             | Terminate — do not redeliver                  |
 | `msg.inProgress`       | Extend ack deadline (work-in-progress signal) |
+
+`msg.decode[A]` decodes the payload using the given `NatsCodec[A]`.
 
 ## Key-Value store
 
@@ -323,31 +410,61 @@ val createBucket =
 // Obtain a bucket handle (requires Nats in the environment)
 val kv: ZIO[Nats, NatsError, KeyValue] = KeyValue.bucket("config")
 
-// Put
-kv.put("feature.flag", "true")
+// Put — returns the new revision number
+kv.put("feature.flag", "true")   // IO[NatsError, Long]
 kv.put("payload", bytes)
 
-// Get — returns our KeyValueEntry with .key, .value, .revision, .operation, .valueAsString
-kv.get("feature.flag")          // IO[NatsError, Option[KeyValueEntry]]
+// Get — returns KeyValueEntry or None
+kv.get("feature.flag")                     // IO[NatsError, Option[KeyValueEntry]]
+kv.get("feature.flag", revision = 3L)      // get by revision
 
 // Compare-and-swap
 kv.create("lock", bytes)                          // create-only (fails if key exists)
+kv.create("lease", bytes, ttl = 30.seconds)       // create with per-entry TTL
 kv.update("lock", newBytes, expectedRevision = 3) // update only if revision matches
 
 // Delete / purge
-kv.delete("stale-key")  // soft delete — history preserved
-kv.purge("old-key")     // remove all history for the key
+kv.delete("stale-key")                        // soft delete — history preserved
+kv.delete("stale-key", expectedRevision = 5)  // conditional delete
+kv.purge("old-key")                           // remove all history for the key
+kv.purge("old-key", expectedRevision = 5)     // conditional purge
+kv.purge("old-key", markerTtl = 5.minutes)    // purge with TTL on tombstone marker
 
-// Enumerate
-kv.keys                 // IO[NatsError, List[String]]
-kv.history("key")       // IO[NatsError, List[KeyValueEntry]]
+// Enumerate — eagerly loads all keys
+kv.keys                         // IO[NatsError, List[String]]
+kv.keys("foo.*")                // filter by subject pattern
+kv.keys(List("foo.*", "bar.*")) // multiple filters
 
-// Watch for changes
-kv.watch("feature.>")   // ZStream[Any, NatsError, KeyValueEntry]
-kv.watchAll             // watch entire bucket
+// Enumerate — streaming (memory-efficient for large buckets)
+kv.consumeKeys()                // ZStream[Any, NatsError, String]
+kv.consumeKeys("foo.*")
+kv.consumeKeys(List("foo.*", "bar.*"))
+
+kv.history("key")   // IO[NatsError, List[KeyValueEntry]]
+
+// Purge delete/purge markers
+kv.purgeDeletes()                      // removes markers older than 30 minutes
+kv.purgeDeletes(threshold = 1.hour)    // custom threshold
 ```
 
-`KeyValueEntry` fields: `.key`, `.value: Chunk[Byte]`, `.revision: Long`, `.operation: KeyValueOperation`, `.bucketName`, `.valueAsString` (UTF-8 decode helper).
+### Watch for changes
+
+```scala
+// Watch a single key — never completes unless interrupted
+kv.watch("feature.flag")   // ZStream[Any, NatsError, KeyValueEntry]
+kv.watchAll                // watch entire bucket
+
+// Watch with options
+kv.watch("feature.>", KeyValueWatchOptions(
+  ignoreDeletes   = true,  // skip delete/purge markers
+  includeHistory  = true,  // start from first entry per key (not just latest)
+  updatesOnly     = true,  // only deliver new writes after watch starts
+  fromRevision    = Some(42L)  // resume from a specific revision
+))
+kv.watchAll(KeyValueWatchOptions(metaOnly = true))  // headers only, skip values
+```
+
+`KeyValueEntry` fields: `.key`, `.value: Chunk[Byte]`, `.revision: Long`, `.operation: KeyValueOperation`, `.bucketName`, `.valueAsString` (UTF-8 decode), `.decode[A]` (typed decode).
 
 ## Object Store
 
@@ -363,15 +480,49 @@ val createBucket =
 // Obtain a bucket handle (requires Nats in the environment)
 val os: ZIO[Nats, NatsError, ObjectStore] = ObjectStore.bucket("assets")
 
-os.put("logo.png", imageBytes)   // IO[NatsError, ObjectSummary]
-os.get("logo.png")               // IO[NatsError, Chunk[Byte]]
-os.getInfo("logo.png")           // IO[NatsError, ObjectSummary]
-os.delete("old-asset")           // soft delete
-os.list                          // IO[NatsError, List[ObjectSummary]]
-os.watch                         // ZStream[Any, NatsError, ObjectSummary]
+// Put / Get — returns ObjectData[A] wrapping the decoded value + ObjectSummary metadata
+os.put("config.json", configBytes)           // IO[NatsError, ObjectSummary]
+os.get[Chunk[Byte]]("config.json")           // IO[NatsError, ObjectData[Chunk[Byte]]]
+os.get[MyConfig]("config.json")             // IO[NatsError, ObjectData[MyConfig]]
+os.get[MyConfig]("config.json").payload     // IO[NatsError, MyConfig]  (strips wrapper)
+
+// With custom metadata
+os.put(ObjectMeta("logo.png", description = Some("Brand logo")), imageBytes)
+
+// Streaming put/get — avoids loading the full object into memory
+os.putStream("video.mp4", ZStream.fromFile(path))    // IO[NatsError, ObjectSummary]
+os.getStream("video.mp4")                            // ZStream[Any, NatsError, Byte]
+
+// Metadata
+os.getInfo("logo.png")                       // IO[NatsError, ObjectSummary]
+os.getInfo("logo.png", includingDeleted = true)
+
+// Mutation
+os.updateMeta("logo.png", ObjectMeta("logo.png", description = Some("Updated")))
+os.delete("old-asset")                       // IO[NatsError, ObjectSummary] — soft delete
+
+// Links
+os.addLink("alias", "logo.png")              // link to another object in this bucket
+os.addBucketLink("mirror", otherStore)       // link to another ObjectStore bucket
+
+// Seal (make read-only)
+os.seal()                                    // IO[NatsError, ObjectStoreBucketStatus]
+
+os.list                                      // IO[NatsError, List[ObjectSummary]]
+os.getStatus                                 // IO[NatsError, ObjectStoreBucketStatus]
+
+// Watch for changes
+os.watch                                     // ZStream[Any, NatsError, ObjectSummary]
+os.watch(ObjectStoreWatchOptions(
+  ignoreDeletes  = true,
+  includeHistory = true,
+  updatesOnly    = true
+))
 ```
 
 `ObjectSummary` fields: `.name`, `.size: Long`, `.chunks: Long`, `.description: Option[String]`, `.isDeleted: Boolean`.
+
+`ObjectData[A]` fields: `.value: A` (decoded payload), `.summary: ObjectSummary` (metadata). Use the `.payload` extension to strip the wrapper: `os.get[A]("key").payload`.
 
 ## Connection Events
 
@@ -408,6 +559,22 @@ Event ADT:
 | `Error(message)`         | Non-fatal error string from server |
 | `ExceptionOccurred(ex)`  | Exception from the client          |
 
+## Connection utilities
+
+```scala
+nats.status                        // URIO[Nats, ConnectionStatus]
+nats.serverInfo                    // IO[NatsError, NatsServerInfo]
+nats.rtt                           // IO[NatsError, Duration]
+nats.connectedUrl                  // URIO[Nats, Option[String]]
+nats.statistics                    // URIO[Nats, ConnectionStats]
+nats.outgoingPendingMessageCount   // URIO[Nats, Long]
+nats.outgoingPendingBytes          // URIO[Nats, Long]
+nats.flush(timeout = 1.second)     // IO[NatsError, Unit]
+nats.drain(timeout = 30.seconds)   // IO[NatsError, Unit]
+```
+
+`ConnectionStats` fields: `.inMsgs`, `.outMsgs`, `.inBytes`, `.outBytes`, `.reconnects`, `.droppedCount`, and more.
+
 ## Error handling
 
 All operations return `IO[NatsError, A]`. `NatsError` is a sealed trait with exhaustive pattern matching:
@@ -420,6 +587,7 @@ nats.publish(Subject("subject"), bytes).catchAll {
   case Timeout(msg)                             => ZIO.logWarning(s"Timed out: $msg")
   case JetStreamApiError(msg, code, apiCode, _) => ZIO.logError(s"JetStream API $code/$apiCode: $msg")
   case KeyNotFound(key)                         => ZIO.logInfo(s"Key $key not found")
+  case DecodingError(msg, _)                    => ZIO.logError(s"Decode failed: $msg")
   case other                                    => ZIO.logError(other.message)
 }
 ```
@@ -449,10 +617,9 @@ object MySpec extends ZIOSpecDefault {
   def spec = suite("MySpec")(
     test("publishes and receives") {
       for {
-        nats  <- ZIO.service[Nats]
-        fiber <- nats.subscribe(Subject("t")).take(1).runCollect.fork
+        fiber <- Nats.subscribeRaw(Subject("t")).take(1).runCollect.fork
         _     <- ZIO.sleep(200.millis)
-        _     <- nats.publish(Subject("t"), "hi".toNatsData)
+        _     <- Nats.publish(Subject("t"), "hi")
         msgs  <- fiber.join
       } yield assertTrue(msgs.head.dataAsString == "hi")
     }
@@ -486,8 +653,6 @@ NatsConfig(
   password             = None,
   credentialPath       = None,
   authHandler          = None,
-  // Serialization format — any zio-blocks Format (default: JsonFormat)
-  format               = JsonFormat,
   // Escape hatch for any Options.Builder field not covered above:
   optionsCustomizer    = identity
 )
@@ -508,14 +673,16 @@ program.provide(Nats.default)
 
 ## Examples
 
-See [`examples/`](examples/) for two runnable apps. Both require a running NATS server; `RealisticApp` additionally requires JetStream (`docker run -p 4222:4222 nats -js`).
+See [`examples/`](examples/) for runnable apps. All require a running NATS server; `RealisticApp` additionally requires JetStream (`docker run -p 4222:4222 nats -js`).
 
-| File                                                           | What it shows                                         |
-|----------------------------------------------------------------|-------------------------------------------------------|
-| [`QuickStartApp`](examples/src/main/scala/QuickStartApp.scala) | Connect, publish, subscribe, receive 3 messages       |
-| [`RealisticApp`](examples/src/main/scala/RealisticApp.scala)   | JetStream + KV + connection events, graceful shutdown |
+| File                                                                         | What it shows                                                   |
+|------------------------------------------------------------------------------|-----------------------------------------------------------------|
+| [`QuickStartApp`](examples/src/main/scala/QuickStartApp.scala)               | Connect, publish, subscribe raw, receive 3 messages             |
+| [`RealisticApp`](examples/src/main/scala/RealisticApp.scala)                 | JetStream + KV + connection events, graceful shutdown           |
+| [`TypedMessagingApp`](examples/src/main/scala/TypedMessagingApp.scala)       | Type-safe publish/subscribe with `NatsCodec` and `Envelope[A]` |
 
 ```
 sbt "zioNatsExamples/runMain QuickStartApp"
 sbt "zioNatsExamples/runMain RealisticApp"
+sbt "zioNatsExamples/runMain TypedMessagingApp"
 ```

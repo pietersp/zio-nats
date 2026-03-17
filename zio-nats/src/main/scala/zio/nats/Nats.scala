@@ -14,7 +14,7 @@ import zio.stream._
  * ==Setting up codecs==
  *
  * Typed methods require a [[NatsCodec]] for each type parameter, resolved at
- * compile time via Scala's implicit/given mechanism.
+ * compile time via Scala's `given`/`using` mechanism.
  *
  * {{{
  * // Install a default codec for all Schema-annotated types:
@@ -22,7 +22,7 @@ import zio.stream._
  * import codecs.derived 
  *
  * // Override per type:
- * implicit val auditCodec: NatsCodec[AuditEvent] =
+ * given auditCodec: NatsCodec[AuditEvent] =
  *   NatsCodec.fromFormat(BsonFormat).derived[AuditEvent]
  * }}}
  */
@@ -33,7 +33,7 @@ trait Nats {
   // -------------------------------------------------------------------------
 
   /**
-   * Encode `value` with the implicit [[NatsCodec]] and publish to `subject`.
+   * Encode `value` with the given [[NatsCodec]] and publish to `subject`.
    *
    * Pass `Chunk[Byte]` to use the identity codec (raw bytes).
    *
