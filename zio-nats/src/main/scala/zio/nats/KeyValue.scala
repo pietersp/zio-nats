@@ -1,7 +1,7 @@
 package zio.nats
 
 import io.nats.client.api.{KeyValueEntry as JKeyValueEntry, KeyValueWatcher as JKeyValueWatcher}
-import io.nats.client.{KeyValue as JKeyValue, KeyValueManagement as JKeyValueManagement}
+import io.nats.client.{KeyValue as JKeyValue, KeyValueManagement as JKeyValueManagement, MessageTtl}
 import zio.*
 import zio.nats.configuration.KeyValueConfig
 import zio.stream.*
@@ -27,6 +27,13 @@ trait KeyValue {
    * JetStreamApiError). Pass `Chunk[Byte]` or `String` for raw/text writes.
    */
   def create[A: NatsCodec](key: String, value: A): IO[NatsError, Long]
+
+  /**
+   * Put if the key does not exist, with a per-entry TTL (minimum 1 second).
+   * The bucket must have been created with a TTL to use this. Returns revision
+   * or fails with JetStreamApiError.
+   */
+  def create[A: NatsCodec](key: String, value: A, ttl: Duration): IO[NatsError, Long]
 
   /**
    * Compare-and-swap: update only if current revision matches expectedRevision.
@@ -83,6 +90,9 @@ object KeyValue {
   def create[A: NatsCodec](key: String, value: A): ZIO[KeyValue, NatsError, Long] =
     ZIO.serviceWithZIO[KeyValue](_.create(key, value))
 
+  def create[A: NatsCodec](key: String, value: A, ttl: Duration): ZIO[KeyValue, NatsError, Long] =
+    ZIO.serviceWithZIO[KeyValue](_.create(key, value, ttl))
+
   def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): ZIO[KeyValue, NatsError, Long] =
     ZIO.serviceWithZIO[KeyValue](_.update(key, value, expectedRevision))
 }
@@ -125,6 +135,11 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
 
   override def create[A: NatsCodec](key: String, value: A): IO[NatsError, Long] =
     ZIO.attemptBlocking(kv.create(key, NatsCodec[A].encode(value).toArray)).mapError(NatsError.fromThrowable)
+
+  override def create[A: NatsCodec](key: String, value: A, ttl: Duration): IO[NatsError, Long] =
+    ZIO
+      .attemptBlocking(kv.create(key, NatsCodec[A].encode(value).toArray, MessageTtl.seconds(ttl.toSeconds.toInt)))
+      .mapError(NatsError.fromThrowable)
 
   override def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): IO[NatsError, Long] =
     ZIO.attemptBlocking(kv.update(key, NatsCodec[A].encode(value).toArray, expectedRevision)).mapError(NatsError.fromThrowable)

@@ -213,7 +213,8 @@ final case class KeyValueBucketStatus(
   maxBucketSize: Long,
   storageType: StorageType,
   replicas: Int,
-  isCompressed: Boolean
+  isCompressed: Boolean,
+  ttl: Option[Duration]
 )
 
 private[nats] object KeyValueBucketStatus {
@@ -226,7 +227,8 @@ private[nats] object KeyValueBucketStatus {
     maxBucketSize = s.getMaxBucketSize,
     storageType = StorageType.fromJava(s.getStorageType),
     replicas = s.getReplicas,
-    isCompressed = s.isCompressed
+    isCompressed = s.isCompressed,
+    ttl = Option(s.getTtl).filter(_.toMillis > 0).map(d => Duration.fromMillis(d.toMillis))
   )
 }
 

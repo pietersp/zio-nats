@@ -90,6 +90,34 @@ object KeyValueSpec extends ZIOSpecDefault {
         hist <- kv.history("h")
         _    <- kvm.delete("kv-hist")
       } yield assertTrue(hist.size == 3)
+    },
+
+    test("bucket-level TTL is reflected in status") {
+      for {
+        kvm    <- ZIO.service[KeyValueManagement]
+        status <- kvm.create(
+                    KeyValueConfig(name = "kv-ttl-bucket", storageType = StorageType.Memory, ttl = Some(10.seconds))
+                  )
+        _      <- kvm.delete("kv-ttl-bucket")
+      } yield assertTrue(status.ttl.exists(_ == 10.seconds))
+    },
+
+    test("create with per-entry TTL stores the entry") {
+      for {
+        kvm <- ZIO.service[KeyValueManagement]
+        _   <- kvm.create(
+                 KeyValueConfig(
+                   name = "kv-entry-ttl",
+                   storageType = StorageType.Memory,
+                   ttl = Some(60.seconds),
+                   limitMarkerTtl = Some(10.seconds)
+                 )
+               )
+        kv  <- KeyValue.bucket("kv-entry-ttl")
+        rev <- kv.create("ttl-key", "hello", 5.seconds)
+        e   <- kv.get("ttl-key")
+        _   <- kvm.delete("kv-entry-ttl")
+      } yield assertTrue(rev == 1L, e.exists(_.valueAsString == "hello"))
     }
   ).provideShared(
     NatsTestLayers.nats,

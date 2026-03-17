@@ -163,7 +163,9 @@ case class KeyValueConfig(
   maxHistoryPerKey: Int = -1,
   storageType: StorageType = StorageType.File,
   compression: Boolean = false,
-  numberOfReplicas: Int = 1
+  numberOfReplicas: Int = 1,
+  ttl: Option[Duration] = None,
+  limitMarkerTtl: Option[Duration] = None
 ) {
   def toJava: JKeyValueConfiguration = KeyValueConfig.toJava(this)
 }
@@ -183,6 +185,8 @@ object KeyValueConfig {
     if (config.maxValueSize > 0) builder.maxValueSize(config.maxValueSize)
     if (config.maxBucketSize > 0) builder.maxBucketSize(config.maxBucketSize)
     if (config.maxHistoryPerKey > 0) builder.maxHistoryPerKey(config.maxHistoryPerKey)
+    config.ttl.foreach(d => builder.ttl(java.time.Duration.ofMillis(d.toMillis)))
+    config.limitMarkerTtl.foreach(d => builder.limitMarker(java.time.Duration.ofMillis(d.toMillis)))
 
     builder.build()
   }
