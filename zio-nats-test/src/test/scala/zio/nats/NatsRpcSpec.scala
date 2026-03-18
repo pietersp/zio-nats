@@ -40,12 +40,15 @@ object NatsRpcSpec extends ZIOSpecDefault {
     },
 
     test("respond sends no reply when decoding fails") {
-      // A codec that always fails to decode
+      // A codec that fails to decode the sentinel "bad" payload but succeeds for all others
       given badDecodeCodec: NatsCodec[String] = new NatsCodec[String] {
-        def encode(a: String): Chunk[Byte] =
-          Chunk.fromArray(a.getBytes(java.nio.charset.StandardCharsets.UTF_8))
-        def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, String] =
-          Left(NatsDecodeError("intentional decode failure"))
+        private val utf8 = java.nio.charset.StandardCharsets.UTF_8
+        def encode(a: String): Chunk[Byte] = Chunk.fromArray(a.getBytes(utf8))
+        def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, String] = {
+          val s = new String(bytes.toArray, utf8)
+          if (s == "bad") Left(NatsDecodeError("intentional decode failure"))
+          else Right(s)
+        }
       }
       ZIO.scoped {
         for {
@@ -64,7 +67,9 @@ object NatsRpcSpec extends ZIOSpecDefault {
           _         <- ZIO.sleep(500.millis)
           gotReply  <- received.poll.map(_.isDefined)
           _         <- fiber.interrupt
-        } yield assertTrue(!gotReply)
+          // Responder must still be alive — a valid request should succeed
+          validReply <- nats.request[String, String](Subject("rpc.decodeerr"), "hello", 5.seconds)
+        } yield assertTrue(!gotReply) && assertTrue(validReply.value == "ok")
       }
     },
 
@@ -72,8 +77,12 @@ object NatsRpcSpec extends ZIOSpecDefault {
       ZIO.scoped {
         for {
           nats      <- ZIO.service[Nats]
-          _         <- NatsRpc.respond[String, String](Subject("rpc.handlererr")) { _ =>
-                         ZIO.fail(NatsError.GeneralError("handler boom", new RuntimeException("boom")))
+          attempts  <- zio.Ref.make(0)
+          _         <- NatsRpc.respond[String, String](Subject("rpc.handlererr")) { req =>
+                         attempts.updateAndGet(_ + 1).flatMap { n =>
+                           if (n == 1) ZIO.fail(NatsError.GeneralError("handler boom", new RuntimeException("boom")))
+                           else ZIO.succeed(s"echo:$req")
+                         }
                        }
           _         <- ZIO.sleep(300.millis)
           // Publish with an explicit replyTo and verify no reply arrives
@@ -88,7 +97,9 @@ object NatsRpcSpec extends ZIOSpecDefault {
           _         <- ZIO.sleep(500.millis)
           gotReply  <- received.poll.map(_.isDefined)
           _         <- fiber.interrupt
-        } yield assertTrue(!gotReply)
+          // Responder must still be alive — a valid request should succeed
+          validReply <- nats.request[String, String](Subject("rpc.handlererr"), "ping", 5.seconds)
+        } yield assertTrue(!gotReply) && assertTrue(validReply.value == "echo:ping")
       }
     }
 

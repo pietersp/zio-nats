@@ -26,13 +26,15 @@ object NatsRpc {
    * Subscribe to `subject` and respond to each incoming request.
    *
    * For each message:
-   *   1. Decode the payload as `A` using [[NatsCodec]][A] (via [[Nats.subscribe]]).
+   *   1. Decode the payload as `A` using [[NatsCodec]][A].
    *   2. Invoke `handler` with the decoded value.
    *   3. Encode the result as `B` and publish it to the message's `replyTo`.
    *
    * Messages without a `replyTo` subject are silently ignored.
-   * Messages that fail to decode propagate the [[NatsError.DecodingError]]
-   * through the stream's error channel, terminating the responder fiber.
+   * Per-message failures (decode errors, handler errors, encode errors) are
+   * logged via ZIO's default fiber-failure logger and skipped — the responder
+   * fiber continues processing subsequent messages. Only infrastructure-level
+   * stream errors (e.g. connection loss) terminate the responder fiber.
    *
    * The subscription runs in a forked fiber linked to the enclosing [[Scope]];
    * it is interrupted automatically when the scope closes.
@@ -56,11 +58,13 @@ object NatsRpc {
     for {
       nats <- ZIO.service[Nats]
       _    <- nats
-                .subscribe[A](subject)
-                .mapZIO { env =>
-                  for {
-                    response <- handler(env.value)
-                    _        <- env.message.replyTo match {
+                .subscribe[Chunk[Byte]](subject)
+                .mapZIO { rawEnv =>
+                  (for {
+                    decoded  <- ZIO.fromEither(rawEnv.message.decode[A])
+                                  .mapError(e => NatsError.DecodingError(e.message, e))
+                    response <- handler(decoded)
+                    _        <- rawEnv.message.replyTo match {
                                   case Some(replyTo) =>
                                     ZIO
                                       .attempt(NatsCodec[B].encode(response))
@@ -69,7 +73,7 @@ object NatsRpc {
                                   case None =>
                                     ZIO.unit
                                 }
-                  } yield ()
+                  } yield ()).ignoreLogged
                 }
                 .runDrain
                 .forkScoped
