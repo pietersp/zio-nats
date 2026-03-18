@@ -61,7 +61,8 @@ trait Nats {
    *
    * Pass `Chunk[Byte]` for `A` and/or `B` to use the identity codec (raw bytes).
    *
-   * Decode failures are surfaced as [[NatsError.DecodingError]].
+   * Fails with [[NatsError.DecodingError]] if the reply cannot be decoded as `B`.
+   * Fails with [[NatsError.Timeout]] if no reply is received within `timeout`.
    */
   def request[A: NatsCodec, B: NatsCodec](
     subject: Subject,
@@ -277,7 +278,14 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
       .mapError(e => NatsError.SerializationError(s"Failed to encode request for subject '${subject.value}': ${e.toString}", e))
       .flatMap { bytes =>
         ZIO
-          .fromCompletionStage(conn.requestWithTimeout(subject.value, bytes.toArray, timeout.asJava))
+          .attemptBlocking {
+            val reply = conn.request(subject.value, bytes.toArray, timeout.asJava)
+            if (reply == null)
+              throw new java.util.concurrent.TimeoutException(
+                s"No reply received for subject '${subject.value}' within $timeout"
+              )
+            reply
+          }
           .mapError(NatsError.fromThrowable)
           .flatMap { jMsg =>
             val msg = NatsMessage.fromJava(jMsg)
