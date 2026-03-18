@@ -55,7 +55,7 @@ object NatsRpcSpec extends ZIOSpecDefault {
           // Publish with an explicit replyTo and verify no reply arrives
           replySubj  = Subject("rpc.decodeerr.inbox")
           received  <- Promise.make[Nothing, Boolean]
-          fiber     <- nats.subscribeRaw(replySubj)
+          fiber     <- nats.subscribe[Chunk[Byte]](replySubj)
                          .tap(_ => received.succeed(true))
                          .take(1)
                          .runDrain
@@ -79,7 +79,7 @@ object NatsRpcSpec extends ZIOSpecDefault {
           // Publish with an explicit replyTo and verify no reply arrives
           replySubj  = Subject("rpc.handlererr.inbox")
           received  <- Promise.make[Nothing, Boolean]
-          fiber     <- nats.subscribeRaw(replySubj)
+          fiber     <- nats.subscribe[Chunk[Byte]](replySubj)
                          .tap(_ => received.succeed(true))
                          .take(1)
                          .runDrain

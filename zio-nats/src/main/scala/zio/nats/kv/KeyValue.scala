@@ -257,19 +257,24 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
   // Put / Create / Update
   // ---------------------------------------------------------------------------
 
-  override def put[A: NatsCodec](key: String, value: A): IO[NatsError, Long] =
-    ZIO.attemptBlocking(kv.put(key, NatsCodec[A].encode(value).toArray)).mapError(NatsError.fromThrowable)
+  private def encode[A: NatsCodec](key: String, value: A): IO[NatsError, Array[Byte]] =
+    ZIO
+      .attempt(NatsCodec[A].encode(value).toArray)
+      .mapError(e => NatsError.SerializationError(s"Failed to encode value for key '$key': ${e.toString}", e))
 
-  override def create[A: NatsCodec](key: String, value: A, ttl: Option[Duration] = None): IO[NatsError, Long] = {
-    val bytes = NatsCodec[A].encode(value).toArray
-    ttl match {
-      case None    => ZIO.attemptBlocking(kv.create(key, bytes)).mapError(NatsError.fromThrowable)
-      case Some(d) => ZIO.attemptBlocking(kv.create(key, bytes, MessageTtl.seconds(d.toSeconds.toInt))).mapError(NatsError.fromThrowable)
+  override def put[A: NatsCodec](key: String, value: A): IO[NatsError, Long] =
+    encode(key, value).flatMap(bytes => ZIO.attemptBlocking(kv.put(key, bytes)).mapError(NatsError.fromThrowable))
+
+  override def create[A: NatsCodec](key: String, value: A, ttl: Option[Duration] = None): IO[NatsError, Long] =
+    encode(key, value).flatMap { bytes =>
+      ttl match {
+        case None    => ZIO.attemptBlocking(kv.create(key, bytes)).mapError(NatsError.fromThrowable)
+        case Some(d) => ZIO.attemptBlocking(kv.create(key, bytes, MessageTtl.seconds(d.toSeconds.toInt))).mapError(NatsError.fromThrowable)
+      }
     }
-  }
 
   override def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): IO[NatsError, Long] =
-    ZIO.attemptBlocking(kv.update(key, NatsCodec[A].encode(value).toArray, expectedRevision)).mapError(NatsError.fromThrowable)
+    encode(key, value).flatMap(bytes => ZIO.attemptBlocking(kv.update(key, bytes, expectedRevision)).mapError(NatsError.fromThrowable))
 
   // ---------------------------------------------------------------------------
   // Delete / Purge

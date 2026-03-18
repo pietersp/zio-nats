@@ -39,9 +39,9 @@ object Main extends ZIOAppDefault {
   val program: ZIO[Nats, NatsError, Unit] =
     for {
       nats  <- ZIO.service[Nats]
-      fiber <- nats.subscribeRaw(Subject("greetings"))
+      fiber <- nats.subscribe[String](Subject("greetings"))
                  .take(3)
-                 .tap(msg => Console.printLine(s"Received: ${msg.dataAsString}").orDie)
+                 .tap(env => Console.printLine(s"Received: ${env.value}").orDie)
                  .runDrain
                  .fork
       _     <- ZIO.sleep(200.millis)
@@ -59,7 +59,7 @@ object Main extends ZIOAppDefault {
 ```
 
 > `Subject` and `QueueGroup` are opaque types from `import zio.nats._` — no additional import needed.
-> `nats.subscribeRaw` returns raw `NatsMessage`s without decoding; `nats.subscribe[A]` decodes each message and wraps it in `Envelope[A]`.
+> `nats.subscribe[String]` decodes each payload as UTF-8 and wraps it in an `Envelope[String]`. Use `Chunk[Byte]` instead to receive raw bytes, with `env.message` giving access to headers, subject, and reply-to.
 
 ## Core concepts
 
@@ -125,14 +125,19 @@ h.add("X-Trace", "def") // Headers with Chunk("abc", "def") for X-Trace
 
 ### Subscribe
 
-`subscribe[A]` and `subscribeRaw` return a `ZStream`. The underlying jnats `Dispatcher` is created when the stream is consumed and closed automatically when the stream is interrupted.
+`subscribe[A]` returns a `ZStream` of `Envelope[A]`. The underlying jnats `Dispatcher` is created when the stream is consumed and closed automatically when the stream is interrupted. Every `Envelope` carries both the decoded value and the raw `NatsMessage`:
 
 ```scala
 // nats: Nats obtained via ZIO.service[Nats]
 
-// Raw NatsMessage — use subscribeRaw when you don't need typed decoding
-nats.subscribeRaw(Subject("events.>"))
-  .tap(msg => ZIO.debug(s"${msg.subject}: ${msg.dataAsString}"))
+// Typed String — payload decoded as UTF-8 via built-in NatsCodec[String]
+nats.subscribe[String](Subject("events.>"))
+  .tap(env => ZIO.debug(s"${env.message.subject}: ${env.value}"))
+  .runDrain
+
+// Raw bytes — identity codec, full NatsMessage available via env.message
+nats.subscribe[Chunk[Byte]](Subject("events.>"))
+  .tap(env => ZIO.debug(s"${env.message.subject}: ${env.message.dataAsString}"))
   .runDrain
 ```
 
@@ -188,17 +193,30 @@ object Person {
   given schema: Schema[Person] = Schema.derived
 }
 
-// Install a default NatsCodec for all Schema-annotated types:
+// Build a NatsCodec for all Schema-annotated types using JSON.
 val codecs = NatsCodec.fromFormat(JsonFormat)
+
+// The codec for Person is derived eagerly here — at this import site —
+// not buried inside the first publish call. If Person has no Schema, or
+// the format cannot derive a codec for it, an exception is thrown
+// immediately at startup, before any message is sent.
 import codecs.derived  // NatsCodec[Person] is now in scope
 ```
+
+### Codec construction guarantees
+
+The `import codecs.derived` line is where the codec is compiled and cached. Two consequences:
+
+1. **Fail-fast** — a missing `Schema`, unsupported type, or incompatible format surfaces immediately at the `import` site, not inside the first `publish` call during production load.
+2. **Safe encode** — once successfully constructed, `NatsCodec[A].encode(value)` calls a pre-built codec and never re-derives. Any serialization failure during publishing surfaces as a typed `NatsError.SerializationError` in the ZIO error channel, not as a JVM exception or untyped defect.
 
 ### Type-Safe Publish
 
 ```scala
 // nats: Nats obtained via ZIO.service[Nats]
 
-// Publish typed data — automatically serialized with the in-scope NatsCodec
+// Encoding is handled by the pre-built NatsCodec[Person].
+// Failures (e.g. OOM inside the serializer) surface as NatsError.SerializationError.
 nats.publish(Subject("users"), Person("Alice", 30))
 ```
 
@@ -605,6 +623,7 @@ import zio.nats.NatsError._
 nats.publish(Subject("subject"), bytes).catchAll {
   case ConnectionClosed(msg)                    => ZIO.logError(s"Connection closed: $msg")
   case Timeout(msg)                             => ZIO.logWarning(s"Timed out: $msg")
+  case SerializationError(msg, _)               => ZIO.logError(s"Encode failed: $msg")
   case JetStreamApiError(msg, code, apiCode, _) => ZIO.logError(s"JetStream API $code/$apiCode: $msg")
   case KeyNotFound(key)                         => ZIO.logInfo(s"Key $key not found")
   case DecodingError(msg, _)                    => ZIO.logError(s"Decode failed: $msg")

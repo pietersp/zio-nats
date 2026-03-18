@@ -32,12 +32,12 @@ object SerializationFormatSpec extends ZIOSpecDefault {
       assertTrue(result.isLeft)
     },
 
-    test("raw NatsSerializer still encodes and decodes (internal API)") {
+    test("makeFor builds a codec that roundtrips (internal API)") {
       val person = Person("Bob", 25)
-      for {
-        encoded <- ZIO.fromEither(NatsSerializer.encode(person, JsonFormat))
-        decoded <- ZIO.fromEither(NatsSerializer.decode[Person](encoded, JsonFormat))
-      } yield assertTrue(decoded == person)
+      val codec  = NatsSerializer.makeFor[Person](JsonFormat)
+      val encoded = codec.encode(person)
+      val decoded = codec.decode(encoded)
+      assertTrue(decoded == Right(person))
     }
   )
 }

@@ -21,8 +21,15 @@ object Order {
 /**
  * Type-safe serialization example using the NatsCodec typeclass.
  *
- * Derives codecs from JsonFormat via the Builder pattern; no manual
- * encoding/decoding required.
+ * `NatsCodec.fromFormat(JsonFormat)` creates a `Builder` that can derive
+ * `NatsCodec[A]` for any type `A` that has a `Schema[A]` in scope.
+ *
+ * The `import jsonCodecs.derived` line brings the codec derivation into scope.
+ * Codecs are built lazily on first use per type and then cached in the Builder:
+ *   - The first call to publish/subscribe for a given type builds the codec.
+ *   - If a type has no `Schema` or the format cannot handle it, an exception
+ *     is thrown at that point, not buried inside a later encode call.
+ *   - Subsequent calls for the same type reuse the cached codec.
  *
  * Requires a running NATS server: nats-server
  *
@@ -30,7 +37,11 @@ object Order {
  */
 object TypedMessagingApp extends ZIOAppDefault {
 
-  // Install a default NatsCodec for all Schema-annotated types using JSON.
+  // Build the codec from JsonFormat. Codec derivation for each type happens
+  // at runtime on first use (the implicit selection is at compile time, but
+  // the codec object is built lazily and then cached in the Builder). If the
+  // format cannot derive a codec (e.g. missing Schema), it throws on first use
+  // rather than silently failing inside an encode call.
   private val jsonCodecs = NatsCodec.fromFormat(JsonFormat)
   import jsonCodecs.derived
 
@@ -38,7 +49,8 @@ object TypedMessagingApp extends ZIOAppDefault {
     for {
       nats <- ZIO.service[Nats]
 
-      // subscribe[User] is the typed overload — auto-decoded via NatsCodec[User]
+      // subscribe[User] decodes each message automatically via NatsCodec[User].
+      // Decode failures surface as NatsError.DecodingError in the stream.
       userFiber <- nats
                      .subscribe[User](Subject("demo.users"))
                      .take(3)
@@ -55,6 +67,9 @@ object TypedMessagingApp extends ZIOAppDefault {
 
       _ <- ZIO.sleep(200.millis)
 
+      // Publish typed values. NatsCodec[User] and NatsCodec[Order] were built
+      // eagerly above; encoding here just calls the pre-built codec. Any
+      // encoding failure (e.g. OOM) surfaces as NatsError.SerializationError.
       _ <- Console.printLine("Publishing users...").orDie
       _ <- nats.publish(Subject("demo.users"), User("Alice", 30))
       _ <- nats.publish(Subject("demo.users"), User("Bob", 25))

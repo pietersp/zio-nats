@@ -69,6 +69,26 @@ Connection lifecycle events are exposed via `Nats.lifecycleEvents: ZStream[Nats,
   ```
 - Multiple formats can coexist; per-type overrides are plain `implicit val`s.
 
+#### Codec lifecycle guarantees
+
+`NatsCodec.Builder.derived[A]` is a polymorphic `given` (equivalent to `implicit def`), so it
+creates a new instance on every implicit resolution. To avoid redundant re-derivation, `Builder`
+caches codec instances in a `ConcurrentHashMap` keyed on the `Schema[A]` instance. This means:
+
+1. **Lazy first-use construction** — `NatsSerializer.makeFor[A](format)` is called the first time
+   `NatsCodec[A]` is resolved for a given type `A`. If the format has no `Deriver` for `A`, an
+   exception is thrown then, not buried inside a later `encode` call.
+2. **Cached thereafter** — subsequent resolutions for the same `A` return the cached codec without
+   re-deriving. The cache key is the `Schema[A]` instance, which is stable for the typical case of
+   companion-object `given val` schemas.
+3. **Safe encode** — once the codec is constructed, `NatsCodec[A].encode(value)` delegates to a
+   pre-built `NatsSerializer.CompiledCodec[A]`. Any residual throw (e.g. OOM) is a library defect,
+   not a schema error.
+
+At every call site (`publish`, `put`, `create`, `update`, etc.) the `encode` call is wrapped in
+`ZIO.attempt(...).mapError(e => NatsError.SerializationError(...))` so even defect-level throws
+surface as typed `NatsError` rather than ZIO defects.
+
 All publish/put/get/create/update methods are generic `[A: NatsCodec]`. Passing `Chunk[Byte]` or `String` selects the built-in codecs via type inference — no overloads.
 
 ### Opaque Types
@@ -103,7 +123,8 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | File | Contents |
 |------|----------|
 | `zio-nats/src/main/scala/zio/nats/Nats.scala` | Core pub/sub service + `NatsLive`; `lifecycleEvents` stream |
-| `zio-nats/src/main/scala/zio/nats/NatsCodec.scala` | Serialization typeclass |
+| `zio-nats/src/main/scala/zio/nats/NatsCodec.scala` | Serialization typeclass + `Builder` (eager codec construction via `NatsSerializer.makeFor`) |
+| `zio-nats/src/main/scala/zio/nats/serialization/NatsSerializer.scala` | `CompiledCodec[A]` sealed trait, `makeFor[A](format)` factory (eager, can throw), `BinaryCompiledCodec` / `TextCompiledCodec` impls, static one-shot `encode`/`decode` for backward compat |
 | `zio-nats/src/main/scala/zio/nats/NatsError.scala` | Error hierarchy |
 | `zio-nats/src/main/scala/zio/nats/NatsCoreTypes.scala` | `Subject` (opaque), `QueueGroup` (opaque), `Headers`, `PublishParams`, `StorageType`, `ConnectionStatus`, `NatsServerInfo` |
 | `zio-nats/src/main/scala/zio/nats/NatsModels.scala` | `Envelope[+A]`, `ConnectionStats` |

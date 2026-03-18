@@ -15,8 +15,8 @@ object NatsPubSubSpec extends ZIOSpecDefault {
         nats     <- ZIO.service[Nats]
         received <- Promise.make[Nothing, NatsMessage]
         fiber    <- nats
-                   .subscribeRaw(subject)
-                   .tap(msg => received.succeed(msg))
+                   .subscribe[Chunk[Byte]](subject)
+                   .tap(env => received.succeed(env.message))
                    .take(1)
                    .runDrain
                    .fork
@@ -35,8 +35,8 @@ object NatsPubSubSpec extends ZIOSpecDefault {
         nats     <- ZIO.service[Nats]
         received <- Promise.make[Nothing, NatsMessage]
         fiber    <- nats
-                   .subscribeRaw(Subject("test.headers"))
-                   .tap(msg => received.succeed(msg))
+                   .subscribe[Chunk[Byte]](Subject("test.headers"))
+                   .tap(env => received.succeed(env.message))
                    .take(1)
                    .runDrain
                    .fork
@@ -59,9 +59,9 @@ object NatsPubSubSpec extends ZIOSpecDefault {
       for {
         nats  <- ZIO.service[Nats]
         fiber <- nats
-                   .subscribeRaw(subject)
-                   .tap { msg =>
-                     msg.replyTo match {
+                   .subscribe[Chunk[Byte]](subject)
+                   .tap { env =>
+                     env.message.replyTo match {
                        case Some(reply) =>
                          nats.publish(reply, Chunk.fromArray("pong".getBytes))
                        case None => ZIO.unit

@@ -6,6 +6,7 @@ import zio.blocks.schema.codec.Format
 import zio.nats.serialization.NatsSerializer
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Typeclass for encoding and decoding NATS message payloads.
@@ -110,31 +111,46 @@ object NatsCodec {
    */
   final class Builder private[NatsCodec] (val format: Format) {
 
+    // Cache keyed on Schema[A] instance. Since polymorphic givens behave as
+    // implicit defs, each call site would otherwise re-derive. Keying on the
+    // Schema instance works because Schema instances are typically stable vals
+    // in companion objects.
+    private val cache = new ConcurrentHashMap[Any, NatsCodec[?]]()
+
     /**
-     * Derive a [[NatsCodec]] for type A using this builder's format.
+     * Derive a [[NatsCodec]] for type `A` using this builder's format.
+     *
+     * The underlying format codec is built the first time this `given` is
+     * resolved for a particular type `A`, then cached in this [[Builder]]
+     * instance. Subsequent resolutions for the same `A` return the cached
+     * codec without re-deriving.
+     *
+     * If the format cannot derive a codec for `A` — for example because no
+     * implicit `Deriver` is available — an exception is thrown on the first
+     * resolution, failing fast rather than hiding the error inside an `encode`
+     * call.
      *
      * Import this method to make [[NatsCodec]] available for all types that
      * have a given [[zio.blocks.schema.Schema]].
      *
-     *   `import builder.derived`
+     * {{{
+     * import builder.derived
+     * }}}
      */
-    given derived[A: Schema]: NatsCodec[A] = new NatsCodec[A] {
-
-      def encode(value: A): Chunk[Byte] =
-        NatsSerializer.encode(value, format) match {
-          case Right(bytes) => bytes
-          case Left(e)      =>
-            throw new RuntimeException(
-              s"NatsCodec encode failed for ${value.getClass.getSimpleName}: ${e.getMessage}",
-              e
-            )
+    given derived[A: Schema]: NatsCodec[A] = {
+      val schema = summon[Schema[A]]
+      cache.computeIfAbsent(
+        schema,
+        _ => {
+          // Eagerly derive the compiled codec. Throws here if the format
+          // cannot handle A — never inside encode.
+          val compiledCodec = NatsSerializer.makeFor[A](format)
+          new NatsCodec[A] {
+            def encode(value: A): Chunk[Byte]                          = compiledCodec.encode(value)
+            def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, A] = compiledCodec.decode(bytes)
+          }
         }
-
-      def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, A] =
-        NatsSerializer
-          .decode[A](bytes, format)
-          .left
-          .map(e => NatsDecodeError(e.getMessage, Some(e)))
+      ).asInstanceOf[NatsCodec[A]]
     }
   }
 }

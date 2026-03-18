@@ -178,13 +178,22 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
 
   override private[nats] def underlying: JObjectStore = os
 
+  private def encode[A: NatsCodec](objectName: String, data: A): IO[NatsError, Array[Byte]] =
+    ZIO
+      .attempt(NatsCodec[A].encode(data).toArray)
+      .mapError(e => NatsError.SerializationError(s"Failed to encode object '$objectName': ${e.toString}", e))
+
   override def put[A: NatsCodec](objectName: String, data: A): IO[NatsError, ObjectSummary] =
-    ZIO.attemptBlocking(os.put(objectName, NatsCodec[A].encode(data).toArray)).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
+    encode(objectName, data).flatMap(bytes =>
+      ZIO.attemptBlocking(os.put(objectName, bytes)).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
+    )
 
   override def put[A: NatsCodec](meta: ObjectMeta, data: A): IO[NatsError, ObjectSummary] =
-    ZIO
-      .attemptBlocking(os.put(meta.toJava, new ByteArrayInputStream(NatsCodec[A].encode(data).toArray)))
-      .mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
+    encode(meta.name, data).flatMap(bytes =>
+      ZIO
+        .attemptBlocking(os.put(meta.toJava, new ByteArrayInputStream(bytes)))
+        .mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
+    )
 
   override def get[A: NatsCodec](objectName: String): IO[NatsError, ObjectData[A]] =
     ZIO.attemptBlocking {

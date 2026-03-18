@@ -68,40 +68,46 @@ object JetStream {
 
 private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
 
-  override def publish[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): IO[NatsError, PublishAck] = {
-    val bytes = NatsCodec[T].encode(data)
-    (params.headers.nonEmpty, params.options) match {
-      case (false, None) =>
-        ZIO
-          .attemptBlocking(js.publish(subject.value, bytes.toArray))
-          .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
-      case (true, None) =>
-        val msg = NatsMessage.toJava(subject.value, bytes, headers = params.headers)
-        ZIO
-          .attemptBlocking(js.publish(msg))
-          .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
-      case (false, Some(opts)) =>
-        ZIO
-          .attemptBlocking(js.publish(subject.value, bytes.toArray, opts.toJava))
-          .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
-      case (true, Some(opts)) =>
-        val msg = NatsMessage.toJava(subject.value, bytes, headers = params.headers)
-        ZIO
-          .attemptBlocking(js.publish(msg, opts.toJava))
-          .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
-    }
-  }
-
-  override def publishAsync[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): IO[NatsError, Task[PublishAck]] = {
-    val bytes = NatsCodec[T].encode(data)
-    ZIO.attempt {
-      val future = params.options match {
-        case None       => js.publishAsync(subject.value, bytes.toArray)
-        case Some(opts) => js.publishAsync(subject.value, bytes.toArray, opts.toJava)
+  override def publish[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): IO[NatsError, PublishAck] =
+    ZIO
+      .attempt(NatsCodec[T].encode(data))
+      .mapError(e => NatsError.SerializationError(s"Failed to encode JetStream message for subject '${subject.value}': ${e.toString}", e))
+      .flatMap { bytes =>
+        (params.headers.nonEmpty, params.options) match {
+          case (false, None) =>
+            ZIO
+              .attemptBlocking(js.publish(subject.value, bytes.toArray))
+              .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
+          case (true, None) =>
+            val msg = NatsMessage.toJava(subject.value, bytes, headers = params.headers)
+            ZIO
+              .attemptBlocking(js.publish(msg))
+              .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
+          case (false, Some(opts)) =>
+            ZIO
+              .attemptBlocking(js.publish(subject.value, bytes.toArray, opts.toJava))
+              .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
+          case (true, Some(opts)) =>
+            val msg = NatsMessage.toJava(subject.value, bytes, headers = params.headers)
+            ZIO
+              .attemptBlocking(js.publish(msg, opts.toJava))
+              .mapBoth(NatsError.fromThrowable, PublishAck.fromJava)
+        }
       }
-      ZIO.fromCompletionStage(future).map(PublishAck.fromJava)
-    }.mapError(NatsError.fromThrowable)
-  }
+
+  override def publishAsync[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): IO[NatsError, Task[PublishAck]] =
+    ZIO
+      .attempt(NatsCodec[T].encode(data))
+      .mapError(e => NatsError.SerializationError(s"Failed to encode async JetStream message for subject '${subject.value}': ${e.toString}", e))
+      .flatMap { bytes =>
+        ZIO.attempt {
+          val future = params.options match {
+            case None       => js.publishAsync(subject.value, bytes.toArray)
+            case Some(opts) => js.publishAsync(subject.value, bytes.toArray, opts.toJava)
+          }
+          ZIO.fromCompletionStage(future).map(PublishAck.fromJava)
+        }.mapError(NatsError.fromThrowable)
+      }
 
   override def consumer(streamName: String, consumerName: String): IO[NatsError, Consumer] =
     ZIO

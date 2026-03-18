@@ -89,12 +89,20 @@ trait Nats {
    * Subscribe and automatically decode each message payload.
    *
    * Returns a stream of [[Envelope]]s so callers have access to both the
-   * decoded value and the raw [[NatsMessage]] (headers, subject, reply-to).
+   * decoded value and the raw [[NatsMessage]] (headers, subject, reply-to,
+   * raw bytes).
    *
    * Pass an optional [[QueueGroup]] to enable load-balanced delivery: within a
    * queue group, each published message is delivered to exactly one subscriber.
    *
-   * Pass `Chunk[Byte]` to use the identity codec (raw bytes).
+   * Pass `Chunk[Byte]` to use the identity codec and receive raw bytes:
+   *
+   * {{{
+   * // Raw access — env.message exposes subject, headers, reply-to, and payload
+   * nats.subscribe[Chunk[Byte]](Subject("events.>"))
+   *   .tap(env => ZIO.debug(s"${env.message.subject}: ${env.message.dataAsString}"))
+   *   .runDrain
+   * }}}
    *
    * Decode failures are converted to [[NatsError.DecodingError]] and propagated
    * through the stream's error channel.
@@ -104,9 +112,6 @@ trait Nats {
     queue: Option[QueueGroup] = None
   ): ZStream[Any, NatsError, Envelope[A]]
 
-  // -------------------------------------------------------------------------
-  // Utility
-  // -------------------------------------------------------------------------
 
   /** Flush the outbound buffer to the server within `timeout`. */
   def flush(timeout: Duration = 1.second): IO[NatsError, Unit]
@@ -164,20 +169,6 @@ trait Nats {
    * }}}
    */
   def lifecycleEvents: ZStream[Any, Nothing, NatsEvent]
-
-  /**
-   * Subscribe to `subject` and receive raw [[NatsMessage]]s without decoding.
-   *
-   * Pass an optional [[QueueGroup]] to enable load-balanced delivery.
-   *
-   * Use when you need the full [[NatsMessage]] (subject, headers, reply-to,
-   * raw bytes) and do not need typed decoding. For typed access prefer
-   * [[subscribe]][A] which wraps each message in an [[Envelope]].
-   */
-  def subscribeRaw(
-    subject: Subject,
-    queue: Option[QueueGroup] = None
-  ): ZStream[Any, NatsError, NatsMessage]
 }
 
 object Nats {
@@ -258,43 +249,44 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
     subject: Subject,
     value: A,
     params: PublishParams
-  ): IO[NatsError, Unit] = {
-    val bytes = NatsCodec[A].encode(value)
-    if (params.headers.isEmpty && params.replyTo.isEmpty)
-      ZIO.attempt(conn.publish(subject.value, bytes.toArray)).mapError(NatsError.fromThrowable)
-    else {
-      val msg = NatsMessage.toJava(
-        subject = subject.value,
-        data = bytes,
-        replyTo = params.replyTo.map(_.value),
-        headers = params.headers
-      )
-      ZIO.attempt(conn.publish(msg)).mapError(NatsError.fromThrowable)
-    }
-  }
+  ): IO[NatsError, Unit] =
+    ZIO
+      .attempt(NatsCodec[A].encode(value))
+      .mapError(e => NatsError.SerializationError(s"Failed to encode message for subject '${subject.value}': ${e.toString}", e))
+      .flatMap { bytes =>
+        if (params.headers.isEmpty && params.replyTo.isEmpty)
+          ZIO.attempt(conn.publish(subject.value, bytes.toArray)).mapError(NatsError.fromThrowable)
+        else {
+          val msg = NatsMessage.toJava(
+            subject = subject.value,
+            data = bytes,
+            replyTo = params.replyTo.map(_.value),
+            headers = params.headers
+          )
+          ZIO.attempt(conn.publish(msg)).mapError(NatsError.fromThrowable)
+        }
+      }
 
   override def request[A: NatsCodec, B: NatsCodec](
     subject: Subject,
     request: A,
     timeout: Duration
-  ): IO[NatsError, Envelope[B]] = {
-    val bytes = NatsCodec[A].encode(request)
+  ): IO[NatsError, Envelope[B]] =
     ZIO
-      .fromCompletionStage(conn.requestWithTimeout(subject.value, bytes.toArray, timeout.asJava))
-      .mapError(NatsError.fromThrowable)
-      .flatMap { jMsg =>
-        val msg = NatsMessage.fromJava(jMsg)
+      .attempt(NatsCodec[A].encode(request))
+      .mapError(e => NatsError.SerializationError(s"Failed to encode request for subject '${subject.value}': ${e.toString}", e))
+      .flatMap { bytes =>
         ZIO
-          .fromEither(msg.decode[B])
-          .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
+          .fromCompletionStage(conn.requestWithTimeout(subject.value, bytes.toArray, timeout.asJava))
+          .mapError(NatsError.fromThrowable)
+          .flatMap { jMsg =>
+            val msg = NatsMessage.fromJava(jMsg)
+            ZIO
+              .fromEither(msg.decode[B])
+              .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
+          }
       }
-  }
 
-  override def subscribeRaw(
-    subject: Subject,
-    queue: Option[QueueGroup] = None
-  ): ZStream[Any, NatsError, NatsMessage] =
-    subscribeInternal(subject.value, queue.map(_.value))
 
   override def subscribe[A: NatsCodec](
     subject: Subject,
