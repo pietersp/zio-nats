@@ -53,7 +53,7 @@ object Main extends ZIOAppDefault {
 
   val run: ZIO[Any, Throwable, Unit] =
     program
-      .provide(ZLayer.succeed(NatsConfig.default), Nats.live)
+      .provide(NatsConfig.live, Nats.live)
       .mapError(e => new RuntimeException(e.getMessage))
 }
 ```
