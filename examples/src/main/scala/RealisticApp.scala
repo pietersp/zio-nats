@@ -129,6 +129,6 @@ object RealisticApp extends ZIOAppDefault {
                  .runDrain
                  .fork
       _     <- program
-      _     <- fiber.join
+      _     <- fiber.interrupt
     } yield ()).provide(appLayer).mapError(e => new RuntimeException(e.getMessage))
 }
