@@ -278,20 +278,16 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
       .mapError(e => NatsError.SerializationError(s"Failed to encode request for subject '${subject.value}': ${e.toString}", e))
       .flatMap { bytes =>
         ZIO
-          .attemptBlocking {
-            val reply = conn.request(subject.value, bytes.toArray, timeout.asJava)
-            if (reply == null)
-              throw new java.util.concurrent.TimeoutException(
-                s"No reply received for subject '${subject.value}' within $timeout"
-              )
-            reply
-          }
+          .attemptBlocking(Option(conn.request(subject.value, bytes.toArray, timeout.asJava)))
           .mapError(NatsError.fromThrowable)
-          .flatMap { jMsg =>
-            val msg = NatsMessage.fromJava(jMsg)
-            ZIO
-              .fromEither(msg.decode[B])
-              .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
+          .flatMap {
+            case None =>
+              ZIO.fail(NatsError.Timeout(s"No reply received for subject '${subject.value}' within $timeout"))
+            case Some(jMsg) =>
+              val msg = NatsMessage.fromJava(jMsg)
+              ZIO
+                .fromEither(msg.decode[B])
+                .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
           }
       }
 
