@@ -13,6 +13,10 @@ import scala.util.Try
  * by `import zio.nats.*` when `zio-nats-jsoniter` is on the classpath —
  * no additional import or builder step required.
  *
+ * The `NotGiven[NatsCodec[A]]` guard ensures this given does not shadow
+ * built-in codecs (e.g. `NatsCodec[String]`, `NatsCodec[Chunk[Byte]]`) or
+ * any explicit `given NatsCodec[A]` already in scope.
+ *
  * {{{
  * given JsonValueCodec[Person] = JsonCodecMaker.make
  *
@@ -20,7 +24,7 @@ import scala.util.Try
  * nats.publish(Subject("persons"), Person("Alice", 30))
  * }}}
  */
-given fromJsonValueCodec[A](using jc: JsonValueCodec[A]): NatsCodec[A] =
+given fromJsonValueCodec[A](using jc: JsonValueCodec[A], ev: scala.util.NotGiven[NatsCodec[A]]): NatsCodec[A] =
   NatsCodecJsoniter.wrap(jc)
 
 /**

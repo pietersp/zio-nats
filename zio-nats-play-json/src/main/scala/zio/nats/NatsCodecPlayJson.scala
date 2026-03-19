@@ -10,6 +10,10 @@ import zio.Chunk
  * by `import zio.nats.*` when `zio-nats-play-json` is on the classpath —
  * no additional import or builder step required.
  *
+ * The `NotGiven[NatsCodec[A]]` guard ensures this given does not shadow
+ * built-in codecs (e.g. `NatsCodec[String]`, `NatsCodec[Chunk[Byte]]`) or
+ * any explicit `given NatsCodec[A]` already in scope.
+ *
  * {{{
  * given Format[Person] = Json.format[Person]
  *
@@ -17,7 +21,7 @@ import zio.Chunk
  * nats.publish(Subject("persons"), Person("Alice", 30))
  * }}}
  */
-given fromPlayJsonFormat[A](using fmt: Format[A]): NatsCodec[A] =
+given fromPlayJsonFormat[A](using fmt: Format[A], ev: scala.util.NotGiven[NatsCodec[A]]): NatsCodec[A] =
   NatsCodecPlayJson.wrap(fmt)
 
 /**
