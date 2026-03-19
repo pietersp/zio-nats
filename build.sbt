@@ -4,6 +4,7 @@ val zioVersion            = "2.1.24"
 val zioBlocksVersion      = "0.0.29"
 val jnatsVersion          = "2.25.2"
 val testcontainersVersion = "0.44.1"
+val jsoniterScalaVersion  = "2.38.9"
 
 inThisBuild(
   List(
@@ -18,7 +19,7 @@ inThisBuild(
 )
 
 lazy val root = (project in file("."))
-  .aggregate(zioNatsCore, zioNatsZioBlocks, zioNats, zioNatsTestkit, zioNatsTest, zioNatsExamples)
+  .aggregate(zioNatsCore, zioNatsZioBlocks, zioNats, zioNatsJsoniter, zioNatsTestkit, zioNatsTest, zioNatsExamples)
   .settings(
     name               := "zio-nats-root",
     publish / skip     := true,
@@ -54,6 +55,15 @@ lazy val zioNats = (project in file("zio-nats"))
     Compile / resources       := Seq.empty
   )
 
+lazy val zioNatsJsoniter = (project in file("zio-nats-jsoniter"))
+  .dependsOn(zioNatsCore)
+  .settings(
+    name := "zio-nats-jsoniter",
+    libraryDependencies ++= Seq(
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core" % jsoniterScalaVersion
+    )
+  )
+
 lazy val zioNatsTestkit = (project in file("zio-nats-testkit"))
   .dependsOn(zioNatsCore)
   .settings(
@@ -65,13 +75,14 @@ lazy val zioNatsTestkit = (project in file("zio-nats-testkit"))
   )
 
 lazy val zioNatsTest = (project in file("zio-nats-test"))
-  .dependsOn(zioNatsCore, zioNatsZioBlocks, zioNatsTestkit)
+  .dependsOn(zioNatsCore, zioNatsZioBlocks, zioNatsJsoniter, zioNatsTestkit)
   .settings(
     name           := "zio-nats-test",
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio-test"     % zioVersion % Test,
-      "dev.zio" %% "zio-test-sbt" % zioVersion % Test
+      "dev.zio" %% "zio-test"                                          % zioVersion              % Test,
+      "dev.zio" %% "zio-test-sbt"                                      % zioVersion              % Test,
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % jsoniterScalaVersion % Test
     ),
     // Podman/Docker socket configuration for testcontainers.
     // Forking is required so env vars are passed to the test JVM.

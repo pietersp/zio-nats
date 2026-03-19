@@ -30,15 +30,16 @@ Tests use real NATS via testcontainers (Docker required). They start automatical
 
 ## Project Layout
 
-Six sbt subprojects:
+Seven sbt subprojects:
 
 | Subproject | Purpose |
 |-----------|---------|
 | `zio-nats-core` | Core library — all public API; no zio-blocks dependency |
 | `zio-nats-zio-blocks` | Optional zio-blocks integration (`NatsCodec.fromFormat`, `Builder`) |
+| `zio-nats-jsoniter` | Optional jsoniter-scala integration (`NatsCodecJsoniter`, `NatsCodec.fromJsoniter`) |
 | `zio-nats` | Batteries-included wrapper — empty JAR, depends on `zio-nats-core` + `zio-nats-zio-blocks` |
 | `zio-nats-testkit` | `NatsTestLayers` for integration tests |
-| `zio-nats-test` | Integration test suite (122 tests) |
+| `zio-nats-test` | Integration test suite |
 | `examples` | Runnable demos |
 
 ## Architecture
@@ -71,6 +72,15 @@ module (`zio-nats-core`) has **no zio-blocks dependency** — it only provides b
   val builder = NatsCodec.fromFormat(JsonFormat)
   import builder.derived  // enables implicit NatsCodec[A] for any A with a Schema
   ```
+- For domain types with a jsoniter-scala `JsonValueCodec[A]`, add `zio-nats-jsoniter`. A top-level
+  `given fromJsonValueCodec` in `package zio.nats` automatically bridges any `JsonValueCodec[A]` in
+  implicit scope to `NatsCodec[A]` — no builder step required:
+  ```scala
+  given JsonValueCodec[Person] = JsonCodecMaker.make
+  // NatsCodec[Person] resolved automatically via import zio.nats.*
+  nats.publish(Subject("persons"), Person("Alice", 30))
+  ```
+  For an explicit one-off codec, use the `NatsCodec.fromJsoniter(codec)` extension method.
 - For custom codecs with no framework: implement `NatsCodec[A]` directly (depends only on core).
 - Multiple formats can coexist; per-type overrides are plain `given val`s.
 
@@ -153,6 +163,8 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocks.scala` | `NatsCodecZioBlocks.Builder` — derives `NatsCodec[A]` from a zio-blocks `Format` + `Schema`; caches in `ConcurrentHashMap` |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocksExtensions.scala` | Extension methods `NatsCodec.fromFormat` and `NatsCodec.derived` (available via `import zio.nats.*`) |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/serialization/NatsSerializer.scala` | `CompiledCodec[A]` sealed trait, `makeFor[A](format)` factory (eager, can throw), `BinaryCompiledCodec` / `TextCompiledCodec` impls |
+| `zio-nats-jsoniter/src/main/scala/zio/nats/NatsCodecJsoniter.scala` | `NatsCodecJsoniter.wrap` — bridges `JsonValueCodec[A]` to `NatsCodec[A]`; top-level `given fromJsonValueCodec` for automatic resolution |
+| `zio-nats-jsoniter/src/main/scala/zio/nats/NatsCodecJsoniterExtensions.scala` | Extension method `NatsCodec.fromJsoniter` (available via `import zio.nats.*`) |
 | `zio-nats-core/src/main/scala/zio/nats/NatsError.scala` | Error hierarchy |
 | `zio-nats-core/src/main/scala/zio/nats/NatsCoreTypes.scala` | `Subject` (opaque), `QueueGroup` (opaque), `Headers`, `PublishParams`, `StorageType`, `ConnectionStatus`, `NatsServerInfo` |
 | `zio-nats-core/src/main/scala/zio/nats/NatsModels.scala` | `Envelope[+A]`, `ConnectionStats` |

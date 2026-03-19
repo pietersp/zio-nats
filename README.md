@@ -19,16 +19,26 @@ A ZIO 2 wrapper for the [jnats](https://github.com/nats-io/nats.java) NATS clien
 Add to `build.sbt`:
 
 ```scala
-// Full library — pub/sub, JetStream, KV, Object Store, Service Framework,
-// and zio-blocks type-safe serialization included by default.
+// ── Option A: batteries-included ────────────────────────────────────────────
+// Includes pub/sub, JetStream, KV, Object Store, Service Framework,
+// and zio-blocks type-safe serialization.
 libraryDependencies += "dev.zio" %% "zio-nats" % "<version>"
 
-// Testkit (for integration tests — brings in testcontainers)
+// ── Option B: core only (no zio-blocks) ─────────────────────────────────────
+// Use this when you want jsoniter-scala or a fully custom NatsCodec[A]
+// instead of zio-blocks.
+libraryDependencies += "dev.zio" %% "zio-nats-core" % "<version>"
+
+// ── Optional add-on: jsoniter-scala serialization ───────────────────────────
+// Pair with zio-nats-core (instead of zio-blocks) or add alongside zio-nats
+// (to use jsoniter for selected types while keeping zio-blocks for others).
+libraryDependencies += "dev.zio" %% "zio-nats-jsoniter" % "<version>"
+
+// ── Testkit ──────────────────────────────────────────────────────────────────
+// Integration test helpers — starts a NATS container via testcontainers.
 libraryDependencies += "dev.zio" %% "zio-nats-testkit" % "<version>" % Test
 ```
 
-> **Advanced users:** To use a custom serializer instead of zio-blocks, depend on `zio-nats-core`
-> and implement `NatsCodec[A]` directly — it has no zio-blocks dependency.
 
 ## Quick start
 
@@ -285,6 +295,68 @@ import zio.blocks.schema.toon.ToonFormat
 
 val jsonCodecs  = NatsCodec.fromFormat(JsonFormat)
 val avroCodecs  = NatsCodec.fromFormat(AvroFormat)
+```
+
+## Type-Safe Serialization (jsoniter-scala)
+
+As an alternative (or complement) to zio-blocks, `zio-nats-jsoniter` integrates with
+[jsoniter-scala](https://github.com/plokhotnyuk/jsoniter-scala) for high-performance JSON
+serialization.
+
+Add the dependency — choose the base artifact that matches your setup:
+
+```scala
+// Replace zio-blocks entirely: core + jsoniter
+libraryDependencies += "dev.zio" %% "zio-nats-core"    % "<version>"
+libraryDependencies += "dev.zio" %% "zio-nats-jsoniter" % "<version>"
+
+// Or add jsoniter alongside zio-blocks (selected types use jsoniter, rest use zio-blocks)
+libraryDependencies += "dev.zio" %% "zio-nats"          % "<version>"
+libraryDependencies += "dev.zio" %% "zio-nats-jsoniter" % "<version>"
+```
+
+### Automatic bridging (recommended)
+
+Place a `given JsonValueCodec[A]` in scope and `import zio.nats.*`. The top-level
+`given fromJsonValueCodec` bridges it to `NatsCodec[A]` automatically — no builder step required:
+
+```scala
+import com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec
+import com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker
+import zio.nats.*
+
+case class Person(name: String, age: Int)
+object Person {
+  given JsonValueCodec[Person] = JsonCodecMaker.make
+}
+
+// NatsCodec[Person] is resolved automatically — just use the service:
+nats.publish(Subject("persons"), Person("Alice", 30))
+nats.subscribe[Person](Subject("persons")).payload
+  .tap(p => ZIO.debug(s"Got: ${p.name}"))
+  .runDrain
+```
+
+### Explicit one-off codec
+
+Use `NatsCodec.fromJsoniter` when you need a codec without putting one into implicit scope:
+
+```scala
+val codec: NatsCodec[Person] = NatsCodec.fromJsoniter(JsonCodecMaker.make[Person])
+```
+
+### Coexistence with zio-blocks
+
+Both integrations can be used in the same project. Per-type overrides are plain `given val`s:
+
+```scala
+// Most types use zio-blocks:
+val codecs = NatsCodec.fromFormat(JsonFormat)
+import codecs.derived
+
+// One type uses jsoniter instead:
+given JsonValueCodec[FastEvent] = JsonCodecMaker.make
+// NatsCodec[FastEvent] resolved via fromJsonValueCodec; other types use zio-blocks
 ```
 
 ## JetStream
