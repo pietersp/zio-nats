@@ -3,6 +3,9 @@ package zio.nats.config
 import io.nats.client.{AuthHandler, Options}
 import zio.*
 
+import java.nio.file.Path
+import javax.net.ssl.SSLContext
+
 /**
  * Configuration for a NATS connection.
  *
@@ -27,6 +30,14 @@ import zio.*
  * @param username                Username for user/password authentication.
  * @param password                Password for user/password authentication.
  * @param credentialPath          Path to a `.creds` file for NKey/JWT authentication.
+ *                                Validated at construction (file must exist on the filesystem).
+ * @param tlsContext              Custom [[SSLContext]] for TLS/mTLS connections. When set, the
+ *                                connection will use TLS using the provided context. Use the
+ *                                standard `javax.net.ssl.SSLContext` API to configure certificates,
+ *                                trust stores, and client keys without any jnats imports.
+ * @param tlsFirst                If true, initiate TLS immediately on connect rather than waiting
+ *                                for a server upgrade (`tls_required` servers). Equivalent to
+ *                                jnats `Options.Builder.tlsFirst()` (default: false).
  * @param optionsCustomizer       Escape hatch: apply any additional `Options.Builder` settings
  *                                not covered by the fields above.
  */
@@ -46,7 +57,9 @@ final case class NatsConfig(
   token: Option[String] = None,
   username: Option[String] = None,
   password: Option[String] = None,
-  credentialPath: Option[String] = None,
+  credentialPath: Option[Path] = None,
+  tlsContext: Option[SSLContext] = None,
+  tlsFirst: Boolean = false,
   optionsCustomizer: Options.Builder => Options.Builder = identity
 ) {
 
@@ -76,7 +89,9 @@ final case class NatsConfig(
       u <- username
       p <- password
     } builder = builder.userInfo(u.toCharArray, p.toCharArray)
-    credentialPath.foreach(p => builder = builder.credentialPath(p))
+    credentialPath.foreach(p => builder = builder.credentialPath(p.toString))
+    tlsContext.foreach(ctx => builder = builder.sslContext(ctx))
+    if (tlsFirst) builder = builder.tlsFirst()
     optionsCustomizer(builder)
   }
 }

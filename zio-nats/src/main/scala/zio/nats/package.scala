@@ -114,6 +114,9 @@ package object nats {
     @scala.annotation.targetName("objectDataPayload")
     def payload: ZIO[R, E, A] = zio.map(_.value)
 
+  // --- Connection config re-export ---
+  type NatsConfig = config.NatsConfig; val NatsConfig = config.NatsConfig
+
   // --- JetStream config re-exports ---
   type StreamConfig          = jetstream.StreamConfig;          val StreamConfig          = jetstream.StreamConfig
   type ConsumerConfig        = jetstream.ConsumerConfig;        val ConsumerConfig        = jetstream.ConsumerConfig

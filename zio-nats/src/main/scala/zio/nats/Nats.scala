@@ -201,8 +201,8 @@ object Nats {
                             case ConnectionListener.Events.RECONNECTED        => NatsEvent.Reconnected(url)
                             case ConnectionListener.Events.CLOSED             => NatsEvent.Closed
                             case ConnectionListener.Events.LAME_DUCK          => NatsEvent.LameDuckMode
-                            case ConnectionListener.Events.RESUBSCRIBED       => NatsEvent.Reconnected(url)
-                            case ConnectionListener.Events.DISCOVERED_SERVERS => NatsEvent.ServersDiscovered(url)
+                            case ConnectionListener.Events.RESUBSCRIBED       => NatsEvent.Resubscribed(url)
+                            case ConnectionListener.Events.DISCOVERED_SERVERS => NatsEvent.ServersDiscovered
                           }
                           jQueue.put(event)
                         }
