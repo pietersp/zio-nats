@@ -1,6 +1,11 @@
 package zio.nats.kv
 
-import io.nats.client.api.{KeyResult as JKeyResult, KeyValueEntry as JKeyValueEntry, KeyValuePurgeOptions, KeyValueWatcher as JKeyValueWatcher}
+import io.nats.client.api.{
+  KeyResult as JKeyResult,
+  KeyValueEntry as JKeyValueEntry,
+  KeyValuePurgeOptions,
+  KeyValueWatcher as JKeyValueWatcher
+}
 import io.nats.client.{KeyValue as JKeyValue, KeyValueManagement as JKeyValueManagement, MessageTtl}
 import zio.*
 import zio.nats.{Nats, NatsCodec, NatsError}
@@ -16,11 +21,11 @@ import scala.jdk.CollectionConverters.*
  *
  * All read operations are generic `[A: NatsCodec]` and return [[KvEnvelope]]s
  * that bundle the decoded value with server-side metadata (key, revision,
- * operation, and bucket name). Pass `Chunk[Byte]` as `A` to skip decoding
- * and receive raw bytes.
+ * operation, and bucket name). Pass `Chunk[Byte]` as `A` to skip decoding and
+ * receive raw bytes.
  *
- * Obtain an instance via [[KeyValue.bucket]] (requires a [[zio.nats.Nats]] connection
- * in scope). Use [[KeyValueManagement]] to create or delete buckets.
+ * Obtain an instance via [[KeyValue.bucket]] (requires a [[zio.nats.Nats]]
+ * connection in scope). Use [[KeyValueManagement]] to create or delete buckets.
  *
  * ==Example==
  * {{{
@@ -42,22 +47,26 @@ trait KeyValue {
    * Decode the value for `key` as `A`. Returns [[None]] if the key does not
    * exist or its current state is a delete or purge marker.
    *
-   * @param revision when [[Some]], retrieves the entry at that specific stream
-   *                 revision; when [[None]] (default) retrieves the latest value.
+   * @param revision
+   *   when [[Some]], retrieves the entry at that specific stream revision; when
+   *   [[None]] (default) retrieves the latest value.
    */
   def get[A: NatsCodec](key: String, revision: Option[Long] = None): IO[NatsError, Option[KvEnvelope[A]]]
 
   // --- Put ---
 
-  /** Encode `value` and store under `key`. Pass `Chunk[Byte]` or `String` for raw/text writes. */
+  /**
+   * Encode `value` and store under `key`. Pass `Chunk[Byte]` or `String` for
+   * raw/text writes.
+   */
   def put[A: NatsCodec](key: String, value: A): IO[NatsError, Long]
 
   // --- Conditional writes ---
 
   /**
    * Put only if the key does not exist (returns revision or fails with
-   * JetStreamApiError). Pass an optional per-entry `ttl` (minimum 1 second;
-   * the bucket must have been created with a TTL to use this).
+   * JetStreamApiError). Pass an optional per-entry `ttl` (minimum 1 second; the
+   * bucket must have been created with a TTL to use this).
    */
   def create[A: NatsCodec](key: String, value: A, ttl: Option[Duration] = None): IO[NatsError, Long]
 
@@ -70,16 +79,16 @@ trait KeyValue {
   // --- Delete / Purge ---
 
   /**
-   * Soft-delete: places a delete marker. History is preserved.
-   * Pass `expectedRevision` to guard the delete (fails with JetStreamApiError
-   * on mismatch).
+   * Soft-delete: places a delete marker. History is preserved. Pass
+   * `expectedRevision` to guard the delete (fails with JetStreamApiError on
+   * mismatch).
    */
   def delete(key: String, expectedRevision: Option[Long] = None): IO[NatsError, Unit]
 
   /**
-   * Hard-purge: removes all history for the key.
-   * Pass `expectedRevision` to guard the purge, and/or `markerTtl` to set a
-   * TTL on the resulting tombstone marker (bucket must support TTL).
+   * Hard-purge: removes all history for the key. Pass `expectedRevision` to
+   * guard the purge, and/or `markerTtl` to set a TTL on the resulting tombstone
+   * marker (bucket must support TTL).
    */
   def purge(
     key: String,
@@ -92,9 +101,9 @@ trait KeyValue {
   /**
    * Stream events for one or more keys as [[KvEvent]] values.
    *
-   * Pass a single-element list to watch one key, or multiple keys to watch
-   * all of them in a single subscription. The stream never completes on its
-   * own — interrupt it to stop watching.
+   * Pass a single-element list to watch one key, or multiple keys to watch all
+   * of them in a single subscription. The stream never completes on its own —
+   * interrupt it to stop watching.
    *
    * Emits [[KvEvent.Put]] for writes, [[KvEvent.Delete]] for soft-deletes, and
    * [[KvEvent.Purge]] for purges. Set [[KeyValueWatchOptions.ignoreDeletes]] to
@@ -144,8 +153,8 @@ trait KeyValue {
 
   /**
    * Stream all keys incrementally. More memory-efficient than `keys` for large
-   * buckets — the stream completes when all keys have been delivered.
-   * Pass subject filters to restrict results; omit or pass `Nil` for all keys.
+   * buckets — the stream completes when all keys have been delivered. Pass
+   * subject filters to restrict results; omit or pass `Nil` for all keys.
    */
   def consumeKeys(filters: List[String] = Nil): ZStream[Any, NatsError, String]
 
@@ -157,9 +166,11 @@ trait KeyValue {
  * Service for managing Key-Value buckets.
  *
  * Provides administrative operations to create, update, and delete KV buckets.
- * Obtain an instance via [[KeyValueManagement.live]] (requires [[zio.nats.Nats]] in scope).
+ * Obtain an instance via [[KeyValueManagement.live]] (requires
+ * [[zio.nats.Nats]] in scope).
  */
 trait KeyValueManagement {
+
   /** Create a new KV bucket with the given configuration. */
   def create(config: KeyValueConfig): IO[NatsError, KeyValueBucketStatus]
 
@@ -184,7 +195,8 @@ object KeyValue {
   /**
    * Create a [[KeyValue]] service bound to a specific bucket name.
    *
-   * The bucket must already exist. Use [[KeyValueManagement.create]] to create it.
+   * The bucket must already exist. Use [[KeyValueManagement.create]] to create
+   * it.
    */
   def bucket(bucketName: String): ZIO[Nats, NatsError, KeyValue] =
     ZIO.serviceWithZIO[Nats] { nats =>
@@ -218,10 +230,11 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
 
   private def decodeOpt[A: NatsCodec](opt: Option[KeyValueEntry]): IO[NatsError, Option[KvEnvelope[A]]] =
     opt match {
-      case None                                             => ZIO.none
+      case None                                            => ZIO.none
       case Some(e) if e.operation != KeyValueOperation.Put => ZIO.none
-      case Some(e) =>
-        ZIO.fromEither(e.decode[A])
+      case Some(e)                                         =>
+        ZIO
+          .fromEither(e.decode[A])
           .mapBoth(err => NatsError.DecodingError(err.message, err), v => Some(KvEnvelope(v, e)))
     }
 
@@ -231,7 +244,8 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
     raw.mapZIO { e =>
       e.operation match {
         case KeyValueOperation.Put =>
-          ZIO.fromEither(e.decode[A])
+          ZIO
+            .fromEither(e.decode[A])
             .mapBoth(err => NatsError.DecodingError(err.message, err), v => KvEvent.Put(KvEnvelope(v, e)))
         case KeyValueOperation.Delete =>
           ZIO.succeed(KvEvent.Delete(e))
@@ -269,12 +283,17 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
     encode(key, value).flatMap { bytes =>
       ttl match {
         case None    => ZIO.attemptBlocking(kv.create(key, bytes)).mapError(NatsError.fromThrowable)
-        case Some(d) => ZIO.attemptBlocking(kv.create(key, bytes, MessageTtl.seconds(d.toSeconds.toInt))).mapError(NatsError.fromThrowable)
+        case Some(d) =>
+          ZIO
+            .attemptBlocking(kv.create(key, bytes, MessageTtl.seconds(d.toSeconds.toInt)))
+            .mapError(NatsError.fromThrowable)
       }
     }
 
   override def update[A: NatsCodec](key: String, value: A, expectedRevision: Long): IO[NatsError, Long] =
-    encode(key, value).flatMap(bytes => ZIO.attemptBlocking(kv.update(key, bytes, expectedRevision)).mapError(NatsError.fromThrowable))
+    encode(key, value).flatMap(bytes =>
+      ZIO.attemptBlocking(kv.update(key, bytes, expectedRevision)).mapError(NatsError.fromThrowable)
+    )
 
   // ---------------------------------------------------------------------------
   // Delete / Purge
@@ -292,10 +311,12 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
     markerTtl: Option[Duration] = None
   ): IO[NatsError, Unit] =
     (expectedRevision, markerTtl) match {
-      case (None,      None)    => ZIO.attemptBlocking(kv.purge(key)).mapError(NatsError.fromThrowable)
-      case (Some(rev), None)    => ZIO.attemptBlocking(kv.purge(key, rev)).mapError(NatsError.fromThrowable)
-      case (None,      Some(d)) => ZIO.attemptBlocking(kv.purge(key, MessageTtl.seconds(d.toSeconds.toInt))).mapError(NatsError.fromThrowable)
-      case (Some(rev), Some(d)) => ZIO.attemptBlocking(kv.purge(key, rev, MessageTtl.seconds(d.toSeconds.toInt))).mapError(NatsError.fromThrowable)
+      case (None, None)      => ZIO.attemptBlocking(kv.purge(key)).mapError(NatsError.fromThrowable)
+      case (Some(rev), None) => ZIO.attemptBlocking(kv.purge(key, rev)).mapError(NatsError.fromThrowable)
+      case (None, Some(d))   =>
+        ZIO.attemptBlocking(kv.purge(key, MessageTtl.seconds(d.toSeconds.toInt))).mapError(NatsError.fromThrowable)
+      case (Some(rev), Some(d)) =>
+        ZIO.attemptBlocking(kv.purge(key, rev, MessageTtl.seconds(d.toSeconds.toInt))).mapError(NatsError.fromThrowable)
     }
 
   // ---------------------------------------------------------------------------
@@ -318,7 +339,10 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
     case All
   }
 
-  private def watchInternal(target: WatchTarget, options: KeyValueWatchOptions): ZStream[Any, NatsError, KeyValueEntry] =
+  private def watchInternal(
+    target: WatchTarget,
+    options: KeyValueWatchOptions
+  ): ZStream[Any, NatsError, KeyValueEntry] =
     ZStream.asyncScoped[Any, NatsError, KeyValueEntry] { emit =>
       ZIO.acquireRelease(
         ZIO.attemptBlocking {
@@ -354,7 +378,8 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
       .mapBoth(NatsError.fromThrowable, _.map(KeyValueEntry.fromJava))
       .flatMap { entries =>
         ZIO.foreach(entries.filter(_.operation == KeyValueOperation.Put)) { e =>
-          ZIO.fromEither(e.decode[A])
+          ZIO
+            .fromEither(e.decode[A])
             .mapBoth(err => NatsError.DecodingError(err.message, err), KvEnvelope(_, e))
         }
       }

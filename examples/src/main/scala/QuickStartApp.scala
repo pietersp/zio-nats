@@ -5,13 +5,13 @@ import zio.nats.config.NatsConfig
 /**
  * Minimal zio-nats quick-start using the ZIO environment pattern.
  *
- * Obtain the `Nats` service via `ZIO.service[Nats]` and call methods
- * directly on the instance.
+ * Obtain the `Nats` service via `ZIO.service[Nats]` and call methods directly
+ * on the instance.
  *
- * `subscribe[String]` decodes each message payload as a UTF-8 string using
- * the built-in `NatsCodec[String]`. The resulting `Envelope[String]` holds
- * both the decoded value (`env.value`) and the raw `NatsMessage`
- * (`env.message`) for header and subject access.
+ * `subscribe[String]` decodes each message payload as a UTF-8 string using the
+ * built-in `NatsCodec[String]`. The resulting `Envelope[String]` holds both the
+ * decoded value (`env.value`) and the raw `NatsMessage` (`env.message`) for
+ * header and subject access.
  *
  * Requires a running NATS server: nats-server
  *

@@ -1,6 +1,10 @@
 package zio.nats.objectstore
 
-import io.nats.client.api.{ObjectInfo as JObjectInfo, ObjectStoreStatus as JObjectStoreStatus, ObjectStoreWatchOption as JObjectStoreWatchOption}
+import io.nats.client.api.{
+  ObjectInfo as JObjectInfo,
+  ObjectStoreStatus as JObjectStoreStatus,
+  ObjectStoreWatchOption as JObjectStoreWatchOption
+}
 import zio.Chunk
 import zio.nats.{Headers, StorageType}
 
@@ -16,9 +20,12 @@ import scala.jdk.CollectionConverters.*
  * Pass to [[ObjectStore.put]] or [[ObjectStore.putStream]] to attach a
  * description or headers alongside the stored object.
  *
- * @param name        The object name (unique within the bucket).
- * @param description Optional human-readable description.
- * @param headers     Optional NATS headers to store with the object.
+ * @param name
+ *   The object name (unique within the bucket).
+ * @param description
+ *   Optional human-readable description.
+ * @param headers
+ *   Optional NATS headers to store with the object.
  */
 final case class ObjectMeta(
   name: String,
@@ -70,11 +77,16 @@ final case class ObjectData[+A](value: A, summary: ObjectSummary)
 /**
  * Metadata for a stored object in a NATS Object Store bucket.
  *
- * @param name        The object name (unique within the bucket).
- * @param size        Total size of the object in bytes.
- * @param chunks      Number of chunks the object was split into for storage.
- * @param description Optional human-readable description.
- * @param isDeleted   True if the object has been soft-deleted.
+ * @param name
+ *   The object name (unique within the bucket).
+ * @param size
+ *   Total size of the object in bytes.
+ * @param chunks
+ *   Number of chunks the object was split into for storage.
+ * @param description
+ *   Optional human-readable description.
+ * @param isDeleted
+ *   True if the object has been soft-deleted.
  */
 final case class ObjectSummary(
   name: String,
@@ -101,9 +113,14 @@ private[nats] object ObjectSummary {
 /**
  * Options that control which entries an ObjectStore watch delivers.
  *
- * @param ignoreDeletes  Skip deleted-object entries (default: include them).
- * @param includeHistory Start from the first entry for all objects instead of the last (default: last per object).
- * @param updatesOnly    Start only from new entries written after the watch begins (default: last per object).
+ * @param ignoreDeletes
+ *   Skip deleted-object entries (default: include them).
+ * @param includeHistory
+ *   Start from the first entry for all objects instead of the last (default:
+ *   last per object).
+ * @param updatesOnly
+ *   Start only from new entries written after the watch begins (default: last
+ *   per object).
  */
 case class ObjectStoreWatchOptions(
   ignoreDeletes: Boolean = false,
@@ -130,14 +147,22 @@ object ObjectStoreWatchOptions {
 /**
  * Current status and configuration of a NATS Object Store bucket.
  *
- * @param bucketName    The bucket name.
- * @param description   Optional description.
- * @param size          Total bytes stored across all objects.
- * @param maxBucketSize Maximum allowed bytes (-1 = unlimited).
- * @param storageType   File or Memory storage.
- * @param replicas      Number of server replicas.
- * @param isSealed      True if the bucket has been sealed (read-only).
- * @param isCompressed  Whether objects are compressed on the server.
+ * @param bucketName
+ *   The bucket name.
+ * @param description
+ *   Optional description.
+ * @param size
+ *   Total bytes stored across all objects.
+ * @param maxBucketSize
+ *   Maximum allowed bytes (-1 = unlimited).
+ * @param storageType
+ *   File or Memory storage.
+ * @param replicas
+ *   Number of server replicas.
+ * @param isSealed
+ *   True if the bucket has been sealed (read-only).
+ * @param isCompressed
+ *   Whether objects are compressed on the server.
  */
 final case class ObjectStoreBucketStatus(
   bucketName: String,

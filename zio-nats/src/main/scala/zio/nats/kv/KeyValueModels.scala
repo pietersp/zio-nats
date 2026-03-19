@@ -15,9 +15,9 @@ import zio.nats.{NatsCodec, NatsDecodeError, StorageType}
 /**
  * The type of operation that produced a [[KeyValueEntry]].
  *
- *   - `Put`    — a value was written.
+ *   - `Put` — a value was written.
  *   - `Delete` — a soft-delete marker was placed (history preserved).
- *   - `Purge`  — all history for the key was erased (tombstone written).
+ *   - `Purge` — all history for the key was erased (tombstone written).
  */
 enum KeyValueOperation { case Put, Delete, Purge }
 
@@ -36,15 +36,20 @@ object KeyValueOperation {
 /**
  * Raw metadata for a single entry in a NATS KV bucket.
  *
- * Embedded in [[KvEnvelope]] to give callers access to revision, operation,
- * and other server-side metadata alongside the decoded value.
+ * Embedded in [[KvEnvelope]] to give callers access to revision, operation, and
+ * other server-side metadata alongside the decoded value.
  *
- * @param key        The entry key.
- * @param value      Raw payload bytes. Empty for delete/purge markers.
- * @param revision   The stream sequence number (monotonically increasing).
- * @param operation  Whether this entry is a [[KeyValueOperation.Put]],
- *                   [[KeyValueOperation.Delete]], or [[KeyValueOperation.Purge]] marker.
- * @param bucketName The bucket this entry belongs to.
+ * @param key
+ *   The entry key.
+ * @param value
+ *   Raw payload bytes. Empty for delete/purge markers.
+ * @param revision
+ *   The stream sequence number (monotonically increasing).
+ * @param operation
+ *   Whether this entry is a [[KeyValueOperation.Put]],
+ *   [[KeyValueOperation.Delete]], or [[KeyValueOperation.Purge]] marker.
+ * @param bucketName
+ *   The bucket this entry belongs to.
  */
 final case class KeyValueEntry(
   key: String,
@@ -53,7 +58,7 @@ final case class KeyValueEntry(
   operation: KeyValueOperation,
   bucketName: String
 ) {
-  private[nats] def valueAsString: String = new String(value.toArray, java.nio.charset.StandardCharsets.UTF_8)
+  private[nats] def valueAsString: String                            = new String(value.toArray, java.nio.charset.StandardCharsets.UTF_8)
   private[nats] def decode[A: NatsCodec]: Either[NatsDecodeError, A] = NatsCodec[A].decode(value)
 }
 
@@ -72,15 +77,20 @@ private[nats] object KeyValueEntry {
 // ---------------------------------------------------------------------------
 
 /**
- * A decoded Key-Value entry paired with its server-side [[KeyValueEntry]] metadata.
+ * A decoded Key-Value entry paired with its server-side [[KeyValueEntry]]
+ * metadata.
  *
  * Returned by [[KeyValue.get]] and [[KeyValue.history]], which only ever yield
- * Put entries. Pass `Chunk[Byte]` as `A` to skip decoding and receive raw bytes.
+ * Put entries. Pass `Chunk[Byte]` as `A` to skip decoding and receive raw
+ * bytes.
  *
- * @param value   The decoded payload.
- * @param entry   The raw [[KeyValueEntry]] containing metadata and raw bytes.
+ * @param value
+ *   The decoded payload.
+ * @param entry
+ *   The raw [[KeyValueEntry]] containing metadata and raw bytes.
  */
 final case class KvEnvelope[+A](value: A, entry: KeyValueEntry) {
+
   /** The entry key. */
   def key: String = entry.key
 
@@ -98,14 +108,16 @@ final case class KvEnvelope[+A](value: A, entry: KeyValueEntry) {
 /**
  * An event emitted by a [[KeyValue.watch]] or [[KeyValue.watchAll]] stream.
  *
- *  - [[KvEvent.Put]] carries a decoded value for each successful write.
- *  - [[KvEvent.Delete]] signals that the key was soft-deleted (history preserved).
- *  - [[KvEvent.Purge]] signals that all history for the key was erased.
+ *   - [[KvEvent.Put]] carries a decoded value for each successful write.
+ *   - [[KvEvent.Delete]] signals that the key was soft-deleted (history
+ *     preserved).
+ *   - [[KvEvent.Purge]] signals that all history for the key was erased.
  *
  * All three cases expose [[key]], [[revision]], and [[bucketName]].
  *
  * Set [[KeyValueWatchOptions.ignoreDeletes]] to suppress [[KvEvent.Delete]] and
- * [[KvEvent.Purge]] at the server side when you only care about [[KvEvent.Put]].
+ * [[KvEvent.Purge]] at the server side when you only care about
+ * [[KvEvent.Put]].
  *
  * {{{
  * kv.watch[UserProfile](List("user.42")).map {
@@ -116,6 +128,7 @@ final case class KvEnvelope[+A](value: A, entry: KeyValueEntry) {
  * }}}
  */
 enum KvEvent[+A] {
+
   /** A value was stored under the key. */
   case Put(envelope: KvEnvelope[A])
 
@@ -154,13 +167,21 @@ enum KvEvent[+A] {
 /**
  * Options that control which entries a KV watch delivers.
  *
- * @param ignoreDeletes  Suppress [[KvEvent.Delete]] and [[KvEvent.Purge]] events.
- *                       When `true` the server does not transmit these entries,
- *                       so the watch stream emits only [[KvEvent.Put]] events.
- * @param metaOnly       Receive only metadata; omit value bytes (default: include values).
- * @param includeHistory Start from the first entry per key instead of the last (default: last per key).
- * @param updatesOnly    Start only from new entries written after the watch begins (default: last per key).
- * @param fromRevision   Resume from a specific stream revision (overrides the deliver-policy flags above).
+ * @param ignoreDeletes
+ *   Suppress [[KvEvent.Delete]] and [[KvEvent.Purge]] events. When `true` the
+ *   server does not transmit these entries, so the watch stream emits only
+ *   [[KvEvent.Put]] events.
+ * @param metaOnly
+ *   Receive only metadata; omit value bytes (default: include values).
+ * @param includeHistory
+ *   Start from the first entry per key instead of the last (default: last per
+ *   key).
+ * @param updatesOnly
+ *   Start only from new entries written after the watch begins (default: last
+ *   per key).
+ * @param fromRevision
+ *   Resume from a specific stream revision (overrides the deliver-policy flags
+ *   above).
  */
 case class KeyValueWatchOptions(
   ignoreDeletes: Boolean = false,
@@ -190,16 +211,26 @@ object KeyValueWatchOptions {
 /**
  * Current status and configuration of a NATS KV bucket.
  *
- * @param bucketName       The bucket name.
- * @param description      Optional description.
- * @param entryCount       Number of live entries in the bucket.
- * @param byteCount        Total bytes stored in the bucket.
- * @param maxHistoryPerKey Maximum revisions to keep per key (-1 = unlimited).
- * @param maxBucketSize    Maximum total bytes for the bucket (-1 = unlimited).
- * @param storageType      File or Memory storage.
- * @param replicas         Number of server replicas.
- * @param isCompressed     Whether values are compressed on the server.
- * @param ttl              Default TTL for entries, if configured.
+ * @param bucketName
+ *   The bucket name.
+ * @param description
+ *   Optional description.
+ * @param entryCount
+ *   Number of live entries in the bucket.
+ * @param byteCount
+ *   Total bytes stored in the bucket.
+ * @param maxHistoryPerKey
+ *   Maximum revisions to keep per key (-1 = unlimited).
+ * @param maxBucketSize
+ *   Maximum total bytes for the bucket (-1 = unlimited).
+ * @param storageType
+ *   File or Memory storage.
+ * @param replicas
+ *   Number of server replicas.
+ * @param isCompressed
+ *   Whether values are compressed on the server.
+ * @param ttl
+ *   Default TTL for entries, if configured.
  */
 final case class KeyValueBucketStatus(
   bucketName: String,

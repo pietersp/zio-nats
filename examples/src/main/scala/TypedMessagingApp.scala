@@ -27,8 +27,8 @@ object Order {
  * The `import jsonCodecs.derived` line brings the codec derivation into scope.
  * Codecs are built lazily on first use per type and then cached in the Builder:
  *   - The first call to publish/subscribe for a given type builds the codec.
- *   - If a type has no `Schema` or the format cannot handle it, an exception
- *     is thrown at that point, not buried inside a later encode call.
+ *   - If a type has no `Schema` or the format cannot handle it, an exception is
+ *     thrown at that point, not buried inside a later encode call.
  *   - Subsequent calls for the same type reuse the cached codec.
  *
  * Requires a running NATS server: nats-server

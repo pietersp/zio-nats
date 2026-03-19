@@ -32,7 +32,7 @@ object CoreTypesSpec extends ZIOSpecDefault {
 
     suite("ObjectMeta.toJava")(
       test("includes description and headers when set") {
-        val meta  = ObjectMeta(
+        val meta = ObjectMeta(
           name = "test-obj",
           description = Some("desc"),
           headers = Headers("X-Tag" -> "val")

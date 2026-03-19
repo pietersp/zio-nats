@@ -1,17 +1,22 @@
 package zio.nats.objectstore
 
-import io.nats.client.api.{ObjectStoreConfiguration as JObjectStoreConfiguration}
+import io.nats.client.api.ObjectStoreConfiguration as JObjectStoreConfiguration
 import zio.Duration
 import zio.nats.StorageType
 
 /**
  * Configuration for a NATS Object Store bucket.
  *
- * @param name           Unique bucket name.
- * @param description    Optional human-readable description.
- * @param maxBucketSize  Maximum total bytes for the bucket (-1 = unlimited).
- * @param storageType    File or Memory storage.
- * @param ttl            Default TTL for all objects in the bucket.
+ * @param name
+ *   Unique bucket name.
+ * @param description
+ *   Optional human-readable description.
+ * @param maxBucketSize
+ *   Maximum total bytes for the bucket (-1 = unlimited).
+ * @param storageType
+ *   File or Memory storage.
+ * @param ttl
+ *   Default TTL for all objects in the bucket.
  */
 case class ObjectStoreConfig(
   name: String,

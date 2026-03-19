@@ -11,10 +11,10 @@ object ObjectStoreSpec extends ZIOSpecDefault {
   def spec: Spec[Any, Throwable] = suite("Object Store")(
     test("create bucket, put, get, and delete an object") {
       for {
-        osm     <- ZIO.service[ObjectStoreManagement]
-        _       <- osm.create(ObjectStoreConfig(name = "os-basic", storageType = StorageType.Memory))
-        os      <- ObjectStore.bucket("os-basic")
-        info    <- os.put("my-object", Chunk.fromArray("hello-object".getBytes))
+        osm  <- ZIO.service[ObjectStoreManagement]
+        _    <- osm.create(ObjectStoreConfig(name = "os-basic", storageType = StorageType.Memory))
+        os   <- ObjectStore.bucket("os-basic")
+        info <- os.put("my-object", Chunk.fromArray("hello-object".getBytes))
         data <- os.get[Chunk[Byte]]("my-object")
         _    <- os.delete("my-object")
         _    <- osm.delete("os-basic")
@@ -45,8 +45,8 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         os     <- ObjectStore.bucket("os-large")
         bigData = Chunk.fromArray(Array.fill(128 * 1024)(42.toByte))
         _      <- os.put("big-obj", bigData)
-        got <- os.get[Chunk[Byte]]("big-obj")
-        _   <- osm.delete("os-large")
+        got    <- os.get[Chunk[Byte]]("big-obj")
+        _      <- osm.delete("os-large")
       } yield assertTrue(got.value == bigData)
     },
 
@@ -84,8 +84,8 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         os   <- ObjectStore.bucket("os-link")
         _    <- os.put("original", Chunk.fromArray("link-data".getBytes))
         link <- os.addLink("my-link", "original")
-        got <- os.get[Chunk[Byte]]("my-link")
-        _   <- osm.delete("os-link")
+        got  <- os.get[Chunk[Byte]]("my-link")
+        _    <- osm.delete("os-link")
       } yield assertTrue(
         link.name == "my-link",
         got.value.toArray.sameElements("link-data".getBytes)
@@ -110,31 +110,31 @@ object ObjectStoreSpec extends ZIOSpecDefault {
 
     test("watch with IGNORE_DELETE skips deleted entries") {
       for {
-        osm      <- ZIO.service[ObjectStoreManagement]
-        _        <- osm.create(ObjectStoreConfig(name = "os-watch-del", storageType = StorageType.Memory))
-        os       <- ObjectStore.bucket("os-watch-del")
-        _        <- os.put("obj-a", Chunk.fromArray("data".getBytes))
-        _        <- os.delete("obj-a")
-        entries  <- os
-                      .watch(ObjectStoreWatchOptions(ignoreDeletes = true, includeHistory = true))
-                      .take(2)
-                      .runCollect
-                      .timeout(5.seconds)
-                      .map(_.getOrElse(Chunk.empty))
-        _        <- osm.delete("os-watch-del")
+        osm     <- ZIO.service[ObjectStoreManagement]
+        _       <- osm.create(ObjectStoreConfig(name = "os-watch-del", storageType = StorageType.Memory))
+        os      <- ObjectStore.bucket("os-watch-del")
+        _       <- os.put("obj-a", Chunk.fromArray("data".getBytes))
+        _       <- os.delete("obj-a")
+        entries <- os
+                     .watch(ObjectStoreWatchOptions(ignoreDeletes = true, includeHistory = true))
+                     .take(2)
+                     .runCollect
+                     .timeout(5.seconds)
+                     .map(_.getOrElse(Chunk.empty))
+        _ <- osm.delete("os-watch-del")
       } yield assertTrue(entries.forall(!_.isDeleted))
     },
 
     test("putStream and getStream round-trip a large object without full in-memory buffering") {
       for {
-        osm     <- ZIO.service[ObjectStoreManagement]
-        _       <- osm.create(ObjectStoreConfig(name = "os-stream", storageType = StorageType.Memory))
-        os      <- ObjectStore.bucket("os-stream")
-        bigData  = Chunk.fromArray(Array.fill(512 * 1024)(99.toByte))
-        src      = ZStream.fromChunk(bigData)
-        info    <- os.putStream("streamed-obj", src)
-        got     <- os.getStream("streamed-obj").runCollect
-        _       <- osm.delete("os-stream")
+        osm    <- ZIO.service[ObjectStoreManagement]
+        _      <- osm.create(ObjectStoreConfig(name = "os-stream", storageType = StorageType.Memory))
+        os     <- ObjectStore.bucket("os-stream")
+        bigData = Chunk.fromArray(Array.fill(512 * 1024)(99.toByte))
+        src     = ZStream.fromChunk(bigData)
+        info   <- os.putStream("streamed-obj", src)
+        got    <- os.getStream("streamed-obj").runCollect
+        _      <- osm.delete("os-stream")
       } yield assertTrue(
         info.name == "streamed-obj",
         info.size == 512L * 1024,
@@ -195,14 +195,14 @@ object ObjectStoreSpec extends ZIOSpecDefault {
 
     test("updateMeta changes the description of an existing object") {
       for {
-        osm     <- ZIO.service[ObjectStoreManagement]
-        _       <- osm.create(ObjectStoreConfig(name = "os-updmeta", storageType = StorageType.Memory))
-        os      <- ObjectStore.bucket("os-updmeta")
-        _       <- os.put("upd-obj", Chunk.fromArray("data".getBytes))
-        newMeta  = ObjectMeta(name = "upd-obj", description = Some("updated-desc"))
-        _       <- os.updateMeta("upd-obj", newMeta)
-        info    <- os.getInfo("upd-obj")
-        _       <- osm.delete("os-updmeta")
+        osm    <- ZIO.service[ObjectStoreManagement]
+        _      <- osm.create(ObjectStoreConfig(name = "os-updmeta", storageType = StorageType.Memory))
+        os     <- ObjectStore.bucket("os-updmeta")
+        _      <- os.put("upd-obj", Chunk.fromArray("data".getBytes))
+        newMeta = ObjectMeta(name = "upd-obj", description = Some("updated-desc"))
+        _      <- os.updateMeta("upd-obj", newMeta)
+        info   <- os.getInfo("upd-obj")
+        _      <- osm.delete("os-updmeta")
       } yield assertTrue(info.description.contains("updated-desc"))
     },
 
@@ -268,16 +268,16 @@ object ObjectStoreSpec extends ZIOSpecDefault {
         _        <- os.put("existing", Chunk.fromArray("old".getBytes))
         received <- Promise.make[Nothing, ObjectSummary]
         fiber    <- os
-                      .watch(ObjectStoreWatchOptions(updatesOnly = true))
-                      .tap(info => received.succeed(info))
-                      .take(1)
-                      .runDrain
-                      .fork
-        _        <- ZIO.sleep(300.millis)
-        _        <- os.put("new-obj", Chunk.fromArray("fresh".getBytes))
-        info     <- received.await
-        _        <- fiber.interrupt
-        _        <- osm.delete("os-watch-upd")
+                   .watch(ObjectStoreWatchOptions(updatesOnly = true))
+                   .tap(info => received.succeed(info))
+                   .take(1)
+                   .runDrain
+                   .fork
+        _    <- ZIO.sleep(300.millis)
+        _    <- os.put("new-obj", Chunk.fromArray("fresh".getBytes))
+        info <- received.await
+        _    <- fiber.interrupt
+        _    <- osm.delete("os-watch-upd")
       } yield assertTrue(info.name == "new-obj")
     }
   ).provideShared(

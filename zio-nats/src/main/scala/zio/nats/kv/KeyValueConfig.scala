@@ -15,9 +15,12 @@ import scala.jdk.CollectionConverters.*
  * Republish configuration — re-publishes messages from a KV bucket to another
  * subject after they are stored.
  *
- * @param source      Subject filter matching the published subject.
- * @param destination Subject template for the re-published message.
- * @param headersOnly If true, re-publish only headers (no body).
+ * @param source
+ *   Subject filter matching the published subject.
+ * @param destination
+ *   Subject template for the re-published message.
+ * @param headersOnly
+ *   If true, re-publish only headers (no body).
  */
 case class RepublishConfig(
   source: String,
@@ -32,19 +35,32 @@ case class RepublishConfig(
 /**
  * Configuration for a NATS KV bucket.
  *
- * @param name              Unique bucket name.
- * @param description       Optional human-readable description.
- * @param maxValueSize      Maximum size of a single value in bytes (-1 = unlimited).
- * @param maxBucketSize     Maximum total bytes for the bucket (-1 = unlimited).
- * @param maxHistoryPerKey  Maximum revisions to keep per key (-1 = unlimited).
- * @param storageType       File or Memory storage.
- * @param compression       Enable server-side compression.
- * @param numberOfReplicas  Number of server replicas (default: 1).
- * @param ttl               Default TTL for all entries (server must support per-message TTL).
- * @param limitMarkerTtl    TTL applied to delete/purge tombstone markers.
- * @param mirror            Mirror another KV bucket into this one.
- * @param sources           Aggregate entries from other KV buckets.
- * @param republish         Re-publish stored entries to another subject.
+ * @param name
+ *   Unique bucket name.
+ * @param description
+ *   Optional human-readable description.
+ * @param maxValueSize
+ *   Maximum size of a single value in bytes (-1 = unlimited).
+ * @param maxBucketSize
+ *   Maximum total bytes for the bucket (-1 = unlimited).
+ * @param maxHistoryPerKey
+ *   Maximum revisions to keep per key (-1 = unlimited).
+ * @param storageType
+ *   File or Memory storage.
+ * @param compression
+ *   Enable server-side compression.
+ * @param numberOfReplicas
+ *   Number of server replicas (default: 1).
+ * @param ttl
+ *   Default TTL for all entries (server must support per-message TTL).
+ * @param limitMarkerTtl
+ *   TTL applied to delete/purge tombstone markers.
+ * @param mirror
+ *   Mirror another KV bucket into this one.
+ * @param sources
+ *   Aggregate entries from other KV buckets.
+ * @param republish
+ *   Re-publish stored entries to another subject.
  */
 case class KeyValueConfig(
   name: String,
@@ -101,7 +117,9 @@ object KeyValueConfig {
     }
 
     config.republish.foreach { r =>
-      builder.republish(Republish.builder().source(r.source).destination(r.destination).headersOnly(r.headersOnly).build())
+      builder.republish(
+        Republish.builder().source(r.source).destination(r.destination).headersOnly(r.headersOnly).build()
+      )
     }
 
     builder.build()

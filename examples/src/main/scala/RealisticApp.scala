@@ -74,12 +74,12 @@ object RealisticApp extends ZIOAppDefault {
       // Encoding uses the pre-built NatsCodec[Order]; failures surface as
       // NatsError.SerializationError rather than untyped JVM exceptions.
       orders = List(
-        PurchaseOrder("ord-1", "Widget",      2,  1998),
-        PurchaseOrder("ord-2", "Gadget",      1,  4999),
-        PurchaseOrder("ord-3", "Doohickey",   5,  2495),
-        PurchaseOrder("ord-4", "Thingamajig", 1,   899),
-        PurchaseOrder("ord-5", "Gizmo",       3,  3597)
-      )
+                 PurchaseOrder("ord-1", "Widget", 2, 1998),
+                 PurchaseOrder("ord-2", "Gadget", 1, 4999),
+                 PurchaseOrder("ord-3", "Doohickey", 5, 2495),
+                 PurchaseOrder("ord-4", "Thingamajig", 1, 899),
+                 PurchaseOrder("ord-5", "Gizmo", 3, 3597)
+               )
       _ <- ZIO.foreachDiscard(orders)(order => js.publish(Subject("orders.new"), order))
       _ <- Console.printLine("Published 5 orders").orDie
 
@@ -87,23 +87,23 @@ object RealisticApp extends ZIOAppDefault {
       // Each env.value is a decoded PurchaseOrder; env.message carries the ack handle.
       consumer <- js.consumer("ORDERS", "order-processor")
       _        <- consumer
-                    .fetch[PurchaseOrder](FetchOptions(maxMessages = 5, expiresIn = 5.seconds))
-                    .mapZIO { env =>
-                      for {
-                        _     <- Console.printLine(s"Processing: ${env.value.id} — ${env.value.item} x${env.value.quantity}").orDie
-                        _     <- env.message.ack
-                        entry <- kv.get[String]("processed")
-                        count  = entry.map(_.value.toInt).getOrElse(0)
-                        _     <- kv.put("processed", (count + 1).toString)
-                      } yield ()
-                    }
-                    .runDrain
+             .fetch[PurchaseOrder](FetchOptions(maxMessages = 5, expiresIn = 5.seconds))
+             .mapZIO { env =>
+               for {
+                 _     <- Console.printLine(s"Processing: ${env.value.id} — ${env.value.item} x${env.value.quantity}").orDie
+                 _     <- env.message.ack
+                 entry <- kv.get[String]("processed")
+                 count  = entry.map(_.value.toInt).getOrElse(0)
+                 _     <- kv.put("processed", (count + 1).toString)
+               } yield ()
+             }
+             .runDrain
 
       // --- Report final count from KV ---
       finalEntry <- kv.get[String]("processed")
       _          <- Console
-                      .printLine(s"Done. Processed: ${finalEntry.map(_.value).getOrElse("0")} orders")
-                      .orDie
+             .printLine(s"Done. Processed: ${finalEntry.map(_.value).getOrElse("0")} orders")
+             .orDie
     } yield ()
 
   // ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ object RealisticApp extends ZIOAppDefault {
                  .takeUntil(_ == NatsEvent.Closed)
                  .runDrain
                  .fork
-      _     <- program
-      _     <- fiber.interrupt
+      _ <- program
+      _ <- fiber.interrupt
     } yield ()).provide(appLayer).mapError(e => new RuntimeException(e.getMessage))
 }

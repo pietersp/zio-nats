@@ -11,14 +11,16 @@ import zio.nats.{NatsCodec, NatsError}
  * Provides four consumption strategies suited to different use cases:
  *
  *   - [[fetch]] — bounded pull: retrieve up to N messages then complete.
- *   - [[consume]] — unbounded push: messages are delivered continuously until the stream is interrupted.
+ *   - [[consume]] — unbounded push: messages are delivered continuously until
+ *     the stream is interrupted.
  *   - [[iterate]] — long-running pull: polls the server periodically.
  *   - [[next]] — single message with timeout.
  *
- * Each message is decoded into a [[JsEnvelope]] containing the typed value
- * and the raw [[JetStreamMessage]] for acknowledgement operations.
+ * Each message is decoded into a [[JsEnvelope]] containing the typed value and
+ * the raw [[JetStreamMessage]] for acknowledgement operations.
  */
 trait Consumer {
+
   /** The name of the stream this consumer is bound to. */
   def streamName: String
 
@@ -34,7 +36,8 @@ trait Consumer {
   def fetch[A: NatsCodec](options: FetchOptions = FetchOptions.default): ZStream[Any, NatsError, JsEnvelope[A]]
 
   /**
-   * Consume messages indefinitely via server-push, decoding each payload as `A`.
+   * Consume messages indefinitely via server-push, decoding each payload as
+   * `A`.
    *
    * The stream never completes on its own — interrupt it to stop consuming.
    * Uses efficient server-side push delivery with back-pressure handled by
@@ -56,15 +59,15 @@ trait Consumer {
   ): ZStream[Any, NatsError, JsEnvelope[A]]
 
   /**
-   * Retrieve a single message decoded as `A`, waiting up to `timeout`.
-   * Returns None if no message is available within the timeout.
+   * Retrieve a single message decoded as `A`, waiting up to `timeout`. Returns
+   * None if no message is available within the timeout.
    */
   def next[A: NatsCodec](timeout: Duration = 5.seconds): IO[NatsError, Option[JsEnvelope[A]]]
 
   /**
-   * Unpin this consumer from the specified priority group, allowing a
-   * different client to be pinned. Returns true if the server accepted the
-   * request. Requires the consumer to have been created with
+   * Unpin this consumer from the specified priority group, allowing a different
+   * client to be pinned. Returns true if the server accepted the request.
+   * Requires the consumer to have been created with
    * [[zio.nats.PriorityPolicy.PinnedClient]].
    */
   def unpin(group: String): IO[NatsError, Boolean]
@@ -74,14 +77,17 @@ trait Consumer {
  * Consumer handle for an ordered consumer.
  *
  * Ordered consumers guarantee strict in-order delivery and automatically
- * re-create themselves on the server on reconnect or sequence gaps.
- * The underlying consumer name may change between calls; use
+ * re-create themselves on the server on reconnect or sequence gaps. The
+ * underlying consumer name may change between calls; use
  * [[currentConsumerName]] to inspect it.
  */
 trait OrderedConsumer {
   def streamName: String
 
-  /** The current server-side consumer name. Returns None until the first fetch/consume. */
+  /**
+   * The current server-side consumer name. Returns None until the first
+   * fetch/consume.
+   */
   def currentConsumerName: Option[String]
 
   def fetch[A: NatsCodec](options: FetchOptions = FetchOptions.default): ZStream[Any, NatsError, JsEnvelope[A]]
@@ -100,7 +106,9 @@ private[nats] object ConsumerDecode {
   def decodeMsg[A: NatsCodec](msg: JetStreamMessage): IO[NatsError, JsEnvelope[A]] =
     ZIO.fromEither(msg.decode[A]).mapBoth(e => NatsError.DecodingError(e.message, e), JsEnvelope(_, msg))
 
-  def decodeStream[A: NatsCodec](stream: ZStream[Any, NatsError, JetStreamMessage]): ZStream[Any, NatsError, JsEnvelope[A]] =
+  def decodeStream[A: NatsCodec](
+    stream: ZStream[Any, NatsError, JetStreamMessage]
+  ): ZStream[Any, NatsError, JsEnvelope[A]] =
     stream.mapZIO(decodeMsg[A])
 }
 

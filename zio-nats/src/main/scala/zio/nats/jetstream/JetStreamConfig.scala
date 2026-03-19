@@ -26,9 +26,12 @@ import scala.jdk.CollectionConverters.*
 /**
  * Configures a stream to mirror another stream.
  *
- * @param name          The name of the stream to mirror.
- * @param filterSubject Restrict mirroring to messages on this subject.
- * @param external      External stream reference (for cross-account mirroring).
+ * @param name
+ *   The name of the stream to mirror.
+ * @param filterSubject
+ *   Restrict mirroring to messages on this subject.
+ * @param external
+ *   External stream reference (for cross-account mirroring).
  */
 case class MirrorConfig(
   name: String,
@@ -39,9 +42,12 @@ case class MirrorConfig(
 /**
  * Configures an aggregate source stream to pull from.
  *
- * @param name          The source stream name.
- * @param filterSubject Restrict sourcing to messages on this subject.
- * @param external      External stream reference (for cross-account aggregation).
+ * @param name
+ *   The source stream name.
+ * @param filterSubject
+ *   Restrict sourcing to messages on this subject.
+ * @param external
+ *   External stream reference (for cross-account aggregation).
  */
 case class SourceConfig(
   name: String,
@@ -52,8 +58,10 @@ case class SourceConfig(
 /**
  * External API reference for cross-account stream mirroring or sourcing.
  *
- * @param api     The JetStream API prefix subject of the external account.
- * @param deliver The delivery subject prefix used for the external subscription.
+ * @param api
+ *   The JetStream API prefix subject of the external account.
+ * @param deliver
+ *   The delivery subject prefix used for the external subscription.
  */
 case class ExternalConfig(
   api: String,
@@ -70,29 +78,52 @@ case class ExternalConfig(
  * A stream captures messages published to one or more subjects and stores them
  * according to the specified retention, storage, and limit policies.
  *
- * @param name               Unique stream name.
- * @param subjects           Subjects whose messages are captured by this stream.
- * @param description        Optional human-readable description.
- * @param maxBytes           Maximum total bytes stored (-1 = unlimited).
- * @param maxMsgSize         Maximum size of a single message in bytes (-1 = unlimited).
- * @param maxMsgs            Maximum number of messages stored (-1 = unlimited).
- * @param maxMsgsPerSubject  Maximum messages stored per subject (-1 = unlimited).
- * @param maxAge             Maximum age of messages before they are expired.
- * @param duplicateWindow    Window used for duplicate message detection.
- * @param storageType        File or Memory storage.
- * @param discardPolicy      What to do when limits are reached: discard Old (default) or New messages.
- * @param retentionPolicy    Limits (default), Interest-based, or WorkQueue retention.
- * @param compressionOption  Stream-level compression (default: None).
- * @param numberOfReplicas   Number of server replicas (default: 1).
- * @param mirror             Mirror another stream into this one.
- * @param sources            Aggregate messages from other streams.
- * @param allowRollupHeaders Allow subject-level rollup via message headers.
- * @param denyDelete         Prevent message deletion via admin API.
- * @param denyPurge          Prevent stream purging via admin API.
- * @param allowDirect        Allow direct-get (bypass consumer) for recent messages.
- * @param mirrorDirect       Allow direct-get on mirrored streams.
- * @param isSealed           Make the stream read-only (no new messages accepted).
- * @param firstSequence      Override the starting sequence number.
+ * @param name
+ *   Unique stream name.
+ * @param subjects
+ *   Subjects whose messages are captured by this stream.
+ * @param description
+ *   Optional human-readable description.
+ * @param maxBytes
+ *   Maximum total bytes stored (-1 = unlimited).
+ * @param maxMsgSize
+ *   Maximum size of a single message in bytes (-1 = unlimited).
+ * @param maxMsgs
+ *   Maximum number of messages stored (-1 = unlimited).
+ * @param maxMsgsPerSubject
+ *   Maximum messages stored per subject (-1 = unlimited).
+ * @param maxAge
+ *   Maximum age of messages before they are expired.
+ * @param duplicateWindow
+ *   Window used for duplicate message detection.
+ * @param storageType
+ *   File or Memory storage.
+ * @param discardPolicy
+ *   What to do when limits are reached: discard Old (default) or New messages.
+ * @param retentionPolicy
+ *   Limits (default), Interest-based, or WorkQueue retention.
+ * @param compressionOption
+ *   Stream-level compression (default: None).
+ * @param numberOfReplicas
+ *   Number of server replicas (default: 1).
+ * @param mirror
+ *   Mirror another stream into this one.
+ * @param sources
+ *   Aggregate messages from other streams.
+ * @param allowRollupHeaders
+ *   Allow subject-level rollup via message headers.
+ * @param denyDelete
+ *   Prevent message deletion via admin API.
+ * @param denyPurge
+ *   Prevent stream purging via admin API.
+ * @param allowDirect
+ *   Allow direct-get (bypass consumer) for recent messages.
+ * @param mirrorDirect
+ *   Allow direct-get on mirrored streams.
+ * @param isSealed
+ *   Make the stream read-only (no new messages accepted).
+ * @param firstSequence
+ *   Override the starting sequence number.
  */
 case class StreamConfig(
   name: String,
@@ -184,33 +215,60 @@ object StreamConfig {
  * A consumer is a server-side cursor into a stream. Durable consumers persist
  * across reconnects; ephemeral consumers are cleaned up automatically.
  *
- * @param durableName              Name for a durable consumer (omit for ephemeral).
- * @param deliverSubject           Subject to push messages to (push-based consumers only).
- * @param deliverGroup             Queue group for push-based load balancing.
- * @param description              Optional human-readable description.
- * @param filterSubject            Filter messages by subject.
- * @param filterSubjects           Filter messages by multiple subjects.
- * @param deliverPolicy            Where to start delivering: All, Last, New, ByStartSequence, etc.
- * @param startSeq                 Starting sequence (used with DeliverPolicy.ByStartSequence).
- * @param startTime                Starting time (used with DeliverPolicy.ByStartTime).
- * @param ackPolicy                How messages must be acknowledged: Explicit (default), All, or None.
- * @param ackWait                  Time the server waits for an ack before redelivering (default: 30s).
- * @param maxDeliver               Maximum redelivery attempts (-1 = unlimited).
- * @param maxAckPending            Maximum outstanding unacknowledged messages (-1 = unlimited).
- * @param idleHeartbeat            Interval for server heartbeat on idle push consumers.
- * @param replayPolicy             Instant (default) or Original (replays at original publish rate).
- * @param rateLimit                Maximum message delivery rate in bits/sec (-1 = unlimited).
- * @param sampleFrequency          Sampling percentage for consumer metrics (e.g. "100%").
- * @param maxPullWaiting           Maximum waiting pull requests (-1 = unlimited).
- * @param maxBatch                 Maximum messages per pull batch (-1 = unlimited).
- * @param maxExpires               Maximum expiry for a pull request.
- * @param maxBytes                 Maximum bytes per pull batch (-1 = unlimited).
- * @param headersOnly              Deliver only headers, omit message bodies.
- * @param backoff                  Redelivery backoff schedule (list of delays between attempts).
- * @param metadata                 Arbitrary key-value metadata stored with the consumer.
- * @param pauseUntil               Create the consumer in a paused state until this time.
- * @param priorityPolicy           Priority delivery policy (None, Overflow, Prioritized, PinnedClient).
- * @param priorityGroups           Priority group names for PinnedClient policy.
+ * @param durableName
+ *   Name for a durable consumer (omit for ephemeral).
+ * @param deliverSubject
+ *   Subject to push messages to (push-based consumers only).
+ * @param deliverGroup
+ *   Queue group for push-based load balancing.
+ * @param description
+ *   Optional human-readable description.
+ * @param filterSubject
+ *   Filter messages by subject.
+ * @param filterSubjects
+ *   Filter messages by multiple subjects.
+ * @param deliverPolicy
+ *   Where to start delivering: All, Last, New, ByStartSequence, etc.
+ * @param startSeq
+ *   Starting sequence (used with DeliverPolicy.ByStartSequence).
+ * @param startTime
+ *   Starting time (used with DeliverPolicy.ByStartTime).
+ * @param ackPolicy
+ *   How messages must be acknowledged: Explicit (default), All, or None.
+ * @param ackWait
+ *   Time the server waits for an ack before redelivering (default: 30s).
+ * @param maxDeliver
+ *   Maximum redelivery attempts (-1 = unlimited).
+ * @param maxAckPending
+ *   Maximum outstanding unacknowledged messages (-1 = unlimited).
+ * @param idleHeartbeat
+ *   Interval for server heartbeat on idle push consumers.
+ * @param replayPolicy
+ *   Instant (default) or Original (replays at original publish rate).
+ * @param rateLimit
+ *   Maximum message delivery rate in bits/sec (-1 = unlimited).
+ * @param sampleFrequency
+ *   Sampling percentage for consumer metrics (e.g. "100%").
+ * @param maxPullWaiting
+ *   Maximum waiting pull requests (-1 = unlimited).
+ * @param maxBatch
+ *   Maximum messages per pull batch (-1 = unlimited).
+ * @param maxExpires
+ *   Maximum expiry for a pull request.
+ * @param maxBytes
+ *   Maximum bytes per pull batch (-1 = unlimited).
+ * @param headersOnly
+ *   Deliver only headers, omit message bodies.
+ * @param backoff
+ *   Redelivery backoff schedule (list of delays between attempts).
+ * @param metadata
+ *   Arbitrary key-value metadata stored with the consumer.
+ * @param pauseUntil
+ *   Create the consumer in a paused state until this time.
+ * @param priorityPolicy
+ *   Priority delivery policy (None, Overflow, Prioritized, PinnedClient).
+ * @param priorityGroups
+ *   Priority group names for PinnedClient policy.
  */
 case class ConsumerConfig(
   durableName: Option[String] = None,
@@ -292,16 +350,24 @@ object ConsumerConfig {
 /**
  * Configuration for an ordered consumer.
  *
- * Ordered consumers automatically re-create themselves on the server on reconnect or
- * sequence gaps, ensuring strict in-order delivery without manual ack.
+ * Ordered consumers automatically re-create themselves on the server on
+ * reconnect or sequence gaps, ensuring strict in-order delivery without manual
+ * ack.
  *
- * @param filterSubjects      Subjects to filter on (default: all subjects in the stream).
- * @param deliverPolicy       Where to start delivering (default: last per subject).
- * @param startSequence       Starting stream sequence (used with DeliverPolicy.ByStartSequence).
- * @param startTime           Starting time (used with DeliverPolicy.ByStartTime).
- * @param replayPolicy        Replay policy (default: Instant).
- * @param headersOnly         Deliver only headers, skip message bodies.
- * @param consumerNamePrefix  Prefix for the auto-generated consumer name.
+ * @param filterSubjects
+ *   Subjects to filter on (default: all subjects in the stream).
+ * @param deliverPolicy
+ *   Where to start delivering (default: last per subject).
+ * @param startSequence
+ *   Starting stream sequence (used with DeliverPolicy.ByStartSequence).
+ * @param startTime
+ *   Starting time (used with DeliverPolicy.ByStartTime).
+ * @param replayPolicy
+ *   Replay policy (default: Instant).
+ * @param headersOnly
+ *   Deliver only headers, skip message bodies.
+ * @param consumerNamePrefix
+ *   Prefix for the auto-generated consumer name.
  */
 case class OrderedConsumerConfig(
   filterSubjects: List[String] = Nil,

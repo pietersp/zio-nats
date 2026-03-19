@@ -70,9 +70,9 @@ package object nats {
   }
 
   object PriorityPolicy {
-    val None: PriorityPolicy        = io.nats.client.api.PriorityPolicy.None
-    val Overflow: PriorityPolicy    = io.nats.client.api.PriorityPolicy.Overflow
-    val Prioritized: PriorityPolicy = io.nats.client.api.PriorityPolicy.Prioritized
+    val None: PriorityPolicy         = io.nats.client.api.PriorityPolicy.None
+    val Overflow: PriorityPolicy     = io.nats.client.api.PriorityPolicy.Overflow
+    val Prioritized: PriorityPolicy  = io.nats.client.api.PriorityPolicy.Prioritized
     val PinnedClient: PriorityPolicy = io.nats.client.api.PriorityPolicy.PinnedClient
   }
 
@@ -88,8 +88,7 @@ package object nats {
    * Nats.request[Query, Response](subject, query).payload  // ZIO[Nats, NatsError, Response]
    * }}}
    */
-  extension [R, E, A](zio: ZIO[R, E, Envelope[A]])
-    def payload: ZIO[R, E, A] = zio.map(_.value)
+  extension [R, E, A](zio: ZIO[R, E, Envelope[A]]) def payload: ZIO[R, E, A] = zio.map(_.value)
 
   /**
    * Strips the [[Envelope]] wrapper from every element of a ZStream, emitting
@@ -99,8 +98,7 @@ package object nats {
    * Nats.subscribe[Event](subject).payload  // ZStream[Nats, NatsError, Event]
    * }}}
    */
-  extension [R, E, A](stream: ZStream[R, E, Envelope[A]])
-    def payload: ZStream[R, E, A] = stream.map(_.value)
+  extension [R, E, A](stream: ZStream[R, E, Envelope[A]]) def payload: ZStream[R, E, A] = stream.map(_.value)
 
   /**
    * Strips the [[ObjectData]] wrapper from a ZIO effect, returning only the
@@ -118,53 +116,57 @@ package object nats {
   type NatsConfig = config.NatsConfig; val NatsConfig = config.NatsConfig
 
   // --- JetStream config re-exports ---
-  type StreamConfig          = jetstream.StreamConfig;          val StreamConfig          = jetstream.StreamConfig
-  type ConsumerConfig        = jetstream.ConsumerConfig;        val ConsumerConfig        = jetstream.ConsumerConfig
-  type OrderedConsumerConfig = jetstream.OrderedConsumerConfig; val OrderedConsumerConfig = jetstream.OrderedConsumerConfig
-  type MirrorConfig          = jetstream.MirrorConfig;          val MirrorConfig          = jetstream.MirrorConfig
-  type SourceConfig          = jetstream.SourceConfig;          val SourceConfig          = jetstream.SourceConfig
-  type ExternalConfig        = jetstream.ExternalConfig;        val ExternalConfig        = jetstream.ExternalConfig
+  type StreamConfig          = jetstream.StreamConfig; val StreamConfig     = jetstream.StreamConfig
+  type ConsumerConfig        = jetstream.ConsumerConfig; val ConsumerConfig = jetstream.ConsumerConfig
+  type OrderedConsumerConfig = jetstream.OrderedConsumerConfig;
+  val OrderedConsumerConfig = jetstream.OrderedConsumerConfig
+  type MirrorConfig   = jetstream.MirrorConfig; val MirrorConfig     = jetstream.MirrorConfig
+  type SourceConfig   = jetstream.SourceConfig; val SourceConfig     = jetstream.SourceConfig
+  type ExternalConfig = jetstream.ExternalConfig; val ExternalConfig = jetstream.ExternalConfig
   // --- KV config re-exports ---
-  type KeyValueConfig  = kv.KeyValueConfig;  val KeyValueConfig  = kv.KeyValueConfig
+  type KeyValueConfig  = kv.KeyValueConfig; val KeyValueConfig   = kv.KeyValueConfig
   type RepublishConfig = kv.RepublishConfig; val RepublishConfig = kv.RepublishConfig
   // --- ObjectStore config re-exports ---
   type ObjectStoreConfig = objectstore.ObjectStoreConfig; val ObjectStoreConfig = objectstore.ObjectStoreConfig
 
   // ---- JetStream re-exports (users don't need zio.nats.jetstream._) ----
-  type JetStream           = jetstream.JetStream;           val JetStream           = jetstream.JetStream
+  type JetStream           = jetstream.JetStream; val JetStream                     = jetstream.JetStream
   type JetStreamManagement = jetstream.JetStreamManagement; val JetStreamManagement = jetstream.JetStreamManagement
   type Consumer            = jetstream.Consumer
   type OrderedConsumer     = jetstream.OrderedConsumer
   type JetStreamMessage    = jetstream.JetStreamMessage
-  type JsEnvelope[A]       = jetstream.JsEnvelope[A];       val JsEnvelope          = jetstream.JsEnvelope
-  type PublishAck          = jetstream.PublishAck;           val PublishAck          = jetstream.PublishAck
-  type PublishOptions      = jetstream.PublishOptions;       val PublishOptions      = jetstream.PublishOptions
-  type JsPublishParams     = jetstream.JsPublishParams;      val JsPublishParams     = jetstream.JsPublishParams
-  type FetchOptions        = jetstream.FetchOptions;         val FetchOptions        = jetstream.FetchOptions
-  type ConsumeOptions      = jetstream.ConsumeOptions;       val ConsumeOptions      = jetstream.ConsumeOptions
-  type StreamSummary       = jetstream.StreamSummary;        val StreamSummary       = jetstream.StreamSummary
-  type ConsumerSummary     = jetstream.ConsumerSummary;      val ConsumerSummary     = jetstream.ConsumerSummary
-  type PurgeSummary        = jetstream.PurgeSummary;         val PurgeSummary        = jetstream.PurgeSummary
-  type ConsumerPauseInfo   = jetstream.ConsumerPauseInfo;    val ConsumerPauseInfo   = jetstream.ConsumerPauseInfo
+  type JsEnvelope[A]       = jetstream.JsEnvelope[A]; val JsEnvelope                = jetstream.JsEnvelope
+  type PublishAck          = jetstream.PublishAck; val PublishAck                   = jetstream.PublishAck
+  type PublishOptions      = jetstream.PublishOptions; val PublishOptions           = jetstream.PublishOptions
+  type JsPublishParams     = jetstream.JsPublishParams; val JsPublishParams         = jetstream.JsPublishParams
+  type FetchOptions        = jetstream.FetchOptions; val FetchOptions               = jetstream.FetchOptions
+  type ConsumeOptions      = jetstream.ConsumeOptions; val ConsumeOptions           = jetstream.ConsumeOptions
+  type StreamSummary       = jetstream.StreamSummary; val StreamSummary             = jetstream.StreamSummary
+  type ConsumerSummary     = jetstream.ConsumerSummary; val ConsumerSummary         = jetstream.ConsumerSummary
+  type PurgeSummary        = jetstream.PurgeSummary; val PurgeSummary               = jetstream.PurgeSummary
+  type ConsumerPauseInfo   = jetstream.ConsumerPauseInfo; val ConsumerPauseInfo     = jetstream.ConsumerPauseInfo
   type MessageInfo         = jetstream.MessageInfo
   type AccountStatistics   = jetstream.AccountStatistics
 
   // ---- Key-Value re-exports (users don't need zio.nats.kv._) ----
-  type KeyValue             = kv.KeyValue;             val KeyValue             = kv.KeyValue
-  type KeyValueManagement   = kv.KeyValueManagement;   val KeyValueManagement   = kv.KeyValueManagement
-  type KeyValueEntry        = kv.KeyValueEntry;        val KeyValueEntry        = kv.KeyValueEntry
-  type KvEnvelope[A]        = kv.KvEnvelope[A];        val KvEnvelope           = kv.KvEnvelope
-  type KvEvent[A]           = kv.KvEvent[A];           val KvEvent              = kv.KvEvent
-  type KeyValueOperation    = kv.KeyValueOperation;    val KeyValueOperation    = kv.KeyValueOperation
+  type KeyValue             = kv.KeyValue; val KeyValue                         = kv.KeyValue
+  type KeyValueManagement   = kv.KeyValueManagement; val KeyValueManagement     = kv.KeyValueManagement
+  type KeyValueEntry        = kv.KeyValueEntry; val KeyValueEntry               = kv.KeyValueEntry
+  type KvEnvelope[A]        = kv.KvEnvelope[A]; val KvEnvelope                  = kv.KvEnvelope
+  type KvEvent[A]           = kv.KvEvent[A]; val KvEvent                        = kv.KvEvent
+  type KeyValueOperation    = kv.KeyValueOperation; val KeyValueOperation       = kv.KeyValueOperation
   type KeyValueWatchOptions = kv.KeyValueWatchOptions; val KeyValueWatchOptions = kv.KeyValueWatchOptions
   type KeyValueBucketStatus = kv.KeyValueBucketStatus; val KeyValueBucketStatus = kv.KeyValueBucketStatus
 
   // ---- Object Store re-exports (users don't need zio.nats.objectstore._) ----
-  type ObjectStore             = objectstore.ObjectStore;             val ObjectStore             = objectstore.ObjectStore
-  type ObjectStoreManagement   = objectstore.ObjectStoreManagement;   val ObjectStoreManagement   = objectstore.ObjectStoreManagement
-  type ObjectData[A]           = objectstore.ObjectData[A];           val ObjectData              = objectstore.ObjectData
-  type ObjectSummary           = objectstore.ObjectSummary;           val ObjectSummary           = objectstore.ObjectSummary
-  type ObjectMeta              = objectstore.ObjectMeta;              val ObjectMeta              = objectstore.ObjectMeta
-  type ObjectStoreBucketStatus = objectstore.ObjectStoreBucketStatus; val ObjectStoreBucketStatus = objectstore.ObjectStoreBucketStatus
-  type ObjectStoreWatchOptions = objectstore.ObjectStoreWatchOptions; val ObjectStoreWatchOptions = objectstore.ObjectStoreWatchOptions
+  type ObjectStore           = objectstore.ObjectStore; val ObjectStore = objectstore.ObjectStore
+  type ObjectStoreManagement = objectstore.ObjectStoreManagement;
+  val ObjectStoreManagement = objectstore.ObjectStoreManagement
+  type ObjectData[A]           = objectstore.ObjectData[A]; val ObjectData    = objectstore.ObjectData
+  type ObjectSummary           = objectstore.ObjectSummary; val ObjectSummary = objectstore.ObjectSummary
+  type ObjectMeta              = objectstore.ObjectMeta; val ObjectMeta       = objectstore.ObjectMeta
+  type ObjectStoreBucketStatus = objectstore.ObjectStoreBucketStatus;
+  val ObjectStoreBucketStatus = objectstore.ObjectStoreBucketStatus
+  type ObjectStoreWatchOptions = objectstore.ObjectStoreWatchOptions;
+  val ObjectStoreWatchOptions = objectstore.ObjectStoreWatchOptions
 }

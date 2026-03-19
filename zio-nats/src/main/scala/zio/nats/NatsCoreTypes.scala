@@ -162,8 +162,9 @@ object PublishParams {
 /**
  * Storage backend for JetStream streams, KV buckets, and Object Store buckets.
  *
- *   - `File`   — persisted to disk (survives server restarts).
- *   - `Memory` — stored in RAM only (lost on server restart; higher throughput).
+ *   - `File` — persisted to disk (survives server restarts).
+ *   - `Memory` — stored in RAM only (lost on server restart; higher
+ *     throughput).
  */
 enum StorageType {
   case File, Memory

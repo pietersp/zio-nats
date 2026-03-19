@@ -14,13 +14,14 @@ import scala.annotation.tailrec
  *
  * Dispatches on BinaryFormat (ByteBuffer) vs TextFormat (CharBuffer) — the two
  * concrete subtypes of the sealed Format trait — and handles buffer allocation
- * transparently. Users never see this object; they interact with [[zio.nats.NatsCodec]].
+ * transparently. Users never see this object; they interact with
+ * [[zio.nats.NatsCodec]].
  *
  * The casts to BinaryCodec/TextCodec are safe: BinaryFormat[TC] constrains
  * TC[A] <: BinaryCodec[A], and TextFormat[TC] constrains TC[A] <: TextCodec[A].
  *
- * Use [[makeFor]] to build a [[CompiledCodec]] that pre-derives the format codec
- * once; the per-call encode/decode paths never re-derive.
+ * Use [[makeFor]] to build a [[CompiledCodec]] that pre-derives the format
+ * codec once; the per-call encode/decode paths never re-derive.
  */
 private[nats] object NatsSerializer {
 
@@ -32,10 +33,12 @@ private[nats] object NatsSerializer {
    * A pre-compiled, stateful codec for type `A`.
    *
    * Obtained via [[makeFor]], which derives the underlying format codec once at
-   * construction. Any incompatibility between the format and the schema surfaces
-   * as an exception thrown by [[makeFor]], not from [[encode]] or [[decode]].
+   * construction. Any incompatibility between the format and the schema
+   * surfaces as an exception thrown by [[makeFor]], not from [[encode]] or
+   * [[decode]].
    *
-   * @tparam A the type this codec can encode and decode.
+   * @tparam A
+   *   the type this codec can encode and decode.
    */
   sealed trait CompiledCodec[A] {
 
@@ -51,7 +54,8 @@ private[nats] object NatsSerializer {
     /**
      * Decode bytes to a value.
      *
-     * @return Right(value) on success, Left([[NatsDecodeError]]) on failure.
+     * @return
+     *   Right(value) on success, Left([[NatsDecodeError]]) on failure.
      */
     def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, A]
   }
@@ -64,8 +68,9 @@ private[nats] object NatsSerializer {
    * method throws — failing fast at codec construction time rather than
    * silently at the first `encode` / `decode` call.
    *
-   * @throws RuntimeException (or format-specific exception) if the schema is
-   *   incompatible with the format.
+   * @throws RuntimeException
+   *   (or format-specific exception) if the schema is incompatible with the
+   *   format.
    */
   def makeFor[A: Schema](format: Format): CompiledCodec[A] = format match {
     case bf: BinaryFormat[_] =>
@@ -81,7 +86,7 @@ private[nats] object NatsSerializer {
   // ---------------------------------------------------------------------------
 
   private final class BinaryCompiledCodec[A](codec: BinaryCodec[A]) extends CompiledCodec[A] {
-    def encode(value: A): Chunk[Byte] = Chunk.fromArray(encodeBinary(codec, value))
+    def encode(value: A): Chunk[Byte]                          = Chunk.fromArray(encodeBinary(codec, value))
     def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, A] =
       codec
         .decode(ByteBuffer.wrap(bytes.toArray))
@@ -90,7 +95,7 @@ private[nats] object NatsSerializer {
   }
 
   private final class TextCompiledCodec[A](codec: TextCodec[A]) extends CompiledCodec[A] {
-    def encode(value: A): Chunk[Byte] = Chunk.fromArray(encodeText(codec, value))
+    def encode(value: A): Chunk[Byte]                          = Chunk.fromArray(encodeText(codec, value))
     def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, A] =
       codec
         .decode(UTF_8.decode(ByteBuffer.wrap(bytes.toArray)))

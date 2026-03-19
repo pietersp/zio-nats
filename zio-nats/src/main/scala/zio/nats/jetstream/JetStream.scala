@@ -11,8 +11,9 @@ import zio.nats.{Nats, NatsCodec, NatsError, NatsMessage, Subject}
  * this service are stored in server-side streams and can be replayed,
  * acknowledged, and consumed by durable consumers.
  *
- * Obtain an instance via [[JetStream.live]] (requires a [[zio.nats.Nats]] connection
- * in scope). Use [[JetStreamManagement]] for stream and consumer administration.
+ * Obtain an instance via [[JetStream.live]] (requires a [[zio.nats.Nats]]
+ * connection in scope). Use [[JetStreamManagement]] for stream and consumer
+ * administration.
  *
  * ==Example==
  * {{{
@@ -33,17 +34,26 @@ trait JetStream {
    * @param params
    *   Optional [[JsPublishParams]] (defaults to [[JsPublishParams.empty]]).
    */
-  def publish[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams = JsPublishParams.empty): IO[NatsError, PublishAck]
+  def publish[T: NatsCodec](
+    subject: Subject,
+    data: T,
+    params: JsPublishParams = JsPublishParams.empty
+  ): IO[NatsError, PublishAck]
 
   /**
-   * Encode `data` and publish asynchronously (returns a Task resolving to the ack).
+   * Encode `data` and publish asynchronously (returns a Task resolving to the
+   * ack).
    *
    * Pass `Chunk[Byte]` to use the identity codec (raw bytes).
    *
    * @param params
    *   Optional [[JsPublishParams]] (defaults to [[JsPublishParams.empty]]).
    */
-  def publishAsync[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams = JsPublishParams.empty): IO[NatsError, Task[PublishAck]]
+  def publishAsync[T: NatsCodec](
+    subject: Subject,
+    data: T,
+    params: JsPublishParams = JsPublishParams.empty
+  ): IO[NatsError, Task[PublishAck]]
 
   /** Get a [[Consumer]] handle for a named durable consumer. */
   def consumer(streamName: String, consumerName: String): IO[NatsError, Consumer]
@@ -71,7 +81,10 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
   override def publish[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): IO[NatsError, PublishAck] =
     ZIO
       .attempt(NatsCodec[T].encode(data))
-      .mapError(e => NatsError.SerializationError(s"Failed to encode JetStream message for subject '${subject.value}': ${e.toString}", e))
+      .mapError(e =>
+        NatsError
+          .SerializationError(s"Failed to encode JetStream message for subject '${subject.value}': ${e.toString}", e)
+      )
       .flatMap { bytes =>
         (params.headers.nonEmpty, params.options) match {
           case (false, None) =>
@@ -95,10 +108,19 @@ private[nats] final class JetStreamLive(js: JJetStream) extends JetStream {
         }
       }
 
-  override def publishAsync[T: NatsCodec](subject: Subject, data: T, params: JsPublishParams): IO[NatsError, Task[PublishAck]] =
+  override def publishAsync[T: NatsCodec](
+    subject: Subject,
+    data: T,
+    params: JsPublishParams
+  ): IO[NatsError, Task[PublishAck]] =
     ZIO
       .attempt(NatsCodec[T].encode(data))
-      .mapError(e => NatsError.SerializationError(s"Failed to encode async JetStream message for subject '${subject.value}': ${e.toString}", e))
+      .mapError(e =>
+        NatsError.SerializationError(
+          s"Failed to encode async JetStream message for subject '${subject.value}': ${e.toString}",
+          e
+        )
+      )
       .flatMap { bytes =>
         ZIO.attempt {
           val future = params.options match {

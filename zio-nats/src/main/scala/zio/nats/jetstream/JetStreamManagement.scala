@@ -13,8 +13,9 @@ import scala.jdk.CollectionConverters.*
  * Provides CRUD operations for streams and consumers, as well as stream
  * purging, message-level access, consumer pause/resume, and account statistics.
  *
- * Obtain an instance via [[JetStreamManagement.live]] (requires [[zio.nats.Nats]] in scope).
- * For publishing and consuming messages see [[JetStream]] and [[Consumer]].
+ * Obtain an instance via [[JetStreamManagement.live]] (requires
+ * [[zio.nats.Nats]] in scope). For publishing and consuming messages see
+ * [[JetStream]] and [[Consumer]].
  */
 trait JetStreamManagement {
 
@@ -69,12 +70,18 @@ trait JetStreamManagement {
   // --- Consumer pause / resume ---
 
   /**
-   * Pause a consumer until a specified point in time.
-   * Paused consumers do not deliver messages until `pauseUntil` is reached.
+   * Pause a consumer until a specified point in time. Paused consumers do not
+   * deliver messages until `pauseUntil` is reached.
    */
-  def pauseConsumer(streamName: String, consumerName: String, pauseUntil: java.time.ZonedDateTime): IO[NatsError, ConsumerPauseInfo]
+  def pauseConsumer(
+    streamName: String,
+    consumerName: String,
+    pauseUntil: java.time.ZonedDateTime
+  ): IO[NatsError, ConsumerPauseInfo]
 
-  /** Resume a previously paused consumer immediately. Returns true on success. */
+  /**
+   * Resume a previously paused consumer immediately. Returns true on success.
+   */
   def resumeConsumer(streamName: String, consumerName: String): IO[NatsError, Boolean]
 
   // --- Message access ---
@@ -90,7 +97,10 @@ trait JetStreamManagement {
 
   // --- Account info ---
 
-  /** Retrieve account-level JetStream statistics (storage, memory, stream counts, etc.). */
+  /**
+   * Retrieve account-level JetStream statistics (storage, memory, stream
+   * counts, etc.).
+   */
   def getAccountStatistics: IO[NatsError, AccountStatistics]
 }
 

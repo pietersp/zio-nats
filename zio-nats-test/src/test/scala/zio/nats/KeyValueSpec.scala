@@ -100,7 +100,7 @@ object KeyValueSpec extends ZIOSpecDefault {
         status <- kvm.create(
                     KeyValueConfig(name = "kv-ttl-bucket", storageType = StorageType.Memory, ttl = Some(10.seconds))
                   )
-        _      <- kvm.delete("kv-ttl-bucket")
+        _ <- kvm.delete("kv-ttl-bucket")
       } yield assertTrue(status.ttl.exists(_ == 10.seconds))
     },
 
@@ -108,13 +108,13 @@ object KeyValueSpec extends ZIOSpecDefault {
       for {
         kvm <- ZIO.service[KeyValueManagement]
         _   <- kvm.create(
-                 KeyValueConfig(
-                   name = "kv-entry-ttl",
-                   storageType = StorageType.Memory,
-                   ttl = Some(60.seconds),
-                   limitMarkerTtl = Some(10.seconds)
-                 )
+               KeyValueConfig(
+                 name = "kv-entry-ttl",
+                 storageType = StorageType.Memory,
+                 ttl = Some(60.seconds),
+                 limitMarkerTtl = Some(10.seconds)
                )
+             )
         kv  <- KeyValue.bucket("kv-entry-ttl")
         rev <- kv.create("ttl-key", "hello", Some(5.seconds))
         e   <- kv.get[String]("ttl-key")
@@ -124,9 +124,9 @@ object KeyValueSpec extends ZIOSpecDefault {
 
     test("watch delivers delete events and ignoreDeletes suppresses them") {
       for {
-        kvm    <- ZIO.service[KeyValueManagement]
-        _      <- kvm.create(KeyValueConfig(name = "kv-watch-del", storageType = StorageType.Memory))
-        kv     <- KeyValue.bucket("kv-watch-del")
+        kvm <- ZIO.service[KeyValueManagement]
+        _   <- kvm.create(KeyValueConfig(name = "kv-watch-del", storageType = StorageType.Memory))
+        kv  <- KeyValue.bucket("kv-watch-del")
         // Without ignoreDeletes: both Put and Delete are emitted
         allRef <- Ref.make(List.empty[KvEvent[String]])
         fiber1 <- kv
@@ -134,13 +134,13 @@ object KeyValueSpec extends ZIOSpecDefault {
                     .tap(e => allRef.update(_ :+ e))
                     .runDrain
                     .fork
-        _      <- ZIO.sleep(300.millis)
-        _      <- kv.put("d", "v1")
-        _      <- ZIO.sleep(300.millis)
-        _      <- kv.delete("d")
-        _      <- ZIO.sleep(300.millis)
-        _      <- fiber1.interrupt
-        all    <- allRef.get
+        _   <- ZIO.sleep(300.millis)
+        _   <- kv.put("d", "v1")
+        _   <- ZIO.sleep(300.millis)
+        _   <- kv.delete("d")
+        _   <- ZIO.sleep(300.millis)
+        _   <- fiber1.interrupt
+        all <- allRef.get
         // With ignoreDeletes: only Put is emitted
         putRef <- Ref.make(List.empty[KvEvent[String]])
         _      <- kv.put("d", "v2")
@@ -149,14 +149,14 @@ object KeyValueSpec extends ZIOSpecDefault {
                     .tap(e => putRef.update(_ :+ e))
                     .runDrain
                     .fork
-        _      <- ZIO.sleep(300.millis)
-        _      <- kv.put("d", "v3")
-        _      <- ZIO.sleep(300.millis)
-        _      <- kv.delete("d")
-        _      <- ZIO.sleep(300.millis)
-        _      <- fiber2.interrupt
-        puts   <- putRef.get
-        _      <- kvm.delete("kv-watch-del")
+        _    <- ZIO.sleep(300.millis)
+        _    <- kv.put("d", "v3")
+        _    <- ZIO.sleep(300.millis)
+        _    <- kv.delete("d")
+        _    <- ZIO.sleep(300.millis)
+        _    <- fiber2.interrupt
+        puts <- putRef.get
+        _    <- kvm.delete("kv-watch-del")
       } yield assertTrue(
         all.exists { case KvEvent.Put(env) => env.value == "v1"; case _ => false },
         all.exists { case KvEvent.Delete(_) => true; case _ => false },
@@ -167,10 +167,10 @@ object KeyValueSpec extends ZIOSpecDefault {
 
     test("watch fromRevision replays from a specific point") {
       for {
-        kvm  <- ZIO.service[KeyValueManagement]
-        _    <- kvm.create(
-                  KeyValueConfig(name = "kv-watch-rev", storageType = StorageType.Memory, maxHistoryPerKey = 10)
-                )
+        kvm <- ZIO.service[KeyValueManagement]
+        _   <- kvm.create(
+               KeyValueConfig(name = "kv-watch-rev", storageType = StorageType.Memory, maxHistoryPerKey = 10)
+             )
         kv   <- KeyValue.bucket("kv-watch-rev")
         rev1 <- kv.put("r", "v1")
         _    <- kv.put("r", "v2")
@@ -182,7 +182,7 @@ object KeyValueSpec extends ZIOSpecDefault {
                      .runCollect
                      .timeout(5.seconds)
                      .map(_.getOrElse(Chunk.empty))
-        _       <- kvm.delete("kv-watch-rev")
+        _ <- kvm.delete("kv-watch-rev")
       } yield assertTrue(
         entries.size == 2,
         entries.collect { case KvEvent.Put(env) => env.value }.toList == List("v2", "v3")
@@ -196,28 +196,28 @@ object KeyValueSpec extends ZIOSpecDefault {
         kv       <- KeyValue.bucket("kv-watch-multi")
         received <- Ref.make(List.empty[String])
         fiber    <- kv
-                      .watch[String](List("x", "y"), KeyValueWatchOptions(updatesOnly = true))
-                      .tap(e => received.update(e.key :: _))
-                      .take(2)
-                      .runDrain
-                      .fork
-        _        <- ZIO.sleep(300.millis)
-        _        <- kv.put("x", "1")
-        _        <- kv.put("y", "2")
-        _        <- fiber.join.timeout(5.seconds)
-        keys     <- received.get
-        _        <- kvm.delete("kv-watch-multi")
+                   .watch[String](List("x", "y"), KeyValueWatchOptions(updatesOnly = true))
+                   .tap(e => received.update(e.key :: _))
+                   .take(2)
+                   .runDrain
+                   .fork
+        _    <- ZIO.sleep(300.millis)
+        _    <- kv.put("x", "1")
+        _    <- kv.put("y", "2")
+        _    <- fiber.join.timeout(5.seconds)
+        keys <- received.get
+        _    <- kvm.delete("kv-watch-multi")
       } yield assertTrue(keys.toSet == Set("x", "y"))
     },
 
     test("purgeDeletes removes tombstone entries") {
       for {
-        kvm <- ZIO.service[KeyValueManagement]
-        _   <- kvm.create(KeyValueConfig(name = "kv-purgdel", storageType = StorageType.Memory, maxHistoryPerKey = 5))
-        kv  <- KeyValue.bucket("kv-purgdel")
-        _   <- kv.put("pd", "v1")
-        _   <- kv.delete("pd")
-        _   <- kv.purgeDeletes(Some(-1.millis)) // negative = remove ALL markers regardless of age
+        kvm  <- ZIO.service[KeyValueManagement]
+        _    <- kvm.create(KeyValueConfig(name = "kv-purgdel", storageType = StorageType.Memory, maxHistoryPerKey = 5))
+        kv   <- KeyValue.bucket("kv-purgdel")
+        _    <- kv.put("pd", "v1")
+        _    <- kv.delete("pd")
+        _    <- kv.purgeDeletes(Some(-1.millis)) // negative = remove ALL markers regardless of age
         hist <- kv.history[String]("pd")
         _    <- kvm.delete("kv-purgdel")
       } yield assertTrue(
@@ -279,12 +279,12 @@ object KeyValueSpec extends ZIOSpecDefault {
 
     test("purge with expectedRevision guards against concurrent writes") {
       for {
-        kvm  <- ZIO.service[KeyValueManagement]
-        _    <- kvm.create(KeyValueConfig(name = "kv-purge-rev", storageType = StorageType.Memory))
-        kv   <- KeyValue.bucket("kv-purge-rev")
-        rev  <- kv.put("p", "v1")
-        ok   <- kv.purge("p", Some(rev)).either
-        _    <- kvm.delete("kv-purge-rev")
+        kvm <- ZIO.service[KeyValueManagement]
+        _   <- kvm.create(KeyValueConfig(name = "kv-purge-rev", storageType = StorageType.Memory))
+        kv  <- KeyValue.bucket("kv-purge-rev")
+        rev <- kv.put("p", "v1")
+        ok  <- kv.purge("p", Some(rev)).either
+        _   <- kvm.delete("kv-purge-rev")
       } yield assertTrue(ok.isRight)
     },
 
@@ -322,16 +322,16 @@ object KeyValueSpec extends ZIOSpecDefault {
         _        <- kv.put("existing", "old")
         received <- Promise.make[Nothing, KvEvent[String]]
         fiber    <- kv
-                      .watchAll[String](KeyValueWatchOptions(updatesOnly = true))
-                      .tap(e => received.succeed(e))
-                      .take(1)
-                      .runDrain
-                      .fork
-        _        <- ZIO.sleep(300.millis)
-        _        <- kv.put("new-key", "fresh")
-        event    <- received.await
-        _        <- fiber.interrupt
-        _        <- kvm.delete("kv-watch-upd")
+                   .watchAll[String](KeyValueWatchOptions(updatesOnly = true))
+                   .tap(e => received.succeed(e))
+                   .take(1)
+                   .runDrain
+                   .fork
+        _     <- ZIO.sleep(300.millis)
+        _     <- kv.put("new-key", "fresh")
+        event <- received.await
+        _     <- fiber.interrupt
+        _     <- kvm.delete("kv-watch-upd")
       } yield assertTrue(event.key == "new-key")
     },
 
@@ -351,17 +351,17 @@ object KeyValueSpec extends ZIOSpecDefault {
       for {
         kvm <- ZIO.service[KeyValueManagement]
         _   <- kvm.create(
-                 KeyValueConfig(
-                   name = "kv-purge-mtl",
-                   storageType = StorageType.Memory,
-                   ttl = Some(60.seconds),
-                   limitMarkerTtl = Some(10.seconds)
-                 )
+               KeyValueConfig(
+                 name = "kv-purge-mtl",
+                 storageType = StorageType.Memory,
+                 ttl = Some(60.seconds),
+                 limitMarkerTtl = Some(10.seconds)
                )
-        kv  <- KeyValue.bucket("kv-purge-mtl")
-        _   <- kv.put("p", "v1")
-        ok  <- kv.purge("p", None, Some(2.seconds)).either
-        _   <- kvm.delete("kv-purge-mtl")
+             )
+        kv <- KeyValue.bucket("kv-purge-mtl")
+        _  <- kv.put("p", "v1")
+        ok <- kv.purge("p", None, Some(2.seconds)).either
+        _  <- kvm.delete("kv-purge-mtl")
       } yield assertTrue(ok.isRight)
     },
 
@@ -369,13 +369,13 @@ object KeyValueSpec extends ZIOSpecDefault {
       for {
         kvm <- ZIO.service[KeyValueManagement]
         _   <- kvm.create(
-                 KeyValueConfig(
-                   name = "kv-purge-both",
-                   storageType = StorageType.Memory,
-                   ttl = Some(60.seconds),
-                   limitMarkerTtl = Some(10.seconds)
-                 )
+               KeyValueConfig(
+                 name = "kv-purge-both",
+                 storageType = StorageType.Memory,
+                 ttl = Some(60.seconds),
+                 limitMarkerTtl = Some(10.seconds)
                )
+             )
         kv  <- KeyValue.bucket("kv-purge-both")
         rev <- kv.put("p", "v1")
         ok  <- kv.purge("p", Some(rev), Some(2.seconds)).either
@@ -397,8 +397,10 @@ object KeyValueSpec extends ZIOSpecDefault {
       for {
         kvm <- ZIO.service[KeyValueManagement]
         _   <- kvm.create(KeyValueConfig(name = "kv-update-cfg", storageType = StorageType.Memory, maxHistoryPerKey = 1))
-        ok  <- kvm.update(KeyValueConfig(name = "kv-update-cfg", storageType = StorageType.Memory, maxHistoryPerKey = 5)).either
-        _   <- kvm.delete("kv-update-cfg")
+        ok  <- kvm
+                .update(KeyValueConfig(name = "kv-update-cfg", storageType = StorageType.Memory, maxHistoryPerKey = 5))
+                .either
+        _ <- kvm.delete("kv-update-cfg")
       } yield assertTrue(ok.isRight)
     },
 

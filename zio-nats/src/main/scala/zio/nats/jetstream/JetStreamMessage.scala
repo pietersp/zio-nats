@@ -36,7 +36,9 @@ final class JetStreamMessage(
   private[nats] val underlying: JMessage
 ) {
 
-  /** Return the corresponding pure [[zio.nats.NatsMessage]] (no ack capability). */
+  /**
+   * Return the corresponding pure [[zio.nats.NatsMessage]] (no ack capability).
+   */
   def message: NatsMessage = NatsMessage(subject, replyTo, headers, payload)
 
   /** Decode the payload using the given [[NatsCodec]]. */

@@ -33,8 +33,8 @@ object SerializationFormatSpec extends ZIOSpecDefault {
     },
 
     test("makeFor builds a codec that roundtrips (internal API)") {
-      val person = Person("Bob", 25)
-      val codec  = NatsSerializer.makeFor[Person](JsonFormat)
+      val person  = Person("Bob", 25)
+      val codec   = NatsSerializer.makeFor[Person](JsonFormat)
       val encoded = codec.encode(person)
       val decoded = codec.decode(encoded)
       assertTrue(decoded == Right(person))

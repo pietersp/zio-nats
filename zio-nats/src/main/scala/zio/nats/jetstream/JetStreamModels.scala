@@ -17,10 +17,16 @@ import scala.jdk.CollectionConverters.*
 // Type aliases for raw Java types exposed in the API
 // ---------------------------------------------------------------------------
 
-/** Raw server info for a single stored JetStream message. Returned by [[JetStreamManagement.getMessage]]. */
+/**
+ * Raw server info for a single stored JetStream message. Returned by
+ * [[JetStreamManagement.getMessage]].
+ */
 type MessageInfo = io.nats.client.api.MessageInfo
 
-/** JetStream account-level statistics. Returned by [[JetStreamManagement.getAccountStatistics]]. */
+/**
+ * JetStream account-level statistics. Returned by
+ * [[JetStreamManagement.getAccountStatistics]].
+ */
 type AccountStatistics = io.nats.client.api.AccountStatistics
 
 // ---------------------------------------------------------------------------
@@ -82,8 +88,8 @@ private[nats] object PublishAck {
  *
  * @param messageId
  *   A client-assigned ID used for duplicate detection. If the server has
- *   already stored a message with this ID in the stream's duplicate window,
- *   the publish is acknowledged but [[PublishAck.isDuplicate]] will be true.
+ *   already stored a message with this ID in the stream's duplicate window, the
+ *   publish is acknowledged but [[PublishAck.isDuplicate]] will be true.
  * @param expectedStream
  *   Fail the publish if the subject does not route to this stream.
  * @param expectedLastMsgId
@@ -144,8 +150,9 @@ object JsPublishParams {
  * @param maxBytes
  *   Maximum total bytes to fetch. Ignored when set to -1 (default).
  * @param expiresIn
- *   How long to wait for messages before the fetch expires (default: 5 seconds).
- *   The stream completes when the batch is full or this timeout elapses.
+ *   How long to wait for messages before the fetch expires (default: 5
+ *   seconds). The stream completes when the batch is full or this timeout
+ *   elapses.
  */
 final case class FetchOptions(
   maxMessages: Int = 100,
@@ -167,11 +174,12 @@ object FetchOptions {
 }
 
 /**
- * Options for an unbounded [[Consumer.consume]] or [[Consumer.iterate]] operation.
+ * Options for an unbounded [[Consumer.consume]] or [[Consumer.iterate]]
+ * operation.
  *
  * @param batchSize
- *   Number of messages the server sends per credit replenishment (default: 512).
- *   Ignored when `batchBytes` is set.
+ *   Number of messages the server sends per credit replenishment (default:
+ *   512). Ignored when `batchBytes` is set.
  * @param batchBytes
  *   Maximum bytes per credit replenishment. Takes precedence over `batchSize`
  *   when set to a positive value. Ignored when -1 (default).
@@ -205,11 +213,16 @@ object ConsumeOptions {
 /**
  * Snapshot of a JetStream stream's configuration and current state.
  *
- * @param name          The stream name.
- * @param subjects      Subjects this stream captures.
- * @param messageCount  Number of messages currently stored in the stream.
- * @param byteCount     Total bytes currently stored in the stream.
- * @param consumerCount Number of consumers attached to the stream.
+ * @param name
+ *   The stream name.
+ * @param subjects
+ *   Subjects this stream captures.
+ * @param messageCount
+ *   Number of messages currently stored in the stream.
+ * @param byteCount
+ *   Total bytes currently stored in the stream.
+ * @param consumerCount
+ *   Number of consumers attached to the stream.
  */
 final case class StreamSummary(
   name: String,
@@ -236,11 +249,16 @@ private[nats] object StreamSummary {
 /**
  * Snapshot of a JetStream consumer's state.
  *
- * @param name          The consumer name.
- * @param streamName    The stream this consumer is bound to.
- * @param numPending    Messages available in the stream that have not yet been delivered.
- * @param numAckPending Delivered messages waiting for an acknowledgment.
- * @param redelivered   Number of messages that have been redelivered.
+ * @param name
+ *   The consumer name.
+ * @param streamName
+ *   The stream this consumer is bound to.
+ * @param numPending
+ *   Messages available in the stream that have not yet been delivered.
+ * @param numAckPending
+ *   Delivered messages waiting for an acknowledgment.
+ * @param redelivered
+ *   Number of messages that have been redelivered.
  */
 final case class ConsumerSummary(
   name: String,
@@ -263,7 +281,8 @@ private[nats] object ConsumerSummary {
 /**
  * Result of a stream purge operation.
  *
- * @param purgedCount The number of messages removed from the stream.
+ * @param purgedCount
+ *   The number of messages removed from the stream.
  */
 final case class PurgeSummary(purgedCount: Long)
 
@@ -276,11 +295,15 @@ private[nats] object PurgeSummary {
 // ---------------------------------------------------------------------------
 
 /**
- * Result of a [[JetStreamManagement.pauseConsumer]] or [[JetStreamManagement.resumeConsumer]] call.
+ * Result of a [[JetStreamManagement.pauseConsumer]] or
+ * [[JetStreamManagement.resumeConsumer]] call.
  *
- * @param isPaused       Whether the consumer is currently paused.
- * @param pauseUntil     The time at which the consumer will automatically resume, if paused.
- * @param pauseRemaining Time remaining until the consumer resumes, if paused.
+ * @param isPaused
+ *   Whether the consumer is currently paused.
+ * @param pauseUntil
+ *   The time at which the consumer will automatically resume, if paused.
+ * @param pauseRemaining
+ *   Time remaining until the consumer resumes, if paused.
  */
 final case class ConsumerPauseInfo(
   isPaused: Boolean,

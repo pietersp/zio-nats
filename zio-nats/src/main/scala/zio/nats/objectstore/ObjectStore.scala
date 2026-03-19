@@ -13,12 +13,13 @@ import scala.jdk.CollectionConverters.*
  * Service for object store operations on a single NATS OS bucket.
  *
  * NATS ObjectStore is built on JetStream and is optimised for storing large,
- * named blobs. Objects are chunked automatically on the server side.
- * Use [[putStream]] / [[getStream]] for very large objects to avoid loading
- * them fully into memory.
+ * named blobs. Objects are chunked automatically on the server side. Use
+ * [[putStream]] / [[getStream]] for very large objects to avoid loading them
+ * fully into memory.
  *
- * Obtain an instance via [[ObjectStore.bucket]] (requires a [[zio.nats.Nats]] connection
- * in scope). Use [[ObjectStoreManagement]] to create or delete buckets.
+ * Obtain an instance via [[ObjectStore.bucket]] (requires a [[zio.nats.Nats]]
+ * connection in scope). Use [[ObjectStoreManagement]] to create or delete
+ * buckets.
  *
  * ==Example==
  * {{{
@@ -56,9 +57,8 @@ trait ObjectStore {
    * Returns an [[ObjectData]] containing both the decoded value and the
    * [[ObjectSummary]] metadata (name, size, chunks, description, etc.).
    *
-   * Use `get[Chunk[Byte]](name)` to retrieve raw bytes.
-   * For very large objects prefer [[getStream]] to avoid loading the full
-   * object into memory.
+   * Use `get[Chunk[Byte]](name)` to retrieve raw bytes. For very large objects
+   * prefer [[getStream]] to avoid loading the full object into memory.
    */
   def get[A: NatsCodec](objectName: String): IO[NatsError, ObjectData[A]]
 
@@ -80,8 +80,8 @@ trait ObjectStore {
   def getStream(objectName: String): ZStream[Any, NatsError, Byte]
 
   /**
-   * Retrieve metadata for an object (without downloading data).
-   * Pass `includingDeleted = true` to inspect a deleted object's metadata.
+   * Retrieve metadata for an object (without downloading data). Pass
+   * `includingDeleted = true` to inspect a deleted object's metadata.
    */
   def getInfo(objectName: String, includingDeleted: Boolean = false): IO[NatsError, ObjectSummary]
 
@@ -92,8 +92,8 @@ trait ObjectStore {
   def updateMeta(objectName: String, meta: ObjectMeta): IO[NatsError, ObjectSummary]
 
   /**
-   * Create a link (alias) from `linkName` to the object named `targetObjectName`
-   * in this bucket. A link cannot point to another link.
+   * Create a link (alias) from `linkName` to the object named
+   * `targetObjectName` in this bucket. A link cannot point to another link.
    */
   def addLink(linkName: String, targetObjectName: String): IO[NatsError, ObjectSummary]
 
@@ -125,10 +125,12 @@ trait ObjectStore {
 /**
  * Service for managing Object Store buckets.
  *
- * Provides administrative operations to create and delete OS buckets.
- * Obtain an instance via [[ObjectStoreManagement.live]] (requires [[zio.nats.Nats]] in scope).
+ * Provides administrative operations to create and delete OS buckets. Obtain an
+ * instance via [[ObjectStoreManagement.live]] (requires [[zio.nats.Nats]] in
+ * scope).
  */
 trait ObjectStoreManagement {
+
   /** Create a new Object Store bucket with the given configuration. */
   def create(config: ObjectStoreConfig): IO[NatsError, ObjectStoreBucketStatus]
 
@@ -221,18 +223,20 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
   ): IO[NatsError, ObjectSummary] =
     ZIO.scoped {
       for {
-        in     <- ZIO.succeed(new PipedInputStream(PipeBufferSize))
-        out    <- ZIO.succeed(new PipedOutputStream(in))
+        in  <- ZIO.succeed(new PipedInputStream(PipeBufferSize))
+        out <- ZIO.succeed(new PipedOutputStream(in))
         // Pump ZStream data into the pipe concurrently; close pipe when done
-        _      <- data.chunks
-                    .runForeach(chunk => ZIO.attemptBlocking(out.write(chunk.toArray)))
-                    .ensuring(ZIO.attempt(out.close()).ignoreLogged)
-                    .forkScoped
+        _ <- data.chunks
+               .runForeach(chunk => ZIO.attemptBlocking(out.write(chunk.toArray)))
+               .ensuring(ZIO.attempt(out.close()).ignoreLogged)
+               .forkScoped
         // jnats reads from the pipe on this (blocking) thread
-        result <- ZIO.attemptBlocking(target match {
-                    case Left(name) => os.put(name, in)
-                    case Right(m)   => os.put(m.toJava, in)
-                  }).mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
+        result <- ZIO
+                    .attemptBlocking(target match {
+                      case Left(name) => os.put(name, in)
+                      case Right(m)   => os.put(m.toJava, in)
+                    })
+                    .mapBoth(NatsError.fromThrowable, ObjectSummary.fromJava)
       } yield result
     }
 
@@ -242,21 +246,25 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
         out <- ZIO.succeed(new PipedOutputStream())
         in  <- ZIO.succeed(new PipedInputStream(out, PipeBufferSize))
         // jnats writes to the pipe on a background fiber; close pipe when done
-        dl  <- ZIO.attemptBlocking(os.get(objectName, out))
-                 .ensuring(ZIO.attempt(out.close()).ignoreLogged)
-                 .mapError(NatsError.fromThrowable)
-                 .forkScoped
-      } yield ZStream
-                .fromInputStream(in, PipeBufferSize)
+        dl <- ZIO
+                .attemptBlocking(os.get(objectName, out))
+                .ensuring(ZIO.attempt(out.close()).ignoreLogged)
                 .mapError(NatsError.fromThrowable)
-                // append a zero-element effect that propagates any download error
-                .concat(ZStream.fromZIO(dl.join.unit).drain)
+                .forkScoped
+      } yield ZStream
+        .fromInputStream(in, PipeBufferSize)
+        .mapError(NatsError.fromThrowable)
+        // append a zero-element effect that propagates any download error
+        .concat(ZStream.fromZIO(dl.join.unit).drain)
     }
 
   override def getInfo(objectName: String, includingDeleted: Boolean = false): IO[NatsError, ObjectSummary] =
     ZIO.attemptBlocking(Option(os.getInfo(objectName, includingDeleted))).mapError(NatsError.fromThrowable).flatMap {
       case Some(info) => ZIO.succeed(ObjectSummary.fromJava(info))
-      case None       => ZIO.fail(NatsError.ObjectStoreOperationFailed(s"Object not found: $objectName", new NoSuchElementException(objectName)))
+      case None       =>
+        ZIO.fail(
+          NatsError.ObjectStoreOperationFailed(s"Object not found: $objectName", new NoSuchElementException(objectName))
+        )
     }
 
   override def delete(objectName: String): IO[NatsError, ObjectSummary] =
@@ -285,7 +293,9 @@ private[nats] final class ObjectStoreLive(os: JObjectStore) extends ObjectStore 
   override def getStatus: IO[NatsError, ObjectStoreBucketStatus] =
     ZIO.attemptBlocking(os.getStatus).mapBoth(NatsError.fromThrowable, ObjectStoreBucketStatus.fromJava)
 
-  override def watch(options: ObjectStoreWatchOptions = ObjectStoreWatchOptions.default): ZStream[Any, NatsError, ObjectSummary] =
+  override def watch(
+    options: ObjectStoreWatchOptions = ObjectStoreWatchOptions.default
+  ): ZStream[Any, NatsError, ObjectSummary] =
     watchInternal(options)
 
   private def watchInternal(options: ObjectStoreWatchOptions): ZStream[Any, NatsError, ObjectSummary] =

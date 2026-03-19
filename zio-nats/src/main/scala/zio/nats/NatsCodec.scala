@@ -122,8 +122,8 @@ object NatsCodec {
      *
      * The underlying format codec is built the first time this `given` is
      * resolved for a particular type `A`, then cached in this [[Builder]]
-     * instance. Subsequent resolutions for the same `A` return the cached
-     * codec without re-deriving.
+     * instance. Subsequent resolutions for the same `A` return the cached codec
+     * without re-deriving.
      *
      * If the format cannot derive a codec for `A` — for example because no
      * implicit `Deriver` is available — an exception is thrown on the first
@@ -139,18 +139,20 @@ object NatsCodec {
      */
     given derived[A: Schema]: NatsCodec[A] = {
       val schema = summon[Schema[A]]
-      cache.computeIfAbsent(
-        schema,
-        _ => {
-          // Eagerly derive the compiled codec. Throws here if the format
-          // cannot handle A — never inside encode.
-          val compiledCodec = NatsSerializer.makeFor[A](format)
-          new NatsCodec[A] {
-            def encode(value: A): Chunk[Byte]                          = compiledCodec.encode(value)
-            def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, A] = compiledCodec.decode(bytes)
+      cache
+        .computeIfAbsent(
+          schema,
+          _ => {
+            // Eagerly derive the compiled codec. Throws here if the format
+            // cannot handle A — never inside encode.
+            val compiledCodec = NatsSerializer.makeFor[A](format)
+            new NatsCodec[A] {
+              def encode(value: A): Chunk[Byte]                          = compiledCodec.encode(value)
+              def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, A] = compiledCodec.decode(bytes)
+            }
           }
-        }
-      ).asInstanceOf[NatsCodec[A]]
+        )
+        .asInstanceOf[NatsCodec[A]]
     }
   }
 }

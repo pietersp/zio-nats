@@ -35,16 +35,16 @@ object JetStreamSpec extends ZIOSpecDefault {
           jsm <- ZIO.service[JetStreamManagement]
           js  <- ZIO.service[JetStream]
           _   <- jsm.addStream(
-                   StreamConfig(
-                     name = "maxmsgs-stream",
-                     subjects = List("maxmsgs.>"),
-                     storageType = StorageType.Memory,
-                     maxMsgs = 2
-                   )
+                 StreamConfig(
+                   name = "maxmsgs-stream",
+                   subjects = List("maxmsgs.>"),
+                   storageType = StorageType.Memory,
+                   maxMsgs = 2
                  )
-          _ <- js.publish(Subject("maxmsgs.1"), "a")
-          _ <- js.publish(Subject("maxmsgs.2"), "b")
-          _ <- js.publish(Subject("maxmsgs.3"), "c")
+               )
+          _    <- js.publish(Subject("maxmsgs.1"), "a")
+          _    <- js.publish(Subject("maxmsgs.2"), "b")
+          _    <- js.publish(Subject("maxmsgs.3"), "c")
           info <- jsm.getStreamInfo("maxmsgs-stream")
           _    <- jsm.deleteStream("maxmsgs-stream")
         } yield assertTrue(info.messageCount == 2L)
@@ -55,16 +55,16 @@ object JetStreamSpec extends ZIOSpecDefault {
           jsm <- ZIO.service[JetStreamManagement]
           js  <- ZIO.service[JetStream]
           _   <- jsm.addStream(
-                   StreamConfig(
-                     name = "maxpersub-stream",
-                     subjects = List("maxpersub.>"),
-                     storageType = StorageType.Memory,
-                     maxMsgsPerSubject = 1
-                   )
+                 StreamConfig(
+                   name = "maxpersub-stream",
+                   subjects = List("maxpersub.>"),
+                   storageType = StorageType.Memory,
+                   maxMsgsPerSubject = 1
                  )
-          _ <- js.publish(Subject("maxpersub.a"), "v1")
-          _ <- js.publish(Subject("maxpersub.a"), "v2")
-          _ <- js.publish(Subject("maxpersub.b"), "v1")
+               )
+          _    <- js.publish(Subject("maxpersub.a"), "v1")
+          _    <- js.publish(Subject("maxpersub.a"), "v2")
+          _    <- js.publish(Subject("maxpersub.b"), "v1")
           info <- jsm.getStreamInfo("maxpersub-stream")
           _    <- jsm.deleteStream("maxpersub-stream")
         } yield assertTrue(info.messageCount == 2L)
@@ -75,13 +75,13 @@ object JetStreamSpec extends ZIOSpecDefault {
           jsm <- ZIO.service[JetStreamManagement]
           js  <- ZIO.service[JetStream]
           _   <- jsm.addStream(
-                   StreamConfig(
-                     name = "dupewin-stream",
-                     subjects = List("dupewin.>"),
-                     storageType = StorageType.Memory,
-                     duplicateWindow = Some(30.seconds)
-                   )
+                 StreamConfig(
+                   name = "dupewin-stream",
+                   subjects = List("dupewin.>"),
+                   storageType = StorageType.Memory,
+                   duplicateWindow = Some(30.seconds)
                  )
+               )
           opts  = JsPublishParams(options = Some(PublishOptions(messageId = Some("dw-1"))))
           ack1 <- js.publish(Subject("dupewin.test"), "first", opts)
           ack2 <- js.publish(Subject("dupewin.test"), "first", opts)
@@ -107,23 +107,33 @@ object JetStreamSpec extends ZIOSpecDefault {
 
       test("getStreams lists full stream objects") {
         for {
-          jsm    <- ZIO.service[JetStreamManagement]
-          _      <- createStream(jsm, "getstrs-stream", "getstrs.>")
+          jsm     <- ZIO.service[JetStreamManagement]
+          _       <- createStream(jsm, "getstrs-stream", "getstrs.>")
           streams <- jsm.getStreams
-          _      <- jsm.deleteStream("getstrs-stream")
+          _       <- jsm.deleteStream("getstrs-stream")
         } yield assertTrue(streams.exists(_.name == "getstrs-stream"))
       },
 
       test("updateStream changes a stream's configuration") {
         for {
-          jsm     <- ZIO.service[JetStreamManagement]
-          js      <- ZIO.service[JetStream]
-          _       <- jsm.addStream(StreamConfig("update-stream", subjects = List("update.>"), storageType = StorageType.Memory, maxMsgs = 5))
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <-
+            jsm.addStream(
+              StreamConfig("update-stream", subjects = List("update.>"), storageType = StorageType.Memory, maxMsgs = 5)
+            )
           _       <- js.publish(Subject("update.1"), "a")
           _       <- js.publish(Subject("update.2"), "b")
-          updated <- jsm.updateStream(StreamConfig("update-stream", subjects = List("update.>"), storageType = StorageType.Memory, maxMsgs = 100))
-          info    <- jsm.getStreamInfo("update-stream")
-          _       <- jsm.deleteStream("update-stream")
+          updated <- jsm.updateStream(
+                       StreamConfig(
+                         "update-stream",
+                         subjects = List("update.>"),
+                         storageType = StorageType.Memory,
+                         maxMsgs = 100
+                       )
+                     )
+          info <- jsm.getStreamInfo("update-stream")
+          _    <- jsm.deleteStream("update-stream")
         } yield assertTrue(updated.name == "update-stream", info.messageCount == 2L)
       },
 
@@ -157,12 +167,12 @@ object JetStreamSpec extends ZIOSpecDefault {
 
       test("deleteConsumer removes a consumer from the stream") {
         for {
-          jsm   <- ZIO.service[JetStreamManagement]
-          _     <- createStream(jsm, "delcons-stream", "delcons.>")
-          _     <- jsm.addOrUpdateConsumer(
-                     "delcons-stream",
-                     ConsumerConfig.durable("del-me").copy(filterSubject = Some("delcons.>"))
-                   )
+          jsm <- ZIO.service[JetStreamManagement]
+          _   <- createStream(jsm, "delcons-stream", "delcons.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "delcons-stream",
+                 ConsumerConfig.durable("del-me").copy(filterSubject = Some("delcons.>"))
+               )
           _     <- jsm.deleteConsumer("delcons-stream", "del-me")
           names <- jsm.getConsumerNames("delcons-stream")
           _     <- jsm.deleteStream("delcons-stream")
@@ -171,12 +181,12 @@ object JetStreamSpec extends ZIOSpecDefault {
 
       test("getConsumerInfo returns consumer metadata") {
         for {
-          jsm  <- ZIO.service[JetStreamManagement]
-          _    <- createStream(jsm, "consinfo-stream", "consinfo.>")
-          _    <- jsm.addOrUpdateConsumer(
-                    "consinfo-stream",
-                    ConsumerConfig.durable("info-cons").copy(filterSubject = Some("consinfo.>"))
-                  )
+          jsm <- ZIO.service[JetStreamManagement]
+          _   <- createStream(jsm, "consinfo-stream", "consinfo.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "consinfo-stream",
+                 ConsumerConfig.durable("info-cons").copy(filterSubject = Some("consinfo.>"))
+               )
           info <- jsm.getConsumerInfo("consinfo-stream", "info-cons")
           _    <- jsm.deleteStream("consinfo-stream")
         } yield assertTrue(info.name == "info-cons", info.streamName == "consinfo-stream")
@@ -229,27 +239,31 @@ object JetStreamSpec extends ZIOSpecDefault {
                       firstSequence = 1L
                     )
                   )
-          _    <- jsm.deleteStream("adv-stream")
+          _ <- jsm.deleteStream("adv-stream")
         } yield assertTrue(info.name == "adv-stream")
       },
 
       test("ConsumerConfig advanced fields are accepted by the server") {
         for {
-          jsm  <- ZIO.service[JetStreamManagement]
-          _    <- jsm.addStream(StreamConfig("cons-adv-stream", subjects = List("consadv.>"), storageType = StorageType.Memory))
+          jsm <- ZIO.service[JetStreamManagement]
+          _   <- jsm.addStream(
+                 StreamConfig("cons-adv-stream", subjects = List("consadv.>"), storageType = StorageType.Memory)
+               )
           info <- jsm.addOrUpdateConsumer(
                     "cons-adv-stream",
-                    ConsumerConfig.durable("adv-consumer").copy(
-                      filterSubject = Some("consadv.>"),
-                      maxDeliver = 5L,
-                      maxAckPending = 100L,
-                      backoff = List(1.second, 2.seconds),
-                      metadata = Map("env" -> "test"),
-                      sampleFrequency = Some("100%"),
-                      maxPullWaiting = 10L
-                    )
+                    ConsumerConfig
+                      .durable("adv-consumer")
+                      .copy(
+                        filterSubject = Some("consadv.>"),
+                        maxDeliver = 5L,
+                        maxAckPending = 100L,
+                        backoff = List(1.second, 2.seconds),
+                        metadata = Map("env" -> "test"),
+                        sampleFrequency = Some("100%"),
+                        maxPullWaiting = 10L
+                      )
                   )
-          _    <- jsm.deleteStream("cons-adv-stream")
+          _ <- jsm.deleteStream("cons-adv-stream")
         } yield assertTrue(info.name == "adv-consumer")
       }
     ),
@@ -299,13 +313,13 @@ object JetStreamSpec extends ZIOSpecDefault {
 
       test("publish with headers propagates headers to the consumer") {
         for {
-          jsm      <- ZIO.service[JetStreamManagement]
-          js       <- ZIO.service[JetStream]
-          _        <- createStream(jsm, "hdrs-stream", "hdrs.>")
-          _        <- jsm.addOrUpdateConsumer(
-                        "hdrs-stream",
-                        ConsumerConfig.durable("hdrs-cons").copy(filterSubject = Some("hdrs.>"))
-                      )
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "hdrs-stream", "hdrs.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "hdrs-stream",
+                 ConsumerConfig.durable("hdrs-cons").copy(filterSubject = Some("hdrs.>"))
+               )
           params    = JsPublishParams(headers = Headers("X-Custom" -> "my-value"))
           _        <- js.publish(Subject("hdrs.test"), Chunk.fromArray("payload".getBytes), params)
           consumer <- js.consumer("hdrs-stream", "hdrs-cons")
@@ -335,9 +349,9 @@ object JetStreamSpec extends ZIOSpecDefault {
     suite("Consumer pause and resume")(
       test("pause and resume a consumer") {
         for {
-          jsm <- ZIO.service[JetStreamManagement]
-          _   <- jsm.addStream(StreamConfig("pause-stream", subjects = List("pause.>"), storageType = StorageType.Memory))
-          _   <- jsm.addOrUpdateConsumer("pause-stream", ConsumerConfig.durable("pause-cons"))
+          jsm       <- ZIO.service[JetStreamManagement]
+          _         <- jsm.addStream(StreamConfig("pause-stream", subjects = List("pause.>"), storageType = StorageType.Memory))
+          _         <- jsm.addOrUpdateConsumer("pause-stream", ConsumerConfig.durable("pause-cons"))
           pauseUntil = java.time.ZonedDateTime.now().plusSeconds(30)
           pauseInfo <- jsm.pauseConsumer("pause-stream", "pause-cons", pauseUntil)
           resumed   <- jsm.resumeConsumer("pause-stream", "pause-cons")
@@ -349,13 +363,13 @@ object JetStreamSpec extends ZIOSpecDefault {
     suite("Ordered Consumer")(
       test("fetch messages in order") {
         for {
-          jsm <- ZIO.service[JetStreamManagement]
-          js  <- ZIO.service[JetStream]
-          _   <- jsm.addStream(StreamConfig("ord-stream", subjects = List("ord.>"), storageType = StorageType.Memory))
-          _   <- js.publish(Subject("ord.1"), "a")
-          _   <- js.publish(Subject("ord.2"), "b")
-          _   <- js.publish(Subject("ord.3"), "c")
-          oc  <- js.orderedConsumer("ord-stream", OrderedConsumerConfig())
+          jsm  <- ZIO.service[JetStreamManagement]
+          js   <- ZIO.service[JetStream]
+          _    <- jsm.addStream(StreamConfig("ord-stream", subjects = List("ord.>"), storageType = StorageType.Memory))
+          _    <- js.publish(Subject("ord.1"), "a")
+          _    <- js.publish(Subject("ord.2"), "b")
+          _    <- js.publish(Subject("ord.3"), "c")
+          oc   <- js.orderedConsumer("ord-stream", OrderedConsumerConfig())
           msgs <- oc
                     .fetch[String](FetchOptions(maxMessages = 3, expiresIn = 5.seconds))
                     .runCollect
@@ -370,7 +384,9 @@ object JetStreamSpec extends ZIOSpecDefault {
         for {
           jsm <- ZIO.service[JetStreamManagement]
           js  <- ZIO.service[JetStream]
-          _   <- jsm.addStream(StreamConfig("ord-filter-stream", subjects = List("ordf.>"), storageType = StorageType.Memory))
+          _   <- jsm.addStream(
+                 StreamConfig("ord-filter-stream", subjects = List("ordf.>"), storageType = StorageType.Memory)
+               )
           _   <- js.publish(Subject("ordf.x"), "x-msg")
           _   <- js.publish(Subject("ordf.y"), "y-msg")
           oc  <- js.orderedConsumer("ord-filter-stream", OrderedConsumerConfig(filterSubjects = List("ordf.x")))
@@ -445,44 +461,44 @@ object JetStreamSpec extends ZIOSpecDefault {
 
       test("iterate() delivers all messages published to a stream") {
         for {
-          jsm      <- ZIO.service[JetStreamManagement]
-          js       <- ZIO.service[JetStream]
-          _        <- createStream(jsm, "iter-stream", "iter.>")
-          _        <- jsm.addOrUpdateConsumer(
-                        "iter-stream",
-                        ConsumerConfig.durable("iter-cons").copy(filterSubject = Some("iter.>"))
-                      )
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "iter-stream", "iter.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "iter-stream",
+                 ConsumerConfig.durable("iter-cons").copy(filterSubject = Some("iter.>"))
+               )
           _        <- js.publish(Subject("iter.1"), Chunk.fromArray("a".getBytes))
           _        <- js.publish(Subject("iter.2"), Chunk.fromArray("b".getBytes))
           _        <- js.publish(Subject("iter.3"), Chunk.fromArray("c".getBytes))
           consumer <- js.consumer("iter-stream", "iter-cons")
           msgs     <- consumer
-                        .iterate[Chunk[Byte]]()
-                        .tap(_.message.ack)
-                        .take(3)
-                        .runCollect
-          _        <- jsm.deleteStream("iter-stream")
+                    .iterate[Chunk[Byte]]()
+                    .tap(_.message.ack)
+                    .take(3)
+                    .runCollect
+          _ <- jsm.deleteStream("iter-stream")
         } yield assertTrue(msgs.size == 3)
       },
 
       test("iterate() with explicit ConsumeOptions delivers messages") {
         for {
-          jsm      <- ZIO.service[JetStreamManagement]
-          js       <- ZIO.service[JetStream]
-          _        <- createStream(jsm, "iter2-stream", "iter2.>")
-          _        <- jsm.addOrUpdateConsumer(
-                        "iter2-stream",
-                        ConsumerConfig.durable("iter2-cons").copy(filterSubject = Some("iter2.>"))
-                      )
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "iter2-stream", "iter2.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "iter2-stream",
+                 ConsumerConfig.durable("iter2-cons").copy(filterSubject = Some("iter2.>"))
+               )
           _        <- js.publish(Subject("iter2.1"), Chunk.fromArray("x".getBytes))
           _        <- js.publish(Subject("iter2.2"), Chunk.fromArray("y".getBytes))
           consumer <- js.consumer("iter2-stream", "iter2-cons")
           msgs     <- consumer
-                        .iterate[Chunk[Byte]](ConsumeOptions(batchSize = 100), pollTimeout = 3.seconds)
-                        .tap(_.message.ack)
-                        .take(2)
-                        .runCollect
-          _        <- jsm.deleteStream("iter2-stream")
+                    .iterate[Chunk[Byte]](ConsumeOptions(batchSize = 100), pollTimeout = 3.seconds)
+                    .tap(_.message.ack)
+                    .take(2)
+                    .runCollect
+          _ <- jsm.deleteStream("iter2-stream")
         } yield assertTrue(msgs.size == 2)
       }
     ),
@@ -490,13 +506,13 @@ object JetStreamSpec extends ZIOSpecDefault {
     suite("Message acknowledgement")(
       test("nak() causes the message to be redelivered") {
         for {
-          jsm      <- ZIO.service[JetStreamManagement]
-          js       <- ZIO.service[JetStream]
-          _        <- createStream(jsm, "nak-stream", "nak.>")
-          _        <- jsm.addOrUpdateConsumer(
-                        "nak-stream",
-                        ConsumerConfig.durable("nak-cons").copy(filterSubject = Some("nak.>"))
-                      )
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "nak-stream", "nak.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "nak-stream",
+                 ConsumerConfig.durable("nak-cons").copy(filterSubject = Some("nak.>"))
+               )
           _        <- js.publish(Subject("nak.1"), "payload")
           consumer <- js.consumer("nak-stream", "nak-cons")
           msg1     <- consumer.next[String](5.seconds)
@@ -514,13 +530,13 @@ object JetStreamSpec extends ZIOSpecDefault {
 
       test("nakWithDelay() causes redelivery after the delay elapses") {
         for {
-          jsm      <- ZIO.service[JetStreamManagement]
-          js       <- ZIO.service[JetStream]
-          _        <- createStream(jsm, "nakdelay-stream", "nakdelay.>")
-          _        <- jsm.addOrUpdateConsumer(
-                        "nakdelay-stream",
-                        ConsumerConfig.durable("nakdelay-cons").copy(filterSubject = Some("nakdelay.>"))
-                      )
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "nakdelay-stream", "nakdelay.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "nakdelay-stream",
+                 ConsumerConfig.durable("nakdelay-cons").copy(filterSubject = Some("nakdelay.>"))
+               )
           _        <- js.publish(Subject("nakdelay.1"), "delayed")
           consumer <- js.consumer("nakdelay-stream", "nakdelay-cons")
           msg1     <- consumer.next[String](5.seconds)
@@ -533,32 +549,32 @@ object JetStreamSpec extends ZIOSpecDefault {
 
       test("term() terminates a message and it is NOT redelivered") {
         for {
-          jsm      <- ZIO.service[JetStreamManagement]
-          js       <- ZIO.service[JetStream]
-          _        <- createStream(jsm, "term-stream", "term.>")
-          _        <- jsm.addOrUpdateConsumer(
-                        "term-stream",
-                        ConsumerConfig.durable("term-cons").copy(filterSubject = Some("term.>"))
-                      )
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "term-stream", "term.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "term-stream",
+                 ConsumerConfig.durable("term-cons").copy(filterSubject = Some("term.>"))
+               )
           _        <- js.publish(Subject("term.1"), "terminal")
           consumer <- js.consumer("term-stream", "term-cons")
           msg1     <- consumer.next[String](5.seconds)
           _        <- msg1.map(_.message.term).getOrElse(ZIO.unit)
           // After term(), no redelivery should occur
-          msg2     <- consumer.next[String](2.seconds)
-          _        <- jsm.deleteStream("term-stream")
+          msg2 <- consumer.next[String](2.seconds)
+          _    <- jsm.deleteStream("term-stream")
         } yield assertTrue(msg1.isDefined, msg2.isEmpty)
       },
 
       test("inProgress() extends the ack deadline without triggering redelivery") {
         for {
-          jsm      <- ZIO.service[JetStreamManagement]
-          js       <- ZIO.service[JetStream]
-          _        <- createStream(jsm, "inprog-stream", "inprog.>")
-          _        <- jsm.addOrUpdateConsumer(
-                        "inprog-stream",
-                        ConsumerConfig.durable("inprog-cons").copy(filterSubject = Some("inprog.>"))
-                      )
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "inprog-stream", "inprog.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "inprog-stream",
+                 ConsumerConfig.durable("inprog-cons").copy(filterSubject = Some("inprog.>"))
+               )
           _        <- js.publish(Subject("inprog.1"), "working")
           consumer <- js.consumer("inprog-stream", "inprog-cons")
           msg      <- consumer.next[String](5.seconds)
@@ -570,13 +586,13 @@ object JetStreamSpec extends ZIOSpecDefault {
 
       test("ackSync() acknowledges and confirms the server received the ack") {
         for {
-          jsm      <- ZIO.service[JetStreamManagement]
-          js       <- ZIO.service[JetStream]
-          _        <- createStream(jsm, "acksync-stream", "acksync.>")
-          _        <- jsm.addOrUpdateConsumer(
-                        "acksync-stream",
-                        ConsumerConfig.durable("acksync-cons").copy(filterSubject = Some("acksync.>"))
-                      )
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "acksync-stream", "acksync.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "acksync-stream",
+                 ConsumerConfig.durable("acksync-cons").copy(filterSubject = Some("acksync.>"))
+               )
           _        <- js.publish(Subject("acksync.1"), "sync-me")
           consumer <- js.consumer("acksync-stream", "acksync-cons")
           msg      <- consumer.next[String](5.seconds)
@@ -589,23 +605,23 @@ object JetStreamSpec extends ZIOSpecDefault {
     suite("Consumer unpin")(
       test("unpin on a pinned consumer returns a result without throwing") {
         for {
-          jsm      <- ZIO.service[JetStreamManagement]
-          js       <- ZIO.service[JetStream]
-          _        <- createStream(jsm, "unpin-stream", "unpin.>")
-          _        <- jsm.addOrUpdateConsumer(
-                        "unpin-stream",
-                        ConsumerConfig
-                          .durable("unpin-cons")
-                          .copy(
-                            filterSubject = Some("unpin.>"),
-                            priorityPolicy = Some(PriorityPolicy.PinnedClient),
-                            priorityGroups = List("g1")
-                          )
-                      )
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "unpin-stream", "unpin.>")
+          _   <- jsm.addOrUpdateConsumer(
+                 "unpin-stream",
+                 ConsumerConfig
+                   .durable("unpin-cons")
+                   .copy(
+                     filterSubject = Some("unpin.>"),
+                     priorityPolicy = Some(PriorityPolicy.PinnedClient),
+                     priorityGroups = List("g1")
+                   )
+               )
           consumer <- js.consumer("unpin-stream", "unpin-cons")
           // No client is currently pinned, so unpin returns false (not an error)
-          result   <- consumer.unpin("g1").either
-          _        <- jsm.deleteStream("unpin-stream")
+          result <- consumer.unpin("g1").either
+          _      <- jsm.deleteStream("unpin-stream")
         } yield assertTrue(result.isRight)
       }
     ),
@@ -613,13 +629,13 @@ object JetStreamSpec extends ZIOSpecDefault {
     suite("Message access")(
       test("getLastMessage retrieves the latest message on a subject") {
         for {
-          jsm  <- ZIO.service[JetStreamManagement]
-          js   <- ZIO.service[JetStream]
-          _    <- createStream(jsm, "msg-last-stream", "msg.last.>")
-          _    <- js.publish(Subject("msg.last.x"), Chunk.fromArray("first".getBytes))
-          _    <- js.publish(Subject("msg.last.x"), Chunk.fromArray("second".getBytes))
-          msg  <- jsm.getLastMessage("msg-last-stream", "msg.last.x")
-          _    <- jsm.deleteStream("msg-last-stream")
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- createStream(jsm, "msg-last-stream", "msg.last.>")
+          _   <- js.publish(Subject("msg.last.x"), Chunk.fromArray("first".getBytes))
+          _   <- js.publish(Subject("msg.last.x"), Chunk.fromArray("second".getBytes))
+          msg <- jsm.getLastMessage("msg-last-stream", "msg.last.x")
+          _   <- jsm.deleteStream("msg-last-stream")
         } yield assertTrue(new String(msg.getData) == "second")
       }
     )

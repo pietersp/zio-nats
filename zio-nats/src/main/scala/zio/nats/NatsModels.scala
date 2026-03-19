@@ -1,6 +1,6 @@
 package zio.nats
 
-import io.nats.client.{Statistics as JStatistics}
+import io.nats.client.Statistics as JStatistics
 
 // ---------------------------------------------------------------------------
 // Envelope — typed value + raw NatsMessage
@@ -9,9 +9,9 @@ import io.nats.client.{Statistics as JStatistics}
 /**
  * A decoded message value paired with its raw [[NatsMessage]].
  *
- * Returned by [[Nats.request]] and [[Nats.subscribe]] so callers have access
- * to both the decoded payload and the full message metadata (headers,
- * subject, reply-to, raw bytes).
+ * Returned by [[Nats.request]] and [[Nats.subscribe]] so callers have access to
+ * both the decoded payload and the full message metadata (headers, subject,
+ * reply-to, raw bytes).
  *
  * {{{
  * Nats.subscribe[UserEvent](subject).map { env =>

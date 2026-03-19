@@ -20,14 +20,13 @@ object SensorReading {
  * demonstrates each major way to consume them:
  *
  *   1. publishAsync — fire-and-forget batch with deferred ack collection
- *   2. fetch        — bounded pull: retrieve exactly N messages then stop
- *   3. consume      — server-push stream: messages arrive continuously;
- *                     interrupt the stream when done
- *   4. iterate      — long-running pull loop; ordered consumer guarantees
- *                     strict in-order delivery with no manual ack required
+ *   2. fetch — bounded pull: retrieve exactly N messages then stop
+ *   3. consume — server-push stream: messages arrive continuously; interrupt
+ *      the stream when done
+ *   4. iterate — long-running pull loop; ordered consumer guarantees strict
+ *      in-order delivery with no manual ack required
  *
- * Requires a JetStream-enabled NATS server:
- *   docker run -p 4222:4222 nats -js
+ * Requires a JetStream-enabled NATS server: docker run -p 4222:4222 nats -js
  *
  * Run with: sbt "zioNatsExamples/runMain JetStreamApp"
  */
@@ -44,13 +43,15 @@ object JetStreamApp extends ZIOAppDefault {
   // ---------------------------------------------------------------------------
 
   private def createStream(jsm: JetStreamManagement): IO[NatsError, Unit] =
-    jsm.addStream(
-      StreamConfig(
-        name        = streamName,
-        subjects    = List("sensors.>"),
-        storageType = StorageType.Memory
+    jsm
+      .addStream(
+        StreamConfig(
+          name = streamName,
+          subjects = List("sensors.>"),
+          storageType = StorageType.Memory
+        )
       )
-    ).unit
+      .unit
 
   // ---------------------------------------------------------------------------
   // 1. publishAsync — publish a batch, collect acks afterwards
@@ -72,17 +73,19 @@ object JetStreamApp extends ZIOAppDefault {
       SensorReading("sensor-3", 20.0, 1006),
       SensorReading("sensor-2", 23.9, 1007),
       SensorReading("sensor-1", 22.0, 1008),
-      SensorReading("sensor-3", 20.2, 1009),
+      SensorReading("sensor-3", 20.2, 1009)
     )
     for {
       // Enqueue all messages before waiting for any ack
       futures <- ZIO.foreach(readings)(r => js.publishAsync(subject, r))
       // Now wait for all server acks
-      acks    <- ZIO.foreach(futures)(_.orDie)
-      _       <- Console.printLine(
-                   s"Published ${acks.size} readings " +
-                   s"(seq ${acks.head.seqno} – ${acks.last.seqno})"
-                 ).orDie
+      acks <- ZIO.foreach(futures)(_.orDie)
+      _    <- Console
+             .printLine(
+               s"Published ${acks.size} readings " +
+                 s"(seq ${acks.head.seqno} – ${acks.last.seqno})"
+             )
+             .orDie
     } yield ()
   }
 
@@ -103,13 +106,15 @@ object JetStreamApp extends ZIOAppDefault {
       consumer <- js.consumer(streamName, "fetch-demo")
       _        <- Console.printLine("\n[fetch] pulling first 5 readings:").orDie
       _        <- consumer
-                    .fetch[SensorReading](FetchOptions(maxMessages = 5, expiresIn = 5.seconds))
-                    .mapZIO { env =>
-                      Console.printLine(
-                        s"  ${env.value.sensorId}: ${env.value.celsius}°C"
-                      ).orDie *> env.message.ack
-                    }
-                    .runDrain
+             .fetch[SensorReading](FetchOptions(maxMessages = 5, expiresIn = 5.seconds))
+             .mapZIO { env =>
+               Console
+                 .printLine(
+                   s"  ${env.value.sensorId}: ${env.value.celsius}°C"
+                 )
+                 .orDie *> env.message.ack
+             }
+             .runDrain
     } yield ()
 
   // ---------------------------------------------------------------------------
@@ -125,22 +130,26 @@ object JetStreamApp extends ZIOAppDefault {
     for {
       _ <- jsm.addOrUpdateConsumer(
              streamName,
-             ConsumerConfig.durable("consume-demo").copy(
-               ackPolicy    = AckPolicy.Explicit,
-               deliverPolicy = DeliverPolicy.All
-             )
+             ConsumerConfig
+               .durable("consume-demo")
+               .copy(
+                 ackPolicy = AckPolicy.Explicit,
+                 deliverPolicy = DeliverPolicy.All
+               )
            )
       consumer <- js.consumer(streamName, "consume-demo")
       _        <- Console.printLine("\n[consume] streaming all 10 readings via push:").orDie
       _        <- consumer
-                    .consume[SensorReading]()
-                    .take(10)
-                    .mapZIO { env =>
-                      Console.printLine(
-                        s"  ${env.value.sensorId}: ${env.value.celsius}°C"
-                      ).orDie *> env.message.ack
-                    }
-                    .runDrain
+             .consume[SensorReading]()
+             .take(10)
+             .mapZIO { env =>
+               Console
+                 .printLine(
+                   s"  ${env.value.sensorId}: ${env.value.celsius}°C"
+                 )
+                 .orDie *> env.message.ack
+             }
+             .runDrain
     } yield ()
 
   // ---------------------------------------------------------------------------
@@ -161,15 +170,17 @@ object JetStreamApp extends ZIOAppDefault {
                     streamName,
                     OrderedConsumerConfig(deliverPolicy = Some(DeliverPolicy.All))
                   )
-      _        <- consumer
-                    .iterate[SensorReading](pollTimeout = 3.seconds)
-                    .take(10)
-                    .mapZIO { env =>
-                      Console.printLine(
-                        s"  ${env.value.sensorId} @ ${env.value.celsius}°C"
-                      ).orDie
-                    }
-                    .runDrain
+      _ <- consumer
+             .iterate[SensorReading](pollTimeout = 3.seconds)
+             .take(10)
+             .mapZIO { env =>
+               Console
+                 .printLine(
+                   s"  ${env.value.sensorId} @ ${env.value.celsius}°C"
+                 )
+                 .orDie
+             }
+             .runDrain
     } yield ()
 
   // ---------------------------------------------------------------------------

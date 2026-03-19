@@ -21,7 +21,7 @@ import java.util.concurrent.LinkedBlockingQueue
  * {{{
  * // Install a default codec for all Schema-annotated types:
  * val codecs = NatsCodec.fromFormat(JsonFormat)
- * import codecs.derived 
+ * import codecs.derived
  *
  * // Override per type:
  * given auditCodec: NatsCodec[AuditEvent] =
@@ -59,10 +59,12 @@ trait Nats {
    * Returns an [[Envelope]] containing both the decoded response and the raw
    * [[NatsMessage]] (so headers and other metadata remain accessible).
    *
-   * Pass `Chunk[Byte]` for `A` and/or `B` to use the identity codec (raw bytes).
+   * Pass `Chunk[Byte]` for `A` and/or `B` to use the identity codec (raw
+   * bytes).
    *
-   * Fails with [[NatsError.DecodingError]] if the reply cannot be decoded as `B`.
-   * Fails with [[NatsError.Timeout]] if no reply is received within `timeout`.
+   * Fails with [[NatsError.DecodingError]] if the reply cannot be decoded as
+   * `B`. Fails with [[NatsError.Timeout]] if no reply is received within
+   * `timeout`.
    */
   def request[A: NatsCodec, B: NatsCodec](
     subject: Subject,
@@ -90,8 +92,8 @@ trait Nats {
    * Subscribe and automatically decode each message payload.
    *
    * Returns a stream of [[Envelope]]s so callers have access to both the
-   * decoded value and the raw [[NatsMessage]] (headers, subject, reply-to,
-   * raw bytes).
+   * decoded value and the raw [[NatsMessage]] (headers, subject, reply-to, raw
+   * bytes).
    *
    * Pass an optional [[QueueGroup]] to enable load-balanced delivery: within a
    * queue group, each published message is delivered to exactly one subscriber.
@@ -112,7 +114,6 @@ trait Nats {
     subject: Subject,
     queue: Option[QueueGroup] = None
   ): ZStream[Any, NatsError, Envelope[A]]
-
 
   /** Flush the outbound buffer to the server within `timeout`. */
   def flush(timeout: Duration = 1.second): IO[NatsError, Unit]
@@ -135,7 +136,9 @@ trait Nats {
   /** URL of the server this connection is currently using, if connected. */
   def connectedUrl: UIO[Option[String]]
 
-  /** Lifetime counters for this connection (messages in/out, reconnects, etc.). */
+  /**
+   * Lifetime counters for this connection (messages in/out, reconnects, etc.).
+   */
   def statistics: UIO[ConnectionStats]
 
   /** Number of messages waiting to be flushed to the server. */
@@ -182,33 +185,32 @@ object Nats {
    * Create a managed NATS connection. The connection is closed when the
    * enclosing [[Scope]] ends.
    *
-   * Connection lifecycle events are available via [[Nats#lifecycleEvents]]
-   * on the returned service.
+   * Connection lifecycle events are available via [[Nats#lifecycleEvents]] on
+   * the returned service.
    */
   def make(config: NatsConfig): ZIO[Scope, NatsError, Nats] =
     for {
-      hub    <- Hub.unbounded[NatsEvent]
-      jQueue  = new LinkedBlockingQueue[NatsEvent]()
-      conn   <- connect(buildOptions(config, jQueue))
-      _      <- relayEvents(jQueue, hub)
+      hub   <- Hub.unbounded[NatsEvent]
+      jQueue = new LinkedBlockingQueue[NatsEvent]()
+      conn  <- connect(buildOptions(config, jQueue))
+      _     <- relayEvents(jQueue, hub)
     } yield new NatsLive(conn, hub)
 
   /** Wire jnats connection- and error-listeners to push events into `queue`. */
   private def buildOptions(config: NatsConfig, queue: LinkedBlockingQueue[NatsEvent]): Options =
-    config.toOptionsBuilder
-      .connectionListener { (conn: JConnection, eventType: ConnectionListener.Events) =>
-        val url   = Option(conn.getConnectedUrl).getOrElse("unknown")
-        val event = eventType match {
-          case ConnectionListener.Events.CONNECTED          => NatsEvent.Connected(url)
-          case ConnectionListener.Events.DISCONNECTED       => NatsEvent.Disconnected(url)
-          case ConnectionListener.Events.RECONNECTED        => NatsEvent.Reconnected(url)
-          case ConnectionListener.Events.CLOSED             => NatsEvent.Closed
-          case ConnectionListener.Events.LAME_DUCK          => NatsEvent.LameDuckMode
-          case ConnectionListener.Events.RESUBSCRIBED       => NatsEvent.Resubscribed(url)
-          case ConnectionListener.Events.DISCOVERED_SERVERS => NatsEvent.ServersDiscovered
-        }
-        queue.put(event)
+    config.toOptionsBuilder.connectionListener { (conn: JConnection, eventType: ConnectionListener.Events) =>
+      val url   = Option(conn.getConnectedUrl).getOrElse("unknown")
+      val event = eventType match {
+        case ConnectionListener.Events.CONNECTED          => NatsEvent.Connected(url)
+        case ConnectionListener.Events.DISCONNECTED       => NatsEvent.Disconnected(url)
+        case ConnectionListener.Events.RECONNECTED        => NatsEvent.Reconnected(url)
+        case ConnectionListener.Events.CLOSED             => NatsEvent.Closed
+        case ConnectionListener.Events.LAME_DUCK          => NatsEvent.LameDuckMode
+        case ConnectionListener.Events.RESUBSCRIBED       => NatsEvent.Resubscribed(url)
+        case ConnectionListener.Events.DISCOVERED_SERVERS => NatsEvent.ServersDiscovered
       }
+      queue.put(event)
+    }
       .errorListener(new ErrorListener {
         override def errorOccurred(conn: JConnection, error: String): Unit =
           queue.put(NatsEvent.Error(error))
@@ -266,7 +268,9 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
   ): IO[NatsError, Unit] =
     ZIO
       .attempt(NatsCodec[A].encode(value))
-      .mapError(e => NatsError.SerializationError(s"Failed to encode message for subject '${subject.value}': ${e.toString}", e))
+      .mapError(e =>
+        NatsError.SerializationError(s"Failed to encode message for subject '${subject.value}': ${e.toString}", e)
+      )
       .flatMap { bytes =>
         if (params.headers.isEmpty && params.replyTo.isEmpty)
           ZIO.attempt(conn.publish(subject.value, bytes.toArray)).mapError(NatsError.fromThrowable)
@@ -288,7 +292,9 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
   ): IO[NatsError, Envelope[B]] =
     ZIO
       .attempt(NatsCodec[A].encode(request))
-      .mapError(e => NatsError.SerializationError(s"Failed to encode request for subject '${subject.value}': ${e.toString}", e))
+      .mapError(e =>
+        NatsError.SerializationError(s"Failed to encode request for subject '${subject.value}': ${e.toString}", e)
+      )
       .flatMap { bytes =>
         ZIO
           .attemptBlocking(Option(conn.request(subject.value, bytes.toArray, timeout.asJava)))
@@ -303,7 +309,6 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
                 .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
           }
       }
-
 
   override def subscribe[A: NatsCodec](
     subject: Subject,
