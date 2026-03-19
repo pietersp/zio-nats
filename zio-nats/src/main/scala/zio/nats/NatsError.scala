@@ -81,6 +81,26 @@ object NatsError {
     initCause(cause)
   }
 
+  // --- Service errors ---
+
+  sealed trait ServiceError extends NatsError
+
+  /**
+   * Raised when a service operation (e.g. resetting stats, reading endpoint
+   * stats) throws an unexpected exception.
+   */
+  final case class ServiceOperationFailed(message: String, cause: Throwable) extends ServiceError {
+    initCause(cause)
+  }
+
+  /**
+   * Raised when the NATS service cannot be built or started (e.g. invalid
+   * config, duplicate endpoint names).
+   */
+  final case class ServiceStartFailed(message: String, cause: Throwable) extends ServiceError {
+    initCause(cause)
+  }
+
   // --- General fallback ---
 
   final case class GeneralError(message: String, cause: Throwable) extends NatsError { initCause(cause) }

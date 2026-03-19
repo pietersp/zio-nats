@@ -169,4 +169,22 @@ package object nats {
   val ObjectStoreBucketStatus = objectstore.ObjectStoreBucketStatus
   type ObjectStoreWatchOptions = objectstore.ObjectStoreWatchOptions;
   val ObjectStoreWatchOptions = objectstore.ObjectStoreWatchOptions
+
+  // ---- Service framework re-exports (users don't need zio.nats.service._) ----
+  type ServiceConfig         = service.ServiceConfig; val ServiceConfig       = service.ServiceConfig
+  type ServiceGroup          = service.ServiceGroup; val ServiceGroup         = service.ServiceGroup
+  type QueueGroupPolicy      = service.QueueGroupPolicy; val QueueGroupPolicy = service.QueueGroupPolicy
+  type ServiceErrorMapper[E] = service.ServiceErrorMapper[E]
+  val ServiceErrorMapper = service.ServiceErrorMapper
+  type ServiceEndpoint[In, Out] = service.ServiceEndpoint[In, Out]
+  val ServiceEndpoint = service.ServiceEndpoint
+  type BoundEndpoint      = service.BoundEndpoint
+  type ServiceRequest[+A] = service.ServiceRequest[A]; val ServiceRequest  = service.ServiceRequest
+  type NatsService        = service.NatsService
+  type ServiceDiscovery   = service.ServiceDiscovery; val ServiceDiscovery = service.ServiceDiscovery
+  type PingResponse       = service.PingResponse; val PingResponse         = service.PingResponse
+  type InfoResponse       = service.InfoResponse; val InfoResponse         = service.InfoResponse
+  type StatsResponse      = service.StatsResponse; val StatsResponse       = service.StatsResponse
+  type EndpointStats      = service.EndpointStats; val EndpointStats       = service.EndpointStats
+  type EndpointInfo       = service.EndpointInfo; val EndpointInfo         = service.EndpointInfo
 }

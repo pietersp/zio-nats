@@ -1,11 +1,14 @@
 package zio.nats
 
 import io.nats.client.{Connection => JConnection, ConnectionListener, ErrorListener, Options}
+import io.nats.service.{Service => JService}
 import zio._
 import zio.nats.config.NatsConfig
+import zio.nats.service.{BoundEndpoint, NatsService, NatsServiceLive, ServiceConfig}
 import zio.stream._
 
 import java.util.concurrent.LinkedBlockingQueue
+import scala.jdk.CollectionConverters._
 
 /**
  * Core NATS service: publish, subscribe, and request-reply.
@@ -148,6 +151,53 @@ trait Nats {
   def outgoingPendingBytes: UIO[Long]
 
   /**
+   * Create and start a NATS microservice.
+   *
+   * The service registers itself for discovery and begins handling requests
+   * immediately. It is automatically stopped (with drain) when the enclosing
+   * [[Scope]] ends.
+   *
+   * Endpoints are created by declaring a [[service.ServiceEndpoint]] and
+   * binding a handler via `implement`:
+   *
+   * ==Example: single endpoint==
+   * {{{
+   * val greet = ServiceEndpoint[String, String]("greet")
+   *
+   * nats.service(
+   *   ServiceConfig("greeter", "1.0.0"),
+   *   greet.implement(name => ZIO.succeed(s"Hello, $name!"))
+   * )
+   * }}}
+   *
+   * ==Example: grouped endpoints==
+   * {{{
+   * val sort = ServiceGroup("sort")
+   * val asc  = ServiceEndpoint[List[Int], List[Int]]("ascending",  group = Some(sort))
+   * val desc = ServiceEndpoint[List[Int], List[Int]]("descending", group = Some(sort))
+   *
+   * nats.service(
+   *   ServiceConfig("sorter", "1.0.0"),
+   *   asc.implement(nums  => ZIO.succeed(nums.sorted)),
+   *   desc.implement(nums => ZIO.succeed(nums.sorted.reverse))
+   * )
+   * }}}
+   *
+   * @param config
+   *   Service name, version, description, and metadata.
+   * @param endpoints
+   *   One or more [[service.BoundEndpoint]]s produced by
+   *   [[service.ServiceEndpoint.implement]] or
+   *   [[service.ServiceEndpoint.implementWithRequest]].
+   * @return
+   *   A [[service.NatsService]] handle for querying stats and identity.
+   */
+  def service(
+    config: ServiceConfig,
+    endpoints: BoundEndpoint*
+  ): ZIO[Scope, NatsError, NatsService]
+
+  /**
    * Escape hatch: access the raw jnats Connection for advanced or unsupported
    * use-cases.
    */
@@ -235,7 +285,7 @@ object Nats {
   ): ZIO[Scope, Nothing, Unit] =
     ZStream
       .repeatZIOOption(
-        ZIO.attemptBlockingInterrupt(queue.take()).mapError(_ => None)
+        ZIO.attemptBlockingInterrupt(queue.take()).orElseFail(None)
       )
       .runForeach(hub.publish)
       .forkScoped
@@ -381,6 +431,44 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
 
   override def outgoingPendingBytes: UIO[Long] =
     ZIO.succeed(conn.outgoingPendingBytes())
+
+  override def service(
+    config: ServiceConfig,
+    endpoints: BoundEndpoint*
+  ): ZIO[Scope, NatsError, NatsService] =
+    for {
+      runtime  <- ZIO.runtime[Any]
+      jService <- buildAndStartService(config, endpoints.toSeq, runtime)
+    } yield new NatsServiceLive(jService)
+
+  private def buildAndStartService(
+    config: ServiceConfig,
+    endpoints: Seq[BoundEndpoint],
+    runtime: Runtime[Any]
+  ): ZIO[Scope, NatsError, JService] =
+    ZIO.acquireRelease(
+      ZIO.attempt {
+        val builder = JService
+          .builder()
+          .connection(conn)
+          .name(config.name)
+          .version(config.version)
+
+        config.description.foreach(builder.description)
+        if (config.metadata.nonEmpty)
+          builder.metadata(config.metadata.asJava)
+        config.drainTimeout.foreach(d => builder.drainTimeout(d.asJava))
+
+        endpoints.foreach { ep =>
+          builder.addServiceEndpoint(ep.buildJava(conn, runtime))
+        }
+
+        val svc = builder.build()
+        svc.startService() // CompletableFuture completes when service stops — do not await
+        svc
+      }
+        .mapError(NatsError.fromThrowable)
+    )(svc => ZIO.attempt(svc.stop()).ignoreLogged)
 
   override def underlying: JConnection = conn
 

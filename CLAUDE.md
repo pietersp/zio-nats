@@ -101,6 +101,7 @@ All publish/put/get/create/update methods are generic `[A: NatsCodec]`. Passing 
 - `JetStreamError` → `JetStreamApiError`, `JetStreamPublishFailed`, `JetStreamConsumeFailed`
 - `KeyValueError` → `KeyNotFound`
 - `ObjectStoreError`
+- `ServiceError` → `ServiceOperationFailed`, `ServiceStartFailed`
 
 ### Package Structure
 
@@ -111,8 +112,24 @@ zio.nats
 ├── jetstream/          JetStream service, management, consumer, models, and config
 ├── kv/                 Key-Value service, management, models, and config
 ├── objectstore/        Object Store service, management, models, and config
+├── service/            NATS Service Framework (Micro protocol) — typed endpoints, discovery, stats
 └── config/             NatsConfig (connection settings only)
 ```
+
+### Service Framework (Micro Protocol)
+
+`ServiceEndpoint[In, Out]` is a declarative typed descriptor for a NATS microservice endpoint. Separate the shape (`.implement` / `.implementWithRequest`) from the handler. Handlers run on the ZIO executor via `runtime.unsafe.fork` — jnats dispatcher threads are never blocked.
+
+Key types (all re-exported from `package object nats`):
+- `ServiceEndpoint[In, Out]` — typed endpoint descriptor; call `.implement[Err]` or `.implementWithRequest[Err]` to get a `BoundEndpoint`
+- `ServiceConfig` — name, version, description, metadata for a service
+- `ServiceGroup` — subject prefix group for organizing endpoints
+- `QueueGroupPolicy` — Default / Disabled / Custom queue group control
+- `ServiceErrorMapper[E]` — typeclass converting handler errors to NATS `(message, code)` pairs
+- `NatsService` — handle to a running service; provides `ping`, `info`, `stats`, `reset`
+- `ServiceDiscovery` — client for cluster-wide service discovery via `$SRV.*`
+
+**Important Scala 3 note:** Infallible handlers (`IO[Nothing, Out]`) require an explicit `[Nothing]` type parameter due to given ambiguity: `ep.implement[Nothing](value => ZIO.succeed(value))`. Handlers with a concrete error type work without annotation.
 
 Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-exporting an opaque type as a plain alias strips its opacity — so they stay in `zio.nats`.
 
@@ -143,4 +160,9 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | `zio-nats/src/main/scala/zio/nats/objectstore/ObjectStoreConfig.scala` | `ObjectStoreConfig` |
 | `zio-nats/src/main/scala/zio/nats/config/NatsConfig.scala` | Connection config (host, port, TLS, reconnect) |
 | `zio-nats/src/main/scala/zio/nats/package.scala` | Type aliases (`NatsIO[A]`), all sub-package re-exports |
+| `zio-nats/src/main/scala/zio/nats/service/ServiceEndpoint.scala` | `ServiceEndpoint[In, Out]`, `BoundEndpoint`, `BoundEndpointLive` |
+| `zio-nats/src/main/scala/zio/nats/service/ServiceConfig.scala` | `ServiceConfig`, `ServiceGroup`, `QueueGroupPolicy`, `ServiceErrorMapper` |
+| `zio-nats/src/main/scala/zio/nats/service/ServiceModels.scala` | `ServiceRequest[A]`, `PingResponse`, `InfoResponse`, `StatsResponse`, `EndpointStats`, `EndpointInfo` |
+| `zio-nats/src/main/scala/zio/nats/service/NatsService.scala` | `NatsService` trait + `NatsServiceLive` |
+| `zio-nats/src/main/scala/zio/nats/service/ServiceDiscovery.scala` | `ServiceDiscovery` trait + `ServiceDiscoveryLive` + companion |
 | `zio-nats-testkit/src/main/scala/zio/nats/NatsTestLayers.scala` | Test layers (Docker NATS) |
