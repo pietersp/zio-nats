@@ -3,7 +3,7 @@ package zio.nats.serialization
 import zio.*
 import zio.blocks.schema.*
 import zio.blocks.schema.json.JsonFormat
-import zio.nats.{NatsCodec, NatsDecodeError}
+import zio.nats.*
 import zio.test.*
 import zio.test.Assertion.*
 

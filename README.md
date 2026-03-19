@@ -10,7 +10,7 @@ A ZIO 2 wrapper for the [jnats](https://github.com/nats-io/nats.java) NATS clien
 - Full API coverage: core pub/sub, JetStream, Key-Value, Object Store
 - `ZStream`-based subscriptions and consumers — no callbacks in user code
 - Typed error model (`NatsError` sealed ADT)
-- Type-safe serialization with [zio-blocks Schema](https://zio.dev/zio-blocks)
+- Type-safe serialization — built-in `Chunk[Byte]`/`String` codecs in core; optional [zio-blocks](https://zio.dev/zio-blocks) integration via `zio-nats-zio-blocks`
 - Zero raw jnats types in user code — `import zio.nats.*` is all you need
 - Scala 3
 
@@ -19,8 +19,13 @@ A ZIO 2 wrapper for the [jnats](https://github.com/nats-io/nats.java) NATS clien
 Add to `build.sbt`:
 
 ```scala
-// Core library
+// Core library — pub/sub, JetStream, KV, Object Store, Service Framework
+// Built-in codecs for Chunk[Byte] and String only; no zio-blocks dependency
 libraryDependencies += "dev.zio" %% "zio-nats" % "<version>"
+
+// Optional: zio-blocks integration for type-safe serialization
+// Adds NatsCodec.fromFormat(JsonFormat / AvroFormat / etc.)
+libraryDependencies += "dev.zio" %% "zio-nats-zio-blocks" % "<version>"
 
 // Testkit (for integration tests — brings in testcontainers)
 libraryDependencies += "dev.zio" %% "zio-nats-testkit" % "<version>" % Test
@@ -176,10 +181,10 @@ zio-nats supports type-safe publish/subscribe using [zio-blocks Schema](https://
 
 ### Setup
 
-Add the zio-blocks-schema dependency (JSON is the default):
+Add `zio-nats-zio-blocks` (which brings in `zio-blocks-schema` transitively):
 
 ```scala
-libraryDependencies += "dev.zio" %% "zio-blocks-schema" % "0.0.29"
+libraryDependencies += "dev.zio" %% "zio-nats-zio-blocks" % "<version>"
 ```
 
 Define schemas for your types and install a codec builder:
@@ -269,16 +274,16 @@ given auditCodec: NatsCodec[AuditEvent] =
 
 ### Available formats
 
-Add the corresponding zio-blocks artifact for the format you need:
+`zio-nats-zio-blocks` brings in `zio-blocks-schema` (JSON) transitively. For other formats add the corresponding artifact alongside it:
 
 ```scala
-// build.sbt — pick one (or more)
-libraryDependencies += "dev.zio" %% "zio-blocks-schema"          % "0.0.29" // JSON
-libraryDependencies += "dev.zio" %% "zio-blocks-schema-avro"     % "0.0.29"
-libraryDependencies += "dev.zio" %% "zio-blocks-schema-toon"     % "0.0.29"
-libraryDependencies += "dev.zio" %% "zio-blocks-schema-msgpack"  % "0.0.29"
-libraryDependencies += "dev.zio" %% "zio-blocks-schema-thrift"   % "0.0.29"
-libraryDependencies += "dev.zio" %% "zio-blocks-schema-bson"     % "0.0.29"
+// build.sbt — zio-nats-zio-blocks is always required; add format artifacts as needed
+libraryDependencies += "dev.zio" %% "zio-nats-zio-blocks"        % "<version>" // always
+libraryDependencies += "dev.zio" %% "zio-blocks-schema-avro"     % "0.0.29"    // Avro
+libraryDependencies += "dev.zio" %% "zio-blocks-schema-toon"     % "0.0.29"    // Toon
+libraryDependencies += "dev.zio" %% "zio-blocks-schema-msgpack"  % "0.0.29"    // MessagePack
+libraryDependencies += "dev.zio" %% "zio-blocks-schema-thrift"   % "0.0.29"    // Thrift
+libraryDependencies += "dev.zio" %% "zio-blocks-schema-bson"     % "0.0.29"    // BSON
 ```
 
 ```scala
@@ -564,24 +569,27 @@ os.watch(ObjectStoreWatchOptions(
 
 ## Connection Events
 
-Wire up `NatsConnectionEvents` before connecting — the customizer must be applied to `NatsConfig.optionsCustomizer`:
+`Nats.lifecycleEvents` is a `ZStream[Any, Nothing, NatsEvent]` that emits connection state changes. Fork it alongside your program:
 
 ```scala
-ZIO.scoped {
-  NatsConnectionEvents.make.flatMap { case (events, customizer) =>
-    val logEvents = events
-      .collect { case NatsEvent.Disconnected(url) => url }
-      .tap(url => ZIO.logWarning(s"Disconnected from $url"))
-      .runDrain
-      .fork
+for {
+  nats <- ZIO.service[Nats]
+  _    <- nats.lifecycleEvents
+            .tap(e => ZIO.logInfo(s"[nats] $e"))
+            .runDrain
+            .fork
+  _    <- program
+} yield ()
+```
 
-    val natsLayer =
-      ZLayer.succeed(NatsConfig.default.copy(optionsCustomizer = customizer)) >>>
-      Nats.live
+Filter to specific events:
 
-    logEvents *> program.provide(natsLayer)
-  }
-}
+```scala
+nats.lifecycleEvents
+  .collect { case NatsEvent.Disconnected(url) => url }
+  .tap(url => ZIO.logWarning(s"Disconnected from $url"))
+  .runDrain
+  .fork
 ```
 
 Event ADT:
@@ -713,16 +721,24 @@ program.provide(Nats.default)
 
 ## Examples
 
-See [`examples/`](examples/) for runnable apps. All require a running NATS server; `RealisticApp` additionally requires JetStream (`docker run -p 4222:4222 nats -js`).
+See [`examples/`](examples/) for runnable apps. `QuickStartApp` requires only a plain NATS server; all others require JetStream (`docker run -p 4222:4222 nats -js`).
 
-| File                                                                         | What it shows                                                   |
-|------------------------------------------------------------------------------|-----------------------------------------------------------------|
-| [`QuickStartApp`](examples/src/main/scala/QuickStartApp.scala)               | Connect, publish, subscribe raw, receive 3 messages             |
-| [`RealisticApp`](examples/src/main/scala/RealisticApp.scala)                 | JetStream + KV + connection events, graceful shutdown           |
-| [`TypedMessagingApp`](examples/src/main/scala/TypedMessagingApp.scala)       | Type-safe publish/subscribe with `NatsCodec` and `Envelope[A]` |
+| File                                                                             | What it shows                                                    |
+|----------------------------------------------------------------------------------|------------------------------------------------------------------|
+| [`QuickStartApp`](examples/src/main/scala/QuickStartApp.scala)                   | Connect, publish, subscribe, receive 3 messages                  |
+| [`TypedMessagingApp`](examples/src/main/scala/TypedMessagingApp.scala)           | Type-safe pub/sub with `NatsCodec` and `Envelope[A]`             |
+| [`JetStreamApp`](examples/src/main/scala/JetStreamApp.scala)                     | JetStream publish, fetch, consume, ordered consumer              |
+| [`KeyValueApp`](examples/src/main/scala/KeyValueApp.scala)                       | KV put/get/watch/history with typed codec                        |
+| [`ObjectStoreApp`](examples/src/main/scala/ObjectStoreApp.scala)                 | Object store chunked upload, streaming, links, watch             |
+| [`ServiceApp`](examples/src/main/scala/ServiceApp.scala)                         | Service framework: typed endpoints, discovery, stats             |
+| [`RealisticApp`](examples/src/main/scala/RealisticApp.scala)                     | JetStream + KV end-to-end order processing                       |
 
 ```
 sbt "zioNatsExamples/runMain QuickStartApp"
-sbt "zioNatsExamples/runMain RealisticApp"
 sbt "zioNatsExamples/runMain TypedMessagingApp"
+sbt "zioNatsExamples/runMain JetStreamApp"
+sbt "zioNatsExamples/runMain KeyValueApp"
+sbt "zioNatsExamples/runMain ObjectStoreApp"
+sbt "zioNatsExamples/runMain ServiceApp"
+sbt "zioNatsExamples/runMain RealisticApp"
 ```

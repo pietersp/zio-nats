@@ -18,7 +18,7 @@ inThisBuild(
 )
 
 lazy val root = (project in file("."))
-  .aggregate(zioNats, zioNatsTestkit, zioNatsTest, zioNatsExamples)
+  .aggregate(zioNats, zioNatsZioBlocks, zioNatsTestkit, zioNatsTest, zioNatsExamples)
   .settings(
     name               := "zio-nats-root",
     publish / skip     := true,
@@ -30,10 +30,19 @@ lazy val zioNats = (project in file("zio-nats"))
   .settings(
     name := "zio-nats",
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio"               % zioVersion,
-      "dev.zio" %% "zio-streams"       % zioVersion,
-      "dev.zio" %% "zio-blocks-schema" % zioBlocksVersion,
-      "io.nats"  % "jnats"             % jnatsVersion
+      "dev.zio" %% "zio"         % zioVersion,
+      "dev.zio" %% "zio-streams" % zioVersion,
+      "io.nats"  % "jnats"       % jnatsVersion
+    )
+  )
+
+lazy val zioNatsZioBlocks = (project in file("zio-nats-zio-blocks"))
+  .enablePlugins(ScoverageSbtPlugin)
+  .dependsOn(zioNats)
+  .settings(
+    name := "zio-nats-zio-blocks",
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio-blocks-schema" % zioBlocksVersion
     )
   )
 
@@ -48,7 +57,7 @@ lazy val zioNatsTestkit = (project in file("zio-nats-testkit"))
   )
 
 lazy val zioNatsTest = (project in file("zio-nats-test"))
-  .dependsOn(zioNats, zioNatsTestkit)
+  .dependsOn(zioNats, zioNatsZioBlocks, zioNatsTestkit)
   .settings(
     name           := "zio-nats-test",
     publish / skip := true,
@@ -76,7 +85,7 @@ lazy val zioNatsTest = (project in file("zio-nats-test"))
   )
 
 lazy val zioNatsExamples = (project in file("examples"))
-  .dependsOn(zioNats)
+  .dependsOn(zioNats, zioNatsZioBlocks)
   .settings(
     name           := "zio-nats-examples",
     publish / skip := true

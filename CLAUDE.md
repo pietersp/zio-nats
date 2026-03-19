@@ -30,13 +30,14 @@ Tests use real NATS via testcontainers (Docker required). They start automatical
 
 ## Project Layout
 
-Four sbt subprojects:
+Five sbt subprojects:
 
 | Subproject | Purpose |
 |-----------|---------|
-| `zio-nats` | Core library — all public API |
+| `zio-nats` | Core library — all public API; no zio-blocks dependency |
+| `zio-nats-zio-blocks` | Optional zio-blocks integration (`NatsCodec.fromFormat`, `Builder`) |
 | `zio-nats-testkit` | `NatsTestLayers` for integration tests |
-| `zio-nats-test` | Integration test suite (24 tests) |
+| `zio-nats-test` | Integration test suite (122 tests) |
 | `examples` | Runnable demos |
 
 ## Architecture
@@ -59,20 +60,23 @@ Connection lifecycle events are exposed via `Nats.lifecycleEvents: ZStream[Nats,
 
 ### Typed Serialization
 
-`NatsCodec[A]` is the serialization typeclass. It is resolved implicitly at compile time.
+`NatsCodec[A]` is the serialization typeclass. It is resolved implicitly at compile time. The core
+module (`zio-nats`) has **no zio-blocks dependency** — it only provides built-in codecs for
+`Chunk[Byte]` and `String`.
 
-- Built-in instances: `NatsCodec[Chunk[Byte]]` (identity) and `NatsCodec[String]` (UTF-8).
-- For domain types: derive from a zio-blocks `Format` + `Schema`:
+- Built-in instances (core): `NatsCodec[Chunk[Byte]]` (identity) and `NatsCodec[String]` (UTF-8).
+- For domain types with zio-blocks schemas, add `zio-nats-zio-blocks` and use:
   ```scala
   val builder = NatsCodec.fromFormat(JsonFormat)
   import builder.derived  // enables implicit NatsCodec[A] for any A with a Schema
   ```
-- Multiple formats can coexist; per-type overrides are plain `implicit val`s.
+- For custom codecs with no framework: implement `NatsCodec[A]` directly (depends only on core).
+- Multiple formats can coexist; per-type overrides are plain `given val`s.
 
-#### Codec lifecycle guarantees
+#### zio-blocks integration (`zio-nats-zio-blocks`)
 
-`NatsCodec.Builder.derived[A]` is a polymorphic `given` (equivalent to `implicit def`), so it
-creates a new instance on every implicit resolution. To avoid redundant re-derivation, `Builder`
+`NatsCodecZioBlocks.Builder.derived[A]` is a polymorphic `given` (equivalent to `implicit def`), so
+it creates a new instance on every implicit resolution. To avoid redundant re-derivation, `Builder`
 caches codec instances in a `ConcurrentHashMap` keyed on the `Schema[A]` instance. This means:
 
 1. **Lazy first-use construction** — `NatsSerializer.makeFor[A](format)` is called the first time
@@ -84,6 +88,10 @@ caches codec instances in a `ConcurrentHashMap` keyed on the `Schema[A]` instanc
 3. **Safe encode** — once the codec is constructed, `NatsCodec[A].encode(value)` delegates to a
    pre-built `NatsSerializer.CompiledCodec[A]`. Any residual throw (e.g. OOM) is a library defect,
    not a schema error.
+
+`NatsCodec.fromFormat` and `NatsCodec.derived` are extension methods defined in
+`NatsCodecZioBlocksExtensions` (in `package zio.nats`). They are available via `import zio.nats.*`
+when `zio-nats-zio-blocks` is on the classpath — no migration for existing users.
 
 At every call site (`publish`, `put`, `create`, `update`, etc.) the `encode` call is wrapped in
 `ZIO.attempt(...).mapError(e => NatsError.SerializationError(...))` so even defect-level throws
@@ -121,7 +129,7 @@ zio.nats
 `ServiceEndpoint[In, Out]` is a declarative typed descriptor for a NATS microservice endpoint. Separate the shape (`.implement` / `.implementWithRequest`) from the handler. Handlers run on the ZIO executor via `runtime.unsafe.fork` — jnats dispatcher threads are never blocked.
 
 Key types (all re-exported from `package object nats`):
-- `ServiceEndpoint[In, Out]` — typed endpoint descriptor; call `.implement[Err]` or `.implementWithRequest[Err]` to get a `BoundEndpoint`
+- `ServiceEndpoint[In, Err, Out]` — typed endpoint descriptor; call `.implement` or `.implementWithRequest` to get a `BoundEndpoint`
 - `ServiceConfig` — name, version, description, metadata for a service
 - `ServiceGroup` — subject prefix group for organizing endpoints
 - `QueueGroupPolicy` — Default / Disabled / Custom queue group control
@@ -140,8 +148,10 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | File | Contents |
 |------|----------|
 | `zio-nats/src/main/scala/zio/nats/Nats.scala` | Core pub/sub service + `NatsLive`; `lifecycleEvents` stream |
-| `zio-nats/src/main/scala/zio/nats/NatsCodec.scala` | Serialization typeclass + `Builder` (eager codec construction via `NatsSerializer.makeFor`) |
-| `zio-nats/src/main/scala/zio/nats/serialization/NatsSerializer.scala` | `CompiledCodec[A]` sealed trait, `makeFor[A](format)` factory (eager, can throw), `BinaryCompiledCodec` / `TextCompiledCodec` impls, static one-shot `encode`/`decode` for backward compat |
+| `zio-nats/src/main/scala/zio/nats/NatsCodec.scala` | Serialization typeclass; built-in `bytesCodec` and `stringCodec` only (no zio-blocks) |
+| `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocks.scala` | `NatsCodecZioBlocks.Builder` — derives `NatsCodec[A]` from a zio-blocks `Format` + `Schema`; caches in `ConcurrentHashMap` |
+| `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocksExtensions.scala` | Extension methods `NatsCodec.fromFormat` and `NatsCodec.derived` (available via `import zio.nats.*`) |
+| `zio-nats-zio-blocks/src/main/scala/zio/nats/serialization/NatsSerializer.scala` | `CompiledCodec[A]` sealed trait, `makeFor[A](format)` factory (eager, can throw), `BinaryCompiledCodec` / `TextCompiledCodec` impls |
 | `zio-nats/src/main/scala/zio/nats/NatsError.scala` | Error hierarchy |
 | `zio-nats/src/main/scala/zio/nats/NatsCoreTypes.scala` | `Subject` (opaque), `QueueGroup` (opaque), `Headers`, `PublishParams`, `StorageType`, `ConnectionStatus`, `NatsServerInfo` |
 | `zio-nats/src/main/scala/zio/nats/NatsModels.scala` | `Envelope[+A]`, `ConnectionStats` |
