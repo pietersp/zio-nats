@@ -174,7 +174,7 @@ object ObjectStoreApp extends ZIOAppDefault {
       _ <- Console.printLine("\n[list]").orDie
 
       objects <- os.list
-      _       <- ZIO.foreach(objects.sortBy(_.name)) { s =>
+      _       <- ZIO.foreachDiscard(objects.sortBy(_.name)) { s =>
              Console.printLine(s"  ${s.name} (${s.size} bytes)").orDie
            }
 

@@ -1154,4 +1154,46 @@ Tests use the existing testcontainers setup from `NatsTestLayers`.
 - **`CompletableFuture` from `startService()`:** The future completes when the service *stops*, not when it starts. The service is ready immediately after `build()` + `startService()`. Do not `await` this future during setup.
 - **ZIO-HTTP comparison:** Our `ServiceEndpoint[In, Out]` + `.implement` pattern is directly inspired by ZIO-HTTP's `Endpoint[PathInput, Input, Err, Output, Auth]` + `.implement`. The key simplification is that NATS has one payload (no path/query/header accumulation via `Combiner`) and a simple error model (message + code, no structured error body via `HttpCodec`).
 - **Fiber fork vs blocking run:** The initial design used `runtime.unsafe.run().getOrThrowFiberFailure()` which blocks jnats dispatcher threads. The updated design uses `runtime.unsafe.fork` (inspired by ZIO-HTTP's Netty bridge) so the dispatcher thread is free immediately. The response is sent asynchronously from the ZIO fiber.
+
+---
+
+## Addendum: Promote `Err` to a Type Parameter on `ServiceEndpoint` (2026-03-19)
+
+### Motivation
+
+The initial implementation placed the error type only at handler-binding time via an explicit type argument on `implement[Err]` / `implementWithRequest[Err]`. Infallible handlers required the awkward `implement[Nothing](...)` annotation. This was inconsistent with the ZIO-HTTP `Endpoint` style, where the full shape (including error type) is encoded in the descriptor.
+
+### What Changed
+
+`ServiceEndpoint` was promoted from a 2-type-parameter shape to a 3-type-parameter shape `ServiceEndpoint[In, Err, Out]`, with `ServiceErrorMapper[Err]` captured as a `using` parameter on the descriptor itself. As a consequence, `implement` and `implementWithRequest` no longer take an `[Err]` type argument — the error type is already known from the endpoint.
+
+`ServiceEndpoint` was changed from a `final case class` to a `final class` (with explicit `val` fields) to avoid a Scala 3 restriction: two overloaded `apply` variants cannot both carry default arguments, and the case class compiler-generated `apply` would have conflicted with the 2-type-param companion factory.
+
+### New API Surface
+
+```scala
+// Infallible endpoint — Err = Nothing, no annotation needed on implement
+val echo = ServiceEndpoint[String, String]("echo")
+val bound = echo.implement(ZIO.succeed(_))          // no [Nothing] required
+
+// Endpoint with a domain error type — declare it on the descriptor
+given ServiceErrorMapper[UserError] with { ... }
+val lookup = ServiceEndpoint[UserQuery, UserResponse]("lookup").withError[UserError]
+val bound2 = lookup.implement(q => UserRepo.find(q))  // error type inferred as UserError
+```
+
+The `withError[E: ServiceErrorMapper]` builder method returns a new `ServiceEndpoint[In, E, Out]` with all other fields copied, making it easy to layer error typing onto an existing infallible descriptor.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `service/ServiceEndpoint.scala` | `final class ServiceEndpoint[In, Err, Out]`; `errorMapper` captured as `using` param; `implement`/`implementWithRequest` drop `[Err]` type param; `withError[E]` builder added; 2-type-param companion `apply` (defaults `Err = Nothing`) |
+| `package.scala` | Type alias updated: `ServiceEndpoint[In, Out]` → `ServiceEndpoint[In, Err, Out]` |
+| `ServiceSpec.scala` | All `implement[Nothing]` / `implementWithRequest[Nothing]` annotations removed; domain-error test uses `.withError[String]` on the descriptor |
+| `ServiceApp.scala` | `implement[Nothing]` annotation removed |
+
+### Why `final class` over `final case class`
+
+Scala 3 forbids more than one overloaded method variant with default arguments (regardless of type-parameter arity). The case class compiler plugin generates a 3-type-param `apply` with defaults matching the constructor; adding a 2-type-param `apply` with defaults in the companion triggers this error. Converting to `final class` with explicit `val` fields avoids the generated `apply` entirely, leaving the companion free to define the single 2-type-param factory with defaults.
 - **Supersedes `NatsRpc`:** The existing `NatsRpc.respond[A, B](subject)(handler)` in `NatsRpc.scala` solves the same problem — typed request-reply handlers — but without discovery, monitoring, stats, grouped endpoints, queue group load balancing, or typed error mapping. Once the service framework ships, `NatsRpc` should be deprecated (and eventually removed). The migration path is straightforward: `NatsRpc.respond[A, B](subject)(handler)` becomes `ServiceEndpoint[A, B](name).implement(handler)` registered on a `NatsService`.

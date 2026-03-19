@@ -176,7 +176,7 @@ package object nats {
   type QueueGroupPolicy      = service.QueueGroupPolicy; val QueueGroupPolicy = service.QueueGroupPolicy
   type ServiceErrorMapper[E] = service.ServiceErrorMapper[E]
   val ServiceErrorMapper = service.ServiceErrorMapper
-  type ServiceEndpoint[In, Out] = service.ServiceEndpoint[In, Out]
+  type ServiceEndpoint[In, Err, Out] = service.ServiceEndpoint[In, Err, Out]
   val ServiceEndpoint = service.ServiceEndpoint
   type BoundEndpoint      = service.BoundEndpoint
   type ServiceRequest[+A] = service.ServiceRequest[A]; val ServiceRequest  = service.ServiceRequest

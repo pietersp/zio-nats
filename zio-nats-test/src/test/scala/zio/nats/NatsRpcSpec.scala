@@ -69,7 +69,7 @@ object NatsRpcSpec extends ZIOSpecDefault {
           _        <- fiber.interrupt
           // Responder must still be alive — a valid request should succeed
           validReply <- nats.request[String, String](Subject("rpc.decodeerr"), "hello", 5.seconds)
-        } yield assertTrue(!gotReply) && assertTrue(validReply.value == "ok")
+        } yield assertTrue(!gotReply, validReply.value == "ok")
       }
     },
 
@@ -100,7 +100,7 @@ object NatsRpcSpec extends ZIOSpecDefault {
           _        <- fiber.interrupt
           // Responder must still be alive — a valid request should succeed
           validReply <- nats.request[String, String](Subject("rpc.handlererr"), "ping", 5.seconds)
-        } yield assertTrue(!gotReply) && assertTrue(validReply.value == "echo:ping")
+        } yield assertTrue(!gotReply, validReply.value == "echo:ping")
       }
     }
   ).provideShared(

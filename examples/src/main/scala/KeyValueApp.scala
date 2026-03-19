@@ -131,7 +131,7 @@ object KeyValueApp extends ZIOAppDefault {
 
       _         <- Console.printLine("\n[history] dark-mode:").orDie
       revisions <- kv.history[FeatureFlag]("dark-mode")
-      _         <- ZIO.foreach(revisions) { env =>
+      _         <- ZIO.foreachDiscard(revisions) { env =>
              Console
                .printLine(
                  s"  rev=${env.revision} enabled=${env.value.enabled} rollout=${env.value.rolloutPercent}%"

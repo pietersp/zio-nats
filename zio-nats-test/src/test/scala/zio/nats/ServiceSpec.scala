@@ -15,7 +15,7 @@ object ServiceSpec extends ZIOSpecDefault {
           ep    = ServiceEndpoint[String, String]("hello")
           svc  <- nats.service(
                    ServiceConfig("ping-test", "1.0.0"),
-                   ep.implement[Nothing](name => ZIO.succeed(s"Hi $name"))
+                   ep.implement(name => ZIO.succeed(s"Hi $name"))
                  )
           discovery <- ServiceDiscovery.make(maxWait = 3.seconds, maxResults = 5)
           responses <- discovery.ping("ping-test")
@@ -34,7 +34,7 @@ object ServiceSpec extends ZIOSpecDefault {
         for {
           nats  <- ZIO.service[Nats]
           ep     = ServiceEndpoint[String, String]("echo")
-          _     <- nats.service(ServiceConfig("echo-svc", "1.0.0"), ep.implement[Nothing](ZIO.succeed(_)))
+          _     <- nats.service(ServiceConfig("echo-svc", "1.0.0"), ep.implement(ZIO.succeed(_)))
           _     <- ZIO.sleep(200.millis)
           reply <- nats.request[String, String](Subject("echo"), "hello", 5.seconds)
         } yield assertTrue(reply.value == "hello")
@@ -49,8 +49,8 @@ object ServiceSpec extends ZIOSpecDefault {
           shout = ServiceEndpoint[String, String]("shout")
           _    <- nats.service(
                  ServiceConfig("multi-svc", "1.0.0"),
-                 greet.implement[Nothing](name => ZIO.succeed(s"Hello, $name")),
-                 shout.implement[Nothing](name => ZIO.succeed(name.toUpperCase))
+                 greet.implement(name => ZIO.succeed(s"Hello, $name")),
+                 shout.implement(name => ZIO.succeed(name.toUpperCase))
                )
           _  <- ZIO.sleep(200.millis)
           r1 <- nats.request[String, String](Subject("greet"), "world", 5.seconds)
@@ -68,8 +68,8 @@ object ServiceSpec extends ZIOSpecDefault {
           desc  = ServiceEndpoint[String, String]("descending", group = Some(sort))
           _    <- nats.service(
                  ServiceConfig("sort-svc", "1.0.0"),
-                 asc.implement[Nothing](s => ZIO.succeed(s.split(",").sorted.mkString(","))),
-                 desc.implement[Nothing](s => ZIO.succeed(s.split(",").sorted.reverse.mkString(",")))
+                 asc.implement(s => ZIO.succeed(s.split(",").sorted.mkString(","))),
+                 desc.implement(s => ZIO.succeed(s.split(",").sorted.reverse.mkString(",")))
                )
           _  <- ZIO.sleep(200.millis)
           r1 <- nats.request[String, String](Subject("sort.ascending"), "c,a,b", 5.seconds)
@@ -82,10 +82,10 @@ object ServiceSpec extends ZIOSpecDefault {
       ZIO.scoped {
         for {
           nats <- ZIO.service[Nats]
-          ep    = ServiceEndpoint[String, String]("maybe-fail")
+          ep    = ServiceEndpoint[String, String]("maybe-fail").withError[String]
           _    <- nats.service(
                  ServiceConfig("error-svc", "1.0.0"),
-                 ep.implement[String](_ => ZIO.fail("intentional error"))
+                 ep.implement(_ => ZIO.fail("intentional error"))
                )
           _ <- ZIO.sleep(200.millis)
           // Service sends a NATS service error; the caller gets an error response header
@@ -101,7 +101,7 @@ object ServiceSpec extends ZIOSpecDefault {
           ep    = ServiceEndpoint[String, String]("timestamp")
           _    <- nats.service(
                  ServiceConfig("clock-svc", "1.0.0"),
-                 ep.implement[Nothing](_ => Clock.instant.map(_.toString))
+                 ep.implement(_ => Clock.instant.map(_.toString))
                )
           _     <- ZIO.sleep(200.millis)
           reply <- nats.request[String, String](Subject("timestamp"), "now", 5.seconds)
@@ -116,7 +116,7 @@ object ServiceSpec extends ZIOSpecDefault {
           ep    = ServiceEndpoint[String, String]("inspect")
           _    <- nats.service(
                  ServiceConfig("inspect-svc", "1.0.0"),
-                 ep.implementWithRequest[Nothing] { req =>
+                 ep.implementWithRequest { req =>
                    val traceId = req.headers.get("X-Trace-Id").headOption.getOrElse("none")
                    ZIO.succeed(s"subj=${req.subject.value} trace=$traceId payload=${req.value}")
                  }
@@ -137,7 +137,7 @@ object ServiceSpec extends ZIOSpecDefault {
           ep    = ServiceEndpoint[String, String]("counted")
           svc  <- nats.service(
                    ServiceConfig("stats-svc", "1.0.0"),
-                   ep.implement[Nothing](ZIO.succeed(_))
+                   ep.implement(ZIO.succeed(_))
                  )
           _ <- ZIO.sleep(200.millis)
           _ <- nats.request[String, String](Subject("counted"), "a", 5.seconds)
@@ -157,7 +157,7 @@ object ServiceSpec extends ZIOSpecDefault {
           ep    = ServiceEndpoint[String, String]("resetme")
           svc  <- nats.service(
                    ServiceConfig("reset-svc", "1.0.0"),
-                   ep.implement[Nothing](ZIO.succeed(_))
+                   ep.implement(ZIO.succeed(_))
                  )
           _ <- ZIO.sleep(200.millis)
           _ <- nats.request[String, String](Subject("resetme"), "x", 5.seconds)
@@ -178,7 +178,7 @@ object ServiceSpec extends ZIOSpecDefault {
         _    <- ZIO.scoped {
                nats.service(
                  ServiceConfig("transient-svc", "1.0.0"),
-                 ep.implement[Nothing](ZIO.succeed(_))
+                 ep.implement(ZIO.succeed(_))
                )
              }
         // After scope closes the service is unregistered; request should time out
@@ -194,8 +194,8 @@ object ServiceSpec extends ZIOSpecDefault {
           ep2   = ServiceEndpoint[String, String]("ep-b")
           _    <- nats.service(
                  ServiceConfig("info-svc", "1.0.0", description = Some("test service")),
-                 ep1.implement[Nothing](ZIO.succeed(_)),
-                 ep2.implement[Nothing](ZIO.succeed(_))
+                 ep1.implement(ZIO.succeed(_)),
+                 ep2.implement(ZIO.succeed(_))
                )
           _         <- ZIO.sleep(200.millis)
           discovery <- ServiceDiscovery.make(maxWait = 3.seconds)
@@ -215,7 +215,7 @@ object ServiceSpec extends ZIOSpecDefault {
           ep    = ServiceEndpoint[String, String]("stat-ep")
           _    <- nats.service(
                  ServiceConfig("disc-stats-svc", "1.0.0"),
-                 ep.implement[Nothing](ZIO.succeed(_))
+                 ep.implement(ZIO.succeed(_))
                )
           _         <- ZIO.sleep(200.millis)
           _         <- nats.request[String, String](Subject("stat-ep"), "ping", 5.seconds)

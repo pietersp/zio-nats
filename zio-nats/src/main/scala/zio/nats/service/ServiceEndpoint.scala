@@ -20,46 +20,48 @@ import scala.jdk.CollectionConverters._
  * A declarative, typed descriptor for a NATS service endpoint.
  *
  * Captures the endpoint's name, optional subject override, queue group policy,
- * optional group prefix, metadata, and — crucially — the input and output types
- * with their [[NatsCodec]] instances. The descriptor is inert: it describes the
- * shape of an endpoint but contains no handler logic.
+ * optional group prefix, metadata, and — crucially — the input type, error
+ * type, and output type with their [[NatsCodec]] / [[ServiceErrorMapper]]
+ * instances. The descriptor is inert: it describes the shape of an endpoint but
+ * contains no handler logic.
  *
  * To create a running endpoint, call [[implement]] or [[implementWithRequest]]
  * to bind a handler function:
  *
  * {{{
- * // 1. Declare the endpoint shape
- * val lookup = ServiceEndpoint[UserQuery, UserResponse]("lookup")
+ * // Infallible endpoint (Err = Nothing)
+ * val echo = ServiceEndpoint[String, String]("echo")
+ * val bound = echo.implement(payload => ZIO.succeed(payload))
  *
- * // 2. Bind a handler — the framework handles decode/encode
- * val bound = lookup.implement { query =>
- *   ZIO.succeed(UserResponse(query.id, "Alice", "alice@example.com"))
- * }
- *
- * // 3. Register on a service
- * nats.service(ServiceConfig("users", "1.0.0"), bound)
+ * // Endpoint with a domain error type
+ * given ServiceErrorMapper[UserError] with { ... }
+ * val lookup = ServiceEndpoint[UserQuery, UserResponse]("lookup").withError[UserError]
+ * val bound2 = lookup.implement(q => UserRepo.find(q))
  * }}}
  *
  * @tparam In
  *   The request payload type (decoded from bytes via `NatsCodec[In]`).
+ * @tparam Err
+ *   The handler error type. Use `Nothing` for infallible handlers. Use
+ *   `.withError[E]` on a 2-type-param endpoint to set a domain error type.
  * @tparam Out
  *   The response payload type (encoded to bytes via `NatsCodec[Out]`).
  */
-final case class ServiceEndpoint[In, Out](
+final class ServiceEndpoint[In, Err, Out](
   /** Endpoint name — used as the NATS subject unless [[subject]] is set. */
-  name: String,
+  val name: String,
   /**
    * Optional subject override. If [[None]], the [[name]] is used as the NATS
    * subject. Wildcards are supported (e.g. `"events.>"`).
    */
-  subject: Option[String] = None,
+  val subject: Option[String] = None,
   /** Queue group policy for load balancing (default: use `"q"`). */
-  queueGroup: QueueGroupPolicy = QueueGroupPolicy.Default,
+  val queueGroup: QueueGroupPolicy = QueueGroupPolicy.Default,
   /** Optional group prefix to prepend to the endpoint subject. */
-  group: Option[ServiceGroup] = None,
+  val group: Option[ServiceGroup] = None,
   /** Optional key-value metadata attached to this endpoint. */
-  metadata: Map[String, String] = Map.empty
-)(using val inCodec: NatsCodec[In], val outCodec: NatsCodec[Out]):
+  val metadata: Map[String, String] = Map.empty
+)(using val inCodec: NatsCodec[In], val outCodec: NatsCodec[Out], val errorMapper: ServiceErrorMapper[Err]):
 
   /**
    * Bind a handler function to this endpoint, producing a [[BoundEndpoint]].
@@ -70,23 +72,20 @@ final case class ServiceEndpoint[In, Out](
    *   - Encodes the `Out` result using the captured `NatsCodec[Out]`.
    *   - Sends the encoded bytes as the NATS reply.
    *
-   * If the handler fails with `Err`, the `ServiceErrorMapper[Err]` converts it
-   * to a NATS service error response. If decoding or encoding fails, a 500
-   * error response is sent automatically.
+   * If the handler fails with `Err`, the `ServiceErrorMapper[Err]` (captured on
+   * this endpoint) converts it to a NATS service error response. If decoding or
+   * encoding fails, a 500 error response is sent automatically.
    *
    * {{{
    * val echo = ServiceEndpoint[String, String]("echo")
    * val bound = echo.implement(name => ZIO.succeed(s"Hello, $name!"))
    * }}}
    */
-  def implement[Err: ServiceErrorMapper](
-    handler: In => IO[Err, Out]
-  ): BoundEndpoint =
+  def implement(handler: In => IO[Err, Out]): BoundEndpoint =
     new BoundEndpointLive[In, Err, Out](
       name = name,
       endpoint = this,
-      handler = req => handler(req.value),
-      errorMapper = summon[ServiceErrorMapper[Err]]
+      handler = req => handler(req.value)
     )
 
   /**
@@ -105,15 +104,55 @@ final case class ServiceEndpoint[In, Out](
    * }
    * }}}
    */
-  def implementWithRequest[Err: ServiceErrorMapper](
-    handler: ServiceRequest[In] => IO[Err, Out]
-  ): BoundEndpoint =
+  def implementWithRequest(handler: ServiceRequest[In] => IO[Err, Out]): BoundEndpoint =
     new BoundEndpointLive[In, Err, Out](
       name = name,
       endpoint = this,
-      handler = handler,
-      errorMapper = summon[ServiceErrorMapper[Err]]
+      handler = handler
     )
+
+  /**
+   * Return a copy of this endpoint descriptor with the error type refined to
+   * `E`. Requires a `ServiceErrorMapper[E]` in implicit scope.
+   *
+   * {{{
+   * given ServiceErrorMapper[UserError] with { ... }
+   * val ep = ServiceEndpoint[UserQuery, UserResponse]("lookup").withError[UserError]
+   * val bound = ep.implement(q => UserRepo.find(q))
+   * }}}
+   */
+  def withError[E: ServiceErrorMapper]: ServiceEndpoint[In, E, Out] =
+    new ServiceEndpoint[In, E, Out](name, subject, queueGroup, group, metadata)(using
+      inCodec,
+      outCodec,
+      summon[ServiceErrorMapper[E]]
+    )
+
+// ---------------------------------------------------------------------------
+// ServiceEndpoint companion — 2-type-param factory for infallible endpoints
+// ---------------------------------------------------------------------------
+
+object ServiceEndpoint:
+  /**
+   * Construct an infallible endpoint descriptor (`Err = Nothing`).
+   *
+   * This is the primary factory for endpoints whose handlers never fail. The
+   * resulting `ServiceEndpoint[In, Nothing, Out]` does not require an explicit
+   * `[Nothing]` annotation on `implement`:
+   *
+   * {{{
+   * val echo = ServiceEndpoint[String, String]("echo")
+   * val bound = echo.implement(ZIO.succeed(_)) // no [Nothing] needed
+   * }}}
+   */
+  def apply[In, Out](
+    name: String,
+    subject: Option[String] = None,
+    queueGroup: QueueGroupPolicy = QueueGroupPolicy.Default,
+    group: Option[ServiceGroup] = None,
+    metadata: Map[String, String] = Map.empty
+  )(using NatsCodec[In], NatsCodec[Out]): ServiceEndpoint[In, Nothing, Out] =
+    new ServiceEndpoint[In, Nothing, Out](name, subject, queueGroup, group, metadata)
 
 // ---------------------------------------------------------------------------
 // BoundEndpoint — type-erased, ready-to-register unit
@@ -144,14 +183,14 @@ trait BoundEndpoint:
 
 private[nats] class BoundEndpointLive[In, Err, Out](
   val name: String,
-  endpoint: ServiceEndpoint[In, Out],
-  handler: ServiceRequest[In] => IO[Err, Out],
-  errorMapper: ServiceErrorMapper[Err]
+  endpoint: ServiceEndpoint[In, Err, Out],
+  handler: ServiceRequest[In] => IO[Err, Out]
 ) extends BoundEndpoint:
 
   private[nats] def buildJava(conn: JConnection, runtime: Runtime[Any]): JServiceEndpoint =
-    val inCodec  = endpoint.inCodec
-    val outCodec = endpoint.outCodec
+    val inCodec     = endpoint.inCodec
+    val outCodec    = endpoint.outCodec
+    val errorMapper = endpoint.errorMapper
 
     val jHandler: ServiceMessageHandler = { (jMsg: JServiceMessage) =>
       Unsafe.unsafe { implicit unsafe =>

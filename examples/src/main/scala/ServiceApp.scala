@@ -33,7 +33,7 @@ object ServiceApp extends ZIOAppDefault {
                        version = "1.0.0",
                        description = Some("Echoes every request back to the caller")
                      ),
-                     echoEndpoint.implement[Nothing](payload => ZIO.succeed(payload))
+                     echoEndpoint.implement(payload => ZIO.succeed(payload))
                    )
 
             _ <- Console.printLine(s"Service '${svc.name}' started [id=${svc.id}]")
