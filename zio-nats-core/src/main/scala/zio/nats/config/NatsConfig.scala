@@ -11,7 +11,7 @@ import javax.net.ssl.SSLContext
  *
  * Provides a Scala-friendly API over `io.nats.client.Options.Builder`. For
  * advanced configuration not covered by this case class, use
- * `optionsCustomizer` to access the raw builder directly.
+ * `advancedOptionsCustomizer` to access the raw builder directly.
  *
  * @param servers
  *   List of NATS server URLs (default: `nats://localhost:4222`).

@@ -177,6 +177,7 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | `zio-nats-jsoniter/src/main/scala/zio/nats/NatsCodecJsoniterExtensions.scala` | Extension method `NatsCodec.fromJsoniter` (available via `import zio.nats.*`) |
 | `zio-nats-play-json/src/main/scala/zio/nats/NatsCodecPlayJson.scala` | `NatsCodecPlayJson.wrap` — bridges play-json `Format[A]` to `NatsCodec[A]`; top-level `given fromPlayJsonFormat` for automatic resolution |
 | `zio-nats-play-json/src/main/scala/zio/nats/NatsCodecPlayJsonExtensions.scala` | Extension method `NatsCodec.fromPlayJson` (available via `import zio.nats.*`) |
+| `zio-nats-core/src/main/scala/zio/nats/JetStreamEnums.scala` | Scala 3 enums: `AckPolicy`, `DeliverPolicy`, `ReplayPolicy`, `DiscardPolicy`, `RetentionPolicy`, `CompressionOption`, `PriorityPolicy` — each with a `private[nats] def toJava` |
 | `zio-nats-core/src/main/scala/zio/nats/NatsError.scala` | Error hierarchy |
 | `zio-nats-core/src/main/scala/zio/nats/NatsCoreTypes.scala` | `Subject` (opaque), `QueueGroup` (opaque), `Headers`, `PublishParams`, `StorageType`, `ConnectionStatus`, `NatsServerInfo` |
 | `zio-nats-core/src/main/scala/zio/nats/NatsModels.scala` | `Envelope[+A]`, `ConnectionStats` |

@@ -1,21 +1,16 @@
 package zio.nats.jetstream
 
 import io.nats.client.api.{
-  AckPolicy,
-  CompressionOption,
-  DeliverPolicy,
   External,
   Mirror,
-  PriorityPolicy,
   Republish,
-  ReplayPolicy,
   Source,
   ConsumerConfiguration as JConsumerConfiguration,
   OrderedConsumerConfiguration as JOrderedConsumerConfiguration,
   StreamConfiguration as JStreamConfiguration
 }
 import zio.Duration
-import zio.nats.StorageType
+import zio.nats.{AckPolicy, CompressionOption, DeliverPolicy, DiscardPolicy, PriorityPolicy, ReplayPolicy, RetentionPolicy, StorageType}
 
 import scala.jdk.CollectionConverters.*
 
@@ -136,8 +131,8 @@ case class StreamConfig(
   maxAge: Option[Duration] = None,
   duplicateWindow: Option[Duration] = None,
   storageType: StorageType = StorageType.File,
-  discardPolicy: io.nats.client.api.DiscardPolicy = io.nats.client.api.DiscardPolicy.Old,
-  retentionPolicy: io.nats.client.api.RetentionPolicy = io.nats.client.api.RetentionPolicy.Limits,
+  discardPolicy: DiscardPolicy = DiscardPolicy.Old,
+  retentionPolicy: RetentionPolicy = RetentionPolicy.Limits,
   compressionOption: CompressionOption = CompressionOption.None,
   numberOfReplicas: Int = 1,
   mirror: Option[MirrorConfig] = None,
@@ -162,9 +157,9 @@ object StreamConfig {
       .builder()
       .name(config.name)
       .storageType(config.storageType.toJava)
-      .discardPolicy(config.discardPolicy)
-      .retentionPolicy(config.retentionPolicy)
-      .compressionOption(config.compressionOption)
+      .discardPolicy(config.discardPolicy.toJava)
+      .retentionPolicy(config.retentionPolicy.toJava)
+      .compressionOption(config.compressionOption.toJava)
       .replicas(config.numberOfReplicas)
 
     if (config.subjects.nonEmpty) builder.addSubjects(config.subjects.asJava)
@@ -308,9 +303,9 @@ object ConsumerConfig {
   def toJava(config: ConsumerConfig): JConsumerConfiguration = {
     val builder = JConsumerConfiguration
       .builder()
-      .deliverPolicy(config.deliverPolicy)
-      .ackPolicy(config.ackPolicy)
-      .replayPolicy(config.replayPolicy)
+      .deliverPolicy(config.deliverPolicy.toJava)
+      .ackPolicy(config.ackPolicy.toJava)
+      .replayPolicy(config.replayPolicy.toJava)
 
     config.durableName.foreach(n => builder.durable(n))
     config.deliverSubject.foreach(s => builder.deliverSubject(s))
@@ -336,7 +331,7 @@ object ConsumerConfig {
       builder.backoff(config.backoff.map(d => java.time.Duration.ofMillis(d.toMillis))*)
     if (config.metadata.nonEmpty) builder.metadata(config.metadata.asJava)
     config.pauseUntil.foreach(t => builder.pauseUntil(t))
-    config.priorityPolicy.foreach(p => builder.priorityPolicy(p))
+    config.priorityPolicy.foreach(p => builder.priorityPolicy(p.toJava))
     if (config.priorityGroups.nonEmpty) builder.priorityGroups(config.priorityGroups.asJava)
 
     builder.build()
@@ -385,10 +380,10 @@ object OrderedConsumerConfig {
   def toJava(config: OrderedConsumerConfig): JOrderedConsumerConfiguration = {
     val occ = new JOrderedConsumerConfiguration()
     if (config.filterSubjects.nonEmpty) occ.filterSubjects(config.filterSubjects.asJava)
-    config.deliverPolicy.foreach(occ.deliverPolicy)
+    config.deliverPolicy.foreach(p => occ.deliverPolicy(p.toJava))
     config.startSequence.foreach(s => occ.startSequence(s))
     config.startTime.foreach(t => occ.startTime(t))
-    config.replayPolicy.foreach(occ.replayPolicy)
+    config.replayPolicy.foreach(p => occ.replayPolicy(p.toJava))
     if (config.headersOnly) occ.headersOnly(true)
     config.consumerNamePrefix.foreach(occ.consumerNamePrefix)
     occ

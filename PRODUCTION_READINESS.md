@@ -60,17 +60,13 @@ In `package.scala` (lines 29–77), `AckPolicy`, `DeliverPolicy`, `ReplayPolicy`
 
 **Fix:** Replace with proper Scala 3 enums and `private[nats]` conversion methods to/from jnats enums.
 
-#### P0-5: `NatsConfig.authHandler` exposes `io.nats.client.AuthHandler`
+#### P0-5: `NatsConfig.authHandler` exposes `io.nats.client.AuthHandler` — WON'T DO
 
-In `NatsConfig.scala` (line 75), `authHandler: Option[AuthHandler]` requires users to `import io.nats.client.AuthHandler`.
+`AuthHandler` is a jnats interface that users must implement to provide dynamic credentials. There is no way to fully hide it — any wrapper would just move the jnats import to the construction site. The field is only needed for advanced/programmatic auth; users relying on `credentialPath`, `token`, or `username`/`password` never encounter it.
 
-**Fix:** Provide factory methods (e.g., `NatsConfig.nkeyAuth(seed)`, `NatsConfig.jwtAuth(credPath)`) or a wrapper trait.
+#### P0-6: `NatsConfig.optionsCustomizer` exposes `io.nats.client.Options.Builder` — WON'T DO
 
-#### P0-6: `NatsConfig.optionsCustomizer` exposes `io.nats.client.Options.Builder`
-
-In `NatsConfig.scala` (line 82). The raw jnats builder type leaks into the public API.
-
-**Fix:** Rename to something like `advancedOptionsCustomizer` to signal its escape-hatch nature, and add prominent documentation noting it uses jnats types directly.
+`optionsCustomizer` is an intentional escape hatch. The type leak cannot be removed without removing the escape hatch itself. Renaming it would be cosmetic only and add churn without fixing the underlying dependency.
 
 ### ZIO Ecosystem Conventions
 
