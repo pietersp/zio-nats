@@ -37,6 +37,7 @@ Seven sbt subprojects:
 | `zio-nats-core` | Core library — all public API; no zio-blocks dependency |
 | `zio-nats-zio-blocks` | Optional zio-blocks integration (`NatsCodec.fromFormat`, `Builder`) |
 | `zio-nats-jsoniter` | Optional jsoniter-scala integration (`NatsCodecJsoniter`, `NatsCodec.fromJsoniter`) |
+| `zio-nats-play-json` | Optional play-json integration (`NatsCodecPlayJson`, `NatsCodec.fromPlayJson`) |
 | `zio-nats` | Batteries-included wrapper — empty JAR, depends on `zio-nats-core` + `zio-nats-zio-blocks` |
 | `zio-nats-testkit` | `NatsTestLayers` for integration tests |
 | `zio-nats-test` | Integration test suite |
@@ -81,6 +82,15 @@ module (`zio-nats-core`) has **no zio-blocks dependency** — it only provides b
   nats.publish(Subject("persons"), Person("Alice", 30))
   ```
   For an explicit one-off codec, use the `NatsCodec.fromJsoniter(codec)` extension method.
+- For domain types with a play-json `Format[A]`, add `zio-nats-play-json`. A top-level
+  `given fromPlayJsonFormat` in `package zio.nats` automatically bridges any `Format[A]` in
+  implicit scope to `NatsCodec[A]` — no builder step required:
+  ```scala
+  given Format[Person] = Json.format[Person]
+  // NatsCodec[Person] resolved automatically via import zio.nats.*
+  nats.publish(Subject("persons"), Person("Alice", 30))
+  ```
+  For an explicit one-off codec, use the `NatsCodec.fromPlayJson(format)` extension method.
 - For custom codecs with no framework: implement `NatsCodec[A]` directly (depends only on core).
 - Multiple formats can coexist; per-type overrides are plain `given val`s.
 
@@ -165,6 +175,8 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/serialization/NatsSerializer.scala` | `CompiledCodec[A]` sealed trait, `makeFor[A](format)` factory (eager, can throw), `BinaryCompiledCodec` / `TextCompiledCodec` impls |
 | `zio-nats-jsoniter/src/main/scala/zio/nats/NatsCodecJsoniter.scala` | `NatsCodecJsoniter.wrap` — bridges `JsonValueCodec[A]` to `NatsCodec[A]`; top-level `given fromJsonValueCodec` for automatic resolution |
 | `zio-nats-jsoniter/src/main/scala/zio/nats/NatsCodecJsoniterExtensions.scala` | Extension method `NatsCodec.fromJsoniter` (available via `import zio.nats.*`) |
+| `zio-nats-play-json/src/main/scala/zio/nats/NatsCodecPlayJson.scala` | `NatsCodecPlayJson.wrap` — bridges play-json `Format[A]` to `NatsCodec[A]`; top-level `given fromPlayJsonFormat` for automatic resolution |
+| `zio-nats-play-json/src/main/scala/zio/nats/NatsCodecPlayJsonExtensions.scala` | Extension method `NatsCodec.fromPlayJson` (available via `import zio.nats.*`) |
 | `zio-nats-core/src/main/scala/zio/nats/NatsError.scala` | Error hierarchy |
 | `zio-nats-core/src/main/scala/zio/nats/NatsCoreTypes.scala` | `Subject` (opaque), `QueueGroup` (opaque), `Headers`, `PublishParams`, `StorageType`, `ConnectionStatus`, `NatsServerInfo` |
 | `zio-nats-core/src/main/scala/zio/nats/NatsModels.scala` | `Envelope[+A]`, `ConnectionStats` |

@@ -5,6 +5,7 @@ val zioBlocksVersion      = "0.0.29"
 val jnatsVersion          = "2.25.2"
 val testcontainersVersion = "0.44.1"
 val jsoniterScalaVersion  = "2.38.9"
+val playJsonVersion       = "3.0.4"
 
 inThisBuild(
   List(
@@ -19,7 +20,7 @@ inThisBuild(
 )
 
 lazy val root = (project in file("."))
-  .aggregate(zioNatsCore, zioNatsZioBlocks, zioNats, zioNatsJsoniter, zioNatsTestkit, zioNatsTest, zioNatsExamples)
+  .aggregate(zioNatsCore, zioNatsZioBlocks, zioNats, zioNatsJsoniter, zioNatsPlayJson, zioNatsTestkit, zioNatsTest, zioNatsExamples)
   .settings(
     name               := "zio-nats-root",
     publish / skip     := true,
@@ -64,6 +65,15 @@ lazy val zioNatsJsoniter = (project in file("zio-nats-jsoniter"))
     )
   )
 
+lazy val zioNatsPlayJson = (project in file("zio-nats-play-json"))
+  .dependsOn(zioNatsCore)
+  .settings(
+    name := "zio-nats-play-json",
+    libraryDependencies ++= Seq(
+      "org.playframework" %% "play-json" % playJsonVersion
+    )
+  )
+
 lazy val zioNatsTestkit = (project in file("zio-nats-testkit"))
   .dependsOn(zioNatsCore)
   .settings(
@@ -75,14 +85,15 @@ lazy val zioNatsTestkit = (project in file("zio-nats-testkit"))
   )
 
 lazy val zioNatsTest = (project in file("zio-nats-test"))
-  .dependsOn(zioNatsCore, zioNatsZioBlocks, zioNatsJsoniter, zioNatsTestkit)
+  .dependsOn(zioNatsCore, zioNatsZioBlocks, zioNatsJsoniter, zioNatsPlayJson, zioNatsTestkit)
   .settings(
     name           := "zio-nats-test",
     publish / skip := true,
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio-test"                                          % zioVersion              % Test,
       "dev.zio" %% "zio-test-sbt"                                      % zioVersion              % Test,
-      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % jsoniterScalaVersion % Test
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % jsoniterScalaVersion % Test,
+      "org.playframework"                     %% "play-json"             % playJsonVersion       % Test
     ),
     // Podman/Docker socket configuration for testcontainers.
     // Forking is required so env vars are passed to the test JVM.
