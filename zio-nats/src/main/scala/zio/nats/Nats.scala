@@ -1,6 +1,6 @@
 package zio.nats
 
-import io.nats.client.{Connection => JConnection, ConnectionListener, ErrorListener}
+import io.nats.client.{Connection => JConnection, ConnectionListener, ErrorListener, Options}
 import zio._
 import zio.nats.config.NatsConfig
 import zio.stream._
@@ -189,42 +189,55 @@ object Nats {
     for {
       hub    <- Hub.unbounded[NatsEvent]
       jQueue  = new LinkedBlockingQueue[NatsEvent]()
-      conn   <- ZIO.acquireRelease(
-                  ZIO
-                    .attemptBlocking {
-                      val options = config.toOptionsBuilder
-                        .connectionListener { (conn: JConnection, eventType: ConnectionListener.Events) =>
-                          val url   = Option(conn.getConnectedUrl).getOrElse("unknown")
-                          val event = eventType match {
-                            case ConnectionListener.Events.CONNECTED          => NatsEvent.Connected(url)
-                            case ConnectionListener.Events.DISCONNECTED       => NatsEvent.Disconnected(url)
-                            case ConnectionListener.Events.RECONNECTED        => NatsEvent.Reconnected(url)
-                            case ConnectionListener.Events.CLOSED             => NatsEvent.Closed
-                            case ConnectionListener.Events.LAME_DUCK          => NatsEvent.LameDuckMode
-                            case ConnectionListener.Events.RESUBSCRIBED       => NatsEvent.Resubscribed(url)
-                            case ConnectionListener.Events.DISCOVERED_SERVERS => NatsEvent.ServersDiscovered
-                          }
-                          jQueue.put(event)
-                        }
-                        .errorListener(new ErrorListener {
-                          override def errorOccurred(conn: JConnection, error: String): Unit =
-                            jQueue.put(NatsEvent.Error(error))
-                          override def exceptionOccurred(conn: JConnection, exp: Exception): Unit =
-                            jQueue.put(NatsEvent.ExceptionOccurred(exp))
-                        })
-                        .build()
-                      io.nats.client.Nats.connect(options)
-                    }
-                    .mapError(NatsError.fromThrowable)
-                )(conn => ZIO.attemptBlocking(conn.close()).ignoreLogged)
-      _      <- ZStream
-                  .repeatZIOOption(
-                    ZIO.attemptBlockingInterrupt(jQueue.take())
-                      .mapError(_ => None)
-                  )
-                  .runForeach(hub.publish)
-                  .forkScoped
+      conn   <- connect(buildOptions(config, jQueue))
+      _      <- relayEvents(jQueue, hub)
     } yield new NatsLive(conn, hub)
+
+  /** Wire jnats connection- and error-listeners to push events into `queue`. */
+  private def buildOptions(config: NatsConfig, queue: LinkedBlockingQueue[NatsEvent]): Options =
+    config.toOptionsBuilder
+      .connectionListener { (conn: JConnection, eventType: ConnectionListener.Events) =>
+        val url   = Option(conn.getConnectedUrl).getOrElse("unknown")
+        val event = eventType match {
+          case ConnectionListener.Events.CONNECTED          => NatsEvent.Connected(url)
+          case ConnectionListener.Events.DISCONNECTED       => NatsEvent.Disconnected(url)
+          case ConnectionListener.Events.RECONNECTED        => NatsEvent.Reconnected(url)
+          case ConnectionListener.Events.CLOSED             => NatsEvent.Closed
+          case ConnectionListener.Events.LAME_DUCK          => NatsEvent.LameDuckMode
+          case ConnectionListener.Events.RESUBSCRIBED       => NatsEvent.Resubscribed(url)
+          case ConnectionListener.Events.DISCOVERED_SERVERS => NatsEvent.ServersDiscovered
+        }
+        queue.put(event)
+      }
+      .errorListener(new ErrorListener {
+        override def errorOccurred(conn: JConnection, error: String): Unit =
+          queue.put(NatsEvent.Error(error))
+        override def exceptionOccurred(conn: JConnection, exp: Exception): Unit =
+          queue.put(NatsEvent.ExceptionOccurred(exp))
+      })
+      .build()
+
+  /** Acquire a jnats connection; release closes it when the Scope ends. */
+  private def connect(options: Options): ZIO[Scope, NatsError, JConnection] =
+    ZIO.acquireRelease(
+      ZIO.attemptBlocking(io.nats.client.Nats.connect(options)).mapError(NatsError.fromThrowable)
+    )(conn => ZIO.attemptBlocking(conn.close()).ignoreLogged)
+
+  /**
+   * Drain `queue` into `hub` on a background fiber for the lifetime of the
+   * Scope. The blocking `queue.take()` call is interrupted when the Scope ends.
+   */
+  private def relayEvents(
+    queue: LinkedBlockingQueue[NatsEvent],
+    hub: Hub[NatsEvent]
+  ): ZIO[Scope, Nothing, Unit] =
+    ZStream
+      .repeatZIOOption(
+        ZIO.attemptBlockingInterrupt(queue.take()).mapError(_ => None)
+      )
+      .runForeach(hub.publish)
+      .forkScoped
+      .unit
 
   /** ZLayer that reads [[NatsConfig]] from the environment. */
   val live: ZLayer[NatsConfig, NatsError, Nats] =
