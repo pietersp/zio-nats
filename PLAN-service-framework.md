@@ -4,9 +4,9 @@
 
 The [NATS Service Framework](https://docs.nats.io/nats-concepts/service_infrastructure/services) (also called "NATS Micro") lets you register request-reply endpoints as named, versioned microservices with built-in discovery, health monitoring, and statistics. It is built entirely on core NATS request-reply — no JetStream dependency.
 
-The jnats library (2.25.2) ships a complete implementation in the `io.nats.service` package. This plan describes how to wrap it idiomatically for ZIO in the `zio-nats` library.
+The jnats library (2.25.2) ships a complete implementation in the `io.nats.service` package. This plan describes how to wrap it idiomatically for ZIO in the `zio-nats` library, using a **typed endpoint pattern** inspired by ZIO-HTTP's `Endpoint` API.
 
-**Scope:** ~4 new files, 2 edits. Comparable to the ObjectStore feature.
+**Scope:** ~5 new files, 3 edits. Comparable to the ObjectStore feature.
 
 ---
 
@@ -54,25 +54,50 @@ Everything lives in `io.nats.service`. The key classes and their roles:
 
 ## Design Decisions
 
-### Handler Bridge: Runtime Capture
+### Typed Endpoint Pattern (ZIO-HTTP–inspired)
+
+The central design is a **declarative, typed endpoint descriptor** that separates the endpoint's shape (input/output types, subject, metadata) from its implementation (the handler function). This is directly inspired by ZIO-HTTP's `Endpoint` API.
+
+**Why typed endpoints over untyped `ServiceRequest => IO[NatsError, Unit]` handlers:**
+- **Compile-time safety:** The handler *must* accept `In` and return `Out` — no forgetting to respond, no wrong type, no accidentally decoding as the wrong type.
+- **Framework-managed serialization:** The framework decodes the request and encodes the response using the `NatsCodec`s captured on the endpoint descriptor. User code never calls `decode`/`respond` manually.
+- **Sealed error channel:** The `implement` method returns a `BoundEndpoint` with no error channel — errors are handled by the framework using a `ServiceErrorMapper`, converting them to NATS service error responses. This matches ZIO-HTTP's `Route[Env, Nothing]` pattern.
+- **Declarative introspection:** The endpoint descriptor can be inspected for documentation, code generation, or schema export without executing any handler code.
+
+**How this differs from ZIO-HTTP:**
+- **No type accumulation.** ZIO-HTTP uses `Combiner` to merge path + query + header + body into one `Input` type. NATS requests have a single payload, so `ServiceEndpoint[In, Out]` has just two type parameters — no `Combiner` needed.
+- **No media type negotiation.** NATS uses whatever codec you configured.
+- **Simpler error model.** NATS service errors are always `(String, Int)` — a message and a code. There's no structured error body in the NATS service protocol. So instead of an error codec, we use a `ServiceErrorMapper[Err]` that extracts the message and code.
+
+### Handler Bridge: Runtime Capture with Fiber Fork
 
 The central challenge is bridging jnats' synchronous `ServiceMessageHandler` callback to ZIO effects.
 
-**Chosen approach:** Capture the ZIO `Runtime` at service-creation time, then use `Unsafe.run` inside the jnats callback.
+**Chosen approach:** Capture the ZIO `Runtime` at service-creation time, then **fork a fiber** inside the jnats callback. The fiber runs on the ZIO executor, leaving the jnats dispatcher thread unblocked.
 
 ```scala
-// Inside NatsServiceLive construction
-val runtime: Runtime[Any] = ??? // captured from ZIO.runtime[Any]
-
 val jHandler: ServiceMessageHandler = { (jMsg: JServiceMessage) =>
   Unsafe.unsafeCompat { implicit unsafe =>
-    runtime.unsafe.run(
-      userHandler(ServiceRequest.fromJava(jMsg, conn))
-        .catchAll(e => ZIO.logError(s"Service handler error: ${e.message}"))
-    ).getOrThrowFiberFailure()
+    runtime.unsafe.fork(
+      for {
+        in  <- inCodec.decode(Chunk.fromArray(jMsg.getData))
+        out <- userHandler(in).mapError(errorMapper.toErrorResponse)
+        enc <- outCodec.encode(out)
+        _   <- ZIO.attempt(jMsg.respond(conn, enc.toArray))
+      } yield ()
+    )
   }
 }
 ```
+
+**Why fork instead of `runtime.unsafe.run().getOrThrowFiberFailure()`:**
+
+ZIO-HTTP's Netty bridge showed the way: they try synchronous execution first and fork a fiber if the effect suspends. They never block server threads. Similarly, we should not block jnats dispatcher threads:
+
+- `runtime.unsafe.run` blocks the jnats dispatcher thread until the handler completes. If a handler does a DB call or another NATS request, the dispatcher thread is stuck.
+- `runtime.unsafe.fork` returns immediately. The handler runs on the ZIO runtime's executor. The jnats dispatcher thread is free to process the next request.
+- The response is sent asynchronously via `jMsg.respond(conn, bytes)`, which is just a publish to the reply-to subject — safe to call from any thread.
+- Error handling is done inside the fiber via `.catchAll`, so unhandled errors still produce a NATS error response.
 
 **Why this over ZStream per endpoint:**
 - Service endpoints are request-reply (one response per request), not streaming
@@ -80,16 +105,11 @@ val jHandler: ServiceMessageHandler = { (jMsg: JServiceMessage) =>
 - The handler approach is what developers expect from a service framework
 - It matches jnats' model directly, minimizing impedance mismatch
 
-**Why this over a Queue-based approach:**
-- Each request needs its own response — a queue adds latency and complexity for no benefit
-- The handler function is the natural unit of composition
-
 ### Lifecycle: Scope-managed
 
 A `NatsService` is created within a `Scope`. When the scope closes, the service stops with drain. This matches how `Nats.make` manages the connection.
 
 ```scala
-// Usage
 ZIO.scoped {
   for {
     service <- nats.service(config, endpoints)
@@ -99,19 +119,15 @@ ZIO.scoped {
 }
 ```
 
-### Error Handling in Handlers
+### Error Handling Strategy
 
-User handler errors are caught and translated to NATS error responses automatically. The user can also call `respondError` explicitly for domain-level errors:
+Errors are handled at two levels:
 
-```scala
-// Automatic: unhandled NatsError becomes a 500 error response
-// Explicit: user controls the error
-request.respondError("User not found", 404)
-```
+1. **Typed domain errors via `ServiceErrorMapper`:** The user's handler can fail with any error type `Err` that has a `ServiceErrorMapper[Err]` instance. The mapper converts `Err` to `(message: String, code: Int)`, which the framework sends as a standard NATS service error response (setting `Nats-Service-Error` and `Nats-Service-Error-Code` headers).
 
-### Typed Handlers via NatsCodec
+2. **Decoding/encoding failures:** If the framework fails to decode the incoming request or encode the outgoing response, it sends a 500 error response automatically.
 
-Handlers receive a `ServiceRequest` with raw bytes. Decoding is explicit via `request.decode[A]` (consistent with how the rest of the library works — the user controls when decoding happens). Responding is generic via `request.respond[A](value)`.
+The user never needs to call `respondError` — the framework does it. But they can still throw domain-specific error codes by defining their `ServiceErrorMapper`.
 
 ---
 
@@ -121,10 +137,11 @@ Handlers receive a `ServiceRequest` with raw bytes. Decoding is explicit via `re
 
 ```
 zio.nats.service/
-  NatsService.scala         — Service trait + Live + companion (layer, builder)
+  ServiceEndpoint.scala     — Typed endpoint descriptor + BoundEndpoint
+  NatsService.scala         — Service trait + Live + companion
   ServiceDiscovery.scala    — Discovery trait + Live
-  ServiceConfig.scala       — ServiceConfig, ServiceEndpointConfig, ServiceGroup
-  ServiceModels.scala       — ServiceRequest, response types, EndpointStats
+  ServiceConfig.scala       — ServiceConfig, ServiceGroup, QueueGroupPolicy, ServiceErrorMapper
+  ServiceModels.scala       — ServiceRequest[A], response types, EndpointStats
 ```
 
 Everything re-exported from `package object nats` so `import zio.nats.*` is sufficient.
@@ -167,107 +184,192 @@ final case class ServiceGroup(
 )
 
 /**
- * Configuration for a single service endpoint.
+ * Controls queue group behavior for an endpoint.
  *
- * @param name       Endpoint name (alphanumeric, hyphens, underscores only)
- * @param subject    NATS subject to listen on. Defaults to `name` if not specified.
- * @param queueGroup Queue group for load balancing. Defaults to `"q"`.
- *                   Set to [[None]] to disable queue grouping.
- * @param group      Optional [[ServiceGroup]] prefix
- * @param metadata   Optional key-value metadata for this endpoint
+ * - [[Default]] uses the standard NATS service queue group `"q"` for load balancing.
+ * - [[Disabled]] disables queue grouping (every instance receives every request).
+ * - [[Custom]] uses a user-specified queue group name.
  */
-final case class ServiceEndpointConfig(
-  name: String,
-  subject: Option[String] = None,
-  queueGroup: Option[Option[String]] = None, // None = use default "q", Some(None) = no queue group, Some(Some(x)) = custom
-  group: Option[ServiceGroup] = None,
-  metadata: Map[String, String] = Map.empty
-)
+enum QueueGroupPolicy:
+  case Default
+  case Disabled
+  case Custom(name: String)
 ```
 
-All config types get a `private[nats] def toJava` method for converting to jnats builders.
-
-### ServiceRequest
-
-The message wrapper the user's handler receives. Carries response capability.
+### ServiceErrorMapper
 
 ```scala
 package zio.nats.service
 
 /**
- * An incoming service request with response capabilities.
+ * Typeclass for converting handler error types to NATS service error responses.
  *
- * This is the ZIO-idiomatic wrapper around jnats' `ServiceMessage`. It provides:
- * - Access to the request payload, subject, and headers
- * - Typed decoding via [[NatsCodec]]
- * - Typed response methods
- * - Standard error responses with NATS service error headers
+ * NATS service errors are a `(message, code)` pair sent via the
+ * `Nats-Service-Error` and `Nats-Service-Error-Code` response headers.
  *
- * ==Example handler==
+ * Built-in instances are provided for [[NatsError]] and [[String]].
+ * Define your own for domain error types:
+ *
  * {{{
- * val handler: ServiceRequest => IO[NatsError, Unit] = { req =>
- *   for {
- *     query  <- req.decode[UserQuery]
- *     result <- lookupUser(query)
- *     _      <- req.respond(result)
- *   } yield ()
- * }
+ * enum UserError:
+ *   case NotFound(id: Int)
+ *   case InvalidInput(msg: String)
+ *
+ * given ServiceErrorMapper[UserError] with
+ *   def toErrorResponse(e: UserError): (String, Int) = e match
+ *     case UserError.NotFound(id)      => (s"User $id not found", 404)
+ *     case UserError.InvalidInput(msg) => (msg, 400)
  * }}}
  */
-final class ServiceRequest private[nats] (
-  private val jMsg: JServiceMessage,
-  private val conn: JConnection
-) {
+trait ServiceErrorMapper[E]:
+  /** Convert an error to a NATS service error `(message, code)` pair. */
+  def toErrorResponse(e: E): (String, Int)
 
+object ServiceErrorMapper:
+  /** Default mapper for [[NatsError]]: sends the error message with code 500. */
+  given ServiceErrorMapper[NatsError] with
+    def toErrorResponse(e: NatsError): (String, Int) = (e.message, 500)
+
+  /** Mapper for plain strings: sends the string with code 500. */
+  given ServiceErrorMapper[String] with
+    def toErrorResponse(e: String): (String, Int) = (e, 500)
+
+  /** Mapper for `Nothing`: trivially satisfied, never invoked. */
+  given ServiceErrorMapper[Nothing] with
+    def toErrorResponse(e: Nothing): (String, Int) = throw new AssertionError("unreachable")
+```
+
+### ServiceEndpoint — The Typed Descriptor
+
+```scala
+package zio.nats.service
+
+/**
+ * A declarative, typed descriptor for a NATS service endpoint.
+ *
+ * Captures the endpoint's name, subject, queue group policy, metadata, and
+ * — crucially — the input and output types with their [[NatsCodec]] instances.
+ * The descriptor is inert: it describes the shape of an endpoint but contains
+ * no handler logic.
+ *
+ * To create a running endpoint, call [[implement]] to bind a handler function:
+ *
+ * {{{
+ * // 1. Declare the endpoint shape
+ * val lookup = ServiceEndpoint[UserQuery, UserResponse]("lookup")
+ *
+ * // 2. Bind a handler — the framework handles decode/encode
+ * val bound = lookup.implement { query =>
+ *   ZIO.succeed(UserResponse(query.id, "Alice", "alice@example.com"))
+ * }
+ *
+ * // 3. Register on a service
+ * nats.service(ServiceConfig("users", "1.0.0"), bound)
+ * }}}
+ *
+ * @tparam In  The request payload type (decoded from bytes via `NatsCodec[In]`)
+ * @tparam Out The response payload type (encoded to bytes via `NatsCodec[Out]`)
+ */
+final case class ServiceEndpoint[In, Out](
+  name: String,
+  subject: Option[String] = None,
+  queueGroup: QueueGroupPolicy = QueueGroupPolicy.Default,
+  group: Option[ServiceGroup] = None,
+  metadata: Map[String, String] = Map.empty
+)(using val inCodec: NatsCodec[In], val outCodec: NatsCodec[Out]):
+
+  /**
+   * Bind a handler function to this endpoint, producing a [[BoundEndpoint]].
+   *
+   * The framework:
+   * - Decodes incoming bytes as `In` using the captured `NatsCodec[In]`
+   * - Passes the decoded value to `handler`
+   * - Encodes the `Out` result using the captured `NatsCodec[Out]`
+   * - Sends the encoded bytes as the NATS reply
+   *
+   * If the handler fails with `Err`, the `ServiceErrorMapper[Err]` converts
+   * it to a NATS service error response. If decoding fails, a 500 error
+   * is sent automatically.
+   *
+   * {{{
+   * val echo = ServiceEndpoint[String, String]("echo")
+   * val bound = echo.implement(name => ZIO.succeed(s"Hello, $name!"))
+   * }}}
+   */
+  def implement[Err: ServiceErrorMapper](
+    handler: In => IO[Err, Out]
+  ): BoundEndpoint
+
+  /**
+   * Bind a handler that also receives request metadata (subject, headers).
+   *
+   * Use this when you need access to NATS headers or the actual subject
+   * the request arrived on (e.g., for wildcard subjects):
+   *
+   * {{{
+   * val ep = ServiceEndpoint[String, String]("events.>")
+   *
+   * val bound = ep.implementWithRequest { req =>
+   *   val topic = req.subject.value  // e.g. "events.user.created"
+   *   val traceId = req.headers.get("X-Trace-Id")
+   *   ZIO.succeed(s"Processed ${req.value} on $topic")
+   * }
+   * }}}
+   */
+  def implementWithRequest[Err: ServiceErrorMapper](
+    handler: ServiceRequest[In] => IO[Err, Out]
+  ): BoundEndpoint
+```
+
+### BoundEndpoint — The Type-Erased, Ready-to-Register Unit
+
+```scala
+package zio.nats.service
+
+/**
+ * An endpoint with its handler bound, ready to be registered on a [[NatsService]].
+ *
+ * Created by calling [[ServiceEndpoint.implement]] or
+ * [[ServiceEndpoint.implementWithRequest]]. The input/output types are
+ * erased at this level — the codec and handler are captured inside.
+ * This allows multiple `BoundEndpoint`s with different type signatures
+ * to be passed together to [[Nats.service]].
+ *
+ * Users never construct this directly.
+ */
+trait BoundEndpoint:
+  /** The endpoint name (for introspection/logging). */
+  def name: String
+
+  /** Build the jnats ServiceEndpoint. Internal use only. */
+  private[nats] def buildJava(conn: JConnection, runtime: Runtime[Any]): JServiceEndpoint
+```
+
+### ServiceRequest — Typed Request Wrapper
+
+```scala
+package zio.nats.service
+
+/**
+ * An incoming service request with the payload already decoded as `A`.
+ *
+ * Provides access to request metadata (subject, headers) alongside the
+ * decoded value. Used with [[ServiceEndpoint.implementWithRequest]] when
+ * the handler needs more than just the payload.
+ *
+ * For the common case where only the payload is needed, use
+ * [[ServiceEndpoint.implement]] instead — it receives `A` directly.
+ *
+ * @tparam A The decoded payload type
+ */
+final case class ServiceRequest[+A](
+  /** The decoded request payload. */
+  value: A,
   /** The subject this request was sent to. */
-  def subject: Subject
-
-  /** The reply-to subject (used internally by respond). */
-  def replyTo: Option[String]
-
-  /** Whether the request has headers. */
-  def hasHeaders: Boolean
-
-  /** Request headers. */
-  def headers: Headers
-
-  /** Raw request payload as bytes. */
-  def data: Chunk[Byte]
-
-  /** Raw request payload as a UTF-8 string. */
-  def dataAsString: String
-
-  /**
-   * Decode the request payload as `A` using the implicit [[NatsCodec]].
-   *
-   * Fails with [[NatsError.DecodingError]] if decoding fails.
-   */
-  def decode[A: NatsCodec]: IO[NatsError, A]
-
-  /**
-   * Encode `value` as `A` and send it as the response.
-   *
-   * This is a terminal operation — only one response can be sent per request.
-   */
-  def respond[A: NatsCodec](value: A): IO[NatsError, Unit]
-
-  /**
-   * Encode `value` as `A` and send it as the response with custom headers.
-   */
-  def respond[A: NatsCodec](value: A, headers: Headers): IO[NatsError, Unit]
-
-  /**
-   * Send a standard NATS service error response.
-   *
-   * Sets the `Nats-Service-Error` and `Nats-Service-Error-Code` headers
-   * on the response so that clients can distinguish errors from successful
-   * responses at the protocol level.
-   *
-   * @param text     Human-readable error description
-   * @param code     Numeric error code (use HTTP-style codes by convention)
-   */
-  def respondError(text: String, code: Int): IO[NatsError, Unit]
-}
+  subject: Subject,
+  /** Request headers (empty if no headers were sent). */
+  headers: Headers
+)
 ```
 
 ### NatsService Trait
@@ -480,28 +582,30 @@ trait Nats {
    * immediately. It is automatically stopped (with drain) when the
    * enclosing [[Scope]] ends.
    *
+   * Endpoints are created by declaring a [[ServiceEndpoint]] and binding
+   * a handler via [[ServiceEndpoint.implement implement]]:
+   *
    * ==Example: single endpoint==
    * {{{
-   * val config = ServiceConfig("greeter", "1.0.0", description = Some("Greeting service"))
+   * val greet = ServiceEndpoint[String, String]("greet")
    *
-   * val greet: ServiceRequest => IO[NatsError, Unit] = { req =>
-   *   for {
-   *     name <- req.decode[String]
-   *     _    <- req.respond(s"Hello, $name!")
-   *   } yield ()
-   * }
-   *
-   * nats.service(config, ServiceEndpointConfig("greet") -> greet)
+   * nats.service(
+   *   ServiceConfig("greeter", "1.0.0"),
+   *   greet.implement(name => ZIO.succeed(s"Hello, $name!"))
+   * )
    * }}}
    *
    * ==Example: grouped endpoints==
    * {{{
    * val sort = ServiceGroup("sort")
    *
+   * val asc  = ServiceEndpoint[List[Int], List[Int]]("ascending",  group = Some(sort))
+   * val desc = ServiceEndpoint[List[Int], List[Int]]("descending", group = Some(sort))
+   *
    * nats.service(
    *   ServiceConfig("sorter", "1.0.0"),
-   *   ServiceEndpointConfig("ascending", group = Some(sort))  -> ascending,
-   *   ServiceEndpointConfig("descending", group = Some(sort)) -> descending
+   *   asc.implement(nums  => ZIO.succeed(nums.sorted)),
+   *   desc.implement(nums => ZIO.succeed(nums.sorted.reverse))
    * )
    * }}}
    *
@@ -509,7 +613,7 @@ trait Nats {
    */
   def service(
     config: ServiceConfig,
-    endpoints: (ServiceEndpointConfig, ServiceRequest => IO[NatsError, Unit])*
+    endpoints: BoundEndpoint*
   ): ZIO[Scope, NatsError, NatsService]
 }
 ```
@@ -539,6 +643,101 @@ Update `fromThrowable` if jnats throws any service-specific exceptions (it doesn
 ---
 
 ## Implementation Details
+
+### BoundEndpoint Implementation
+
+```scala
+private[nats] class BoundEndpointLive[In, Err, Out](
+  val name: String,
+  endpoint: ServiceEndpoint[In, Out],
+  handler: ServiceRequest[In] => IO[Err, Out],
+  errorMapper: ServiceErrorMapper[Err]
+) extends BoundEndpoint:
+
+  private[nats] def buildJava(conn: JConnection, runtime: Runtime[Any]): JServiceEndpoint =
+    val inCodec  = endpoint.inCodec
+    val outCodec = endpoint.outCodec
+
+    val jHandler: ServiceMessageHandler = { (jMsg: JServiceMessage) =>
+      Unsafe.unsafeCompat { implicit unsafe =>
+        runtime.unsafe.fork {
+          val program = for {
+            // Decode input
+            in <- ZIO.fromEither(inCodec.decode(Chunk.fromArray(jMsg.getData)))
+                    .mapError(e => ("Decoding failed: " + e.getMessage, 500))
+
+            // Build typed request
+            req = ServiceRequest(
+              value   = in,
+              subject = Subject(jMsg.getSubject),
+              headers = Headers.fromJava(jMsg.getHeaders)
+            )
+
+            // Run user handler
+            out <- handler(req)
+                     .mapError(e => errorMapper.toErrorResponse(e))
+
+            // Encode output and respond
+            enc <- ZIO.fromEither(outCodec.encode(out))
+                     .mapError(e => ("Encoding failed: " + e.getMessage, 500))
+            _   <- ZIO.attempt(jMsg.respond(conn, enc.toArray))
+                     .mapError(e => ("Response failed: " + e.getMessage, 500))
+          } yield ()
+
+          program.catchAll { case (msg, code) =>
+            ZIO.attempt(jMsg.respondStandardError(conn, msg, code)).ignoreLogged
+          }
+        }
+      }
+    }
+
+    val b = JServiceEndpoint.builder()
+      .endpointName(endpoint.name)
+      .handler(jHandler)
+
+    endpoint.subject.foreach(b.endpointSubject)
+    endpoint.queueGroup match
+      case QueueGroupPolicy.Default     => // use default "q"
+      case QueueGroupPolicy.Disabled    => b.endpointQueueGroup(null)
+      case QueueGroupPolicy.Custom(qg)  => b.endpointQueueGroup(qg)
+
+    endpoint.group.foreach(g => b.group(buildGroup(g)))
+    if (endpoint.metadata.nonEmpty)
+      b.endpointMetadata(endpoint.metadata.asJava)
+
+    b.build()
+
+  private def buildGroup(g: ServiceGroup): JGroup =
+    val jGroup = new JGroup(g.name)
+    g.parent.foreach(p => buildGroup(p).appendGroup(jGroup))
+    g.parent.map(buildGroup).getOrElse(jGroup)
+```
+
+### ServiceEndpoint.implement
+
+```scala
+// Inside ServiceEndpoint[In, Out]
+
+def implement[Err: ServiceErrorMapper](
+  handler: In => IO[Err, Out]
+): BoundEndpoint =
+  new BoundEndpointLive[In, Err, Out](
+    name         = name,
+    endpoint     = this,
+    handler      = req => handler(req.value),
+    errorMapper  = summon[ServiceErrorMapper[Err]]
+  )
+
+def implementWithRequest[Err: ServiceErrorMapper](
+  handler: ServiceRequest[In] => IO[Err, Out]
+): BoundEndpoint =
+  new BoundEndpointLive[In, Err, Out](
+    name         = name,
+    endpoint     = this,
+    handler      = handler,
+    errorMapper  = summon[ServiceErrorMapper[Err]]
+  )
+```
 
 ### NatsServiceLive
 
@@ -578,16 +777,16 @@ private[nats] class NatsServiceLive(
 // In NatsLive
 override def service(
   config: ServiceConfig,
-  endpoints: (ServiceEndpointConfig, ServiceRequest => IO[NatsError, Unit])*
+  endpoints: BoundEndpoint*
 ): ZIO[Scope, NatsError, NatsService] =
   for {
-    runtime <- ZIO.runtime[Any]
+    runtime  <- ZIO.runtime[Any]
     jService <- buildAndStart(config, endpoints, runtime)
   } yield new NatsServiceLive(jService, conn)
 
 private def buildAndStart(
   config: ServiceConfig,
-  endpoints: Seq[(ServiceEndpointConfig, ServiceRequest => IO[NatsError, Unit])],
+  endpoints: Seq[BoundEndpoint],
   runtime: Runtime[Any]
 ): ZIO[Scope, NatsError, JService] =
   ZIO.acquireRelease(
@@ -602,8 +801,8 @@ private def buildAndStart(
         builder.metadata(config.metadata.asJava)
       config.drainTimeout.foreach(d => builder.drainTimeout(d.asJava))
 
-      endpoints.foreach { case (epConfig, handler) =>
-        builder.addServiceEndpoint(buildEndpoint(epConfig, handler, runtime))
+      endpoints.foreach { ep =>
+        builder.addServiceEndpoint(ep.buildJava(conn, runtime))
       }
 
       val svc = builder.build()
@@ -611,47 +810,6 @@ private def buildAndStart(
       svc
     }.mapError(NatsError.fromThrowable)
   )(svc => ZIO.attempt(svc.stop()).ignoreLogged)
-
-private def buildEndpoint(
-  config: ServiceEndpointConfig,
-  handler: ServiceRequest => IO[NatsError, Unit],
-  runtime: Runtime[Any]
-): JServiceEndpoint = {
-  val jHandler: ServiceMessageHandler = { (jMsg: JServiceMessage) =>
-    Unsafe.unsafeCompat { implicit unsafe =>
-      runtime.unsafe.run(
-        handler(new ServiceRequest(jMsg, conn)).catchAll { error =>
-          ZIO.attempt(
-            jMsg.respondStandardError(conn, error.message, 500)
-          ).ignoreLogged
-        }
-      ).getOrThrowFiberFailure()
-    }
-  }
-
-  val b = JServiceEndpoint.builder()
-    .endpointName(config.name)
-    .handler(jHandler)
-
-  config.subject.foreach(b.endpointSubject)
-  config.queueGroup match {
-    case Some(Some(qg)) => b.endpointQueueGroup(qg)
-    case Some(None)     => b.endpointQueueGroup(null) // disables queue group
-    case None           => // use default "q"
-  }
-  config.group.foreach(g => b.group(buildGroup(g)))
-  if (config.metadata.nonEmpty)
-    b.endpointMetadata(config.metadata.asJava)
-
-  b.build()
-}
-
-private def buildGroup(g: ServiceGroup): JGroup = {
-  val jGroup = new JGroup(g.name)
-  g.parent.foreach(p => buildGroup(p).appendGroup(jGroup))
-  // Return the root group
-  g.parent.map(buildGroup).getOrElse(jGroup)
-}
 ```
 
 ### ServiceDiscoveryLive
@@ -681,22 +839,23 @@ private[nats] class ServiceDiscoveryLive(
 
 ## Developer Experience: End-to-End Examples
 
-### Minimal Service
+### Minimal Echo Service
 
 ```scala
 import zio.*
 import zio.nats.*
 
 object MinimalServiceApp extends ZIOAppDefault {
+
+  val echo = ServiceEndpoint[String, String]("echo")
+
   val run =
     ZIO.serviceWithZIO[Nats] { nats =>
       ZIO.scoped {
         for {
           svc <- nats.service(
             ServiceConfig("echo", "1.0.0"),
-            ServiceEndpointConfig("echo") -> { req =>
-              req.respond(req.data) // echo raw bytes back
-            }
+            echo.implement(msg => ZIO.succeed(msg)) // echo back
           )
           _ <- Console.printLine(s"Service ${svc.name} running [${svc.id}]")
           _ <- ZIO.never
@@ -706,7 +865,7 @@ object MinimalServiceApp extends ZIOAppDefault {
 }
 ```
 
-### Typed JSON Service
+### Typed JSON Service with Domain Errors
 
 ```scala
 import zio.*
@@ -716,17 +875,20 @@ import zio.schema.*
 case class UserQuery(id: Int) derives Schema
 case class UserResponse(id: Int, name: String, email: String) derives Schema
 
+enum UserError:
+  case NotFound(id: Int)
+  case InvalidInput(msg: String)
+
+given ServiceErrorMapper[UserError] with
+  def toErrorResponse(e: UserError): (String, Int) = e match
+    case UserError.NotFound(id)      => (s"User $id not found", 404)
+    case UserError.InvalidInput(msg) => (msg, 400)
+
 object UserServiceApp extends ZIOAppDefault {
   val codecs = NatsCodec.fromFormat(JsonFormat)
   import codecs.derived
 
-  val lookup: ServiceRequest => IO[NatsError, Unit] = { req =>
-    for {
-      query <- req.decode[UserQuery]
-      user   = UserResponse(query.id, "Alice", "alice@example.com")
-      _     <- req.respond(user)
-    } yield ()
-  }
+  val lookup = ServiceEndpoint[UserQuery, UserResponse]("lookup")
 
   val run =
     ZIO.serviceWithZIO[Nats] { nats =>
@@ -734,7 +896,12 @@ object UserServiceApp extends ZIOAppDefault {
         for {
           _ <- nats.service(
             ServiceConfig("user-service", "2.1.0", description = Some("User lookup")),
-            ServiceEndpointConfig("lookup") -> lookup
+            lookup.implement { query =>
+              if (query.id > 0)
+                ZIO.succeed(UserResponse(query.id, "Alice", "alice@example.com"))
+              else
+                ZIO.fail(UserError.InvalidInput("ID must be positive"))
+            }
           )
           _ <- ZIO.never
         } yield ()
@@ -746,22 +913,18 @@ object UserServiceApp extends ZIOAppDefault {
 ### Multi-Endpoint with Groups
 
 ```scala
+import zio.*
+import zio.nats.*
+import zio.schema.*
+
 object SortServiceApp extends ZIOAppDefault {
+  val codecs = NatsCodec.fromFormat(JsonFormat)
+  import codecs.derived
+
   val sort = ServiceGroup("sort")
 
-  val ascending: ServiceRequest => IO[NatsError, Unit] = { req =>
-    for {
-      data <- req.decode[String]
-      _    <- req.respond(data.sorted.mkString)
-    } yield ()
-  }
-
-  val descending: ServiceRequest => IO[NatsError, Unit] = { req =>
-    for {
-      data <- req.decode[String]
-      _    <- req.respond(data.sorted.reverse.mkString)
-    } yield ()
-  }
+  val asc  = ServiceEndpoint[List[Int], List[Int]]("ascending",  group = Some(sort))
+  val desc = ServiceEndpoint[List[Int], List[Int]]("descending", group = Some(sort))
 
   val run =
     ZIO.serviceWithZIO[Nats] { nats =>
@@ -769,8 +932,37 @@ object SortServiceApp extends ZIOAppDefault {
         for {
           _ <- nats.service(
             ServiceConfig("sorter", "1.0.0"),
-            ServiceEndpointConfig("ascending",  group = Some(sort)) -> ascending,
-            ServiceEndpointConfig("descending", group = Some(sort)) -> descending
+            asc.implement(nums  => ZIO.succeed(nums.sorted)),
+            desc.implement(nums => ZIO.succeed(nums.sorted.reverse))
+          )
+          _ <- ZIO.never
+        } yield ()
+      }
+    }.provide(Nats.live, NatsConfig.default)
+}
+```
+
+### Using Request Metadata (Headers, Subject)
+
+```scala
+import zio.*
+import zio.nats.*
+
+object AuditServiceApp extends ZIOAppDefault {
+
+  val process = ServiceEndpoint[String, String]("events.>")
+
+  val run =
+    ZIO.serviceWithZIO[Nats] { nats =>
+      ZIO.scoped {
+        for {
+          _ <- nats.service(
+            ServiceConfig("auditor", "1.0.0"),
+            process.implementWithRequest { req =>
+              val topic   = req.subject.value      // e.g. "events.user.created"
+              val traceId = req.headers.get("X-Trace-Id").getOrElse("none")
+              ZIO.succeed(s"Processed ${req.value} on $topic [trace=$traceId]")
+            }
           )
           _ <- ZIO.never
         } yield ()
@@ -782,6 +974,9 @@ object SortServiceApp extends ZIOAppDefault {
 ### Discovery Client
 
 ```scala
+import zio.*
+import zio.nats.*
+
 object DiscoveryApp extends ZIOAppDefault {
   val run =
     ZIO.serviceWithZIO[Nats] { nats =>
@@ -805,9 +1000,15 @@ object DiscoveryApp extends ZIOAppDefault {
 ### Service + Client in One App (Testing Pattern)
 
 ```scala
+import zio.*
+import zio.nats.*
+import zio.schema.*
+
 object ServiceIntegrationTest extends ZIOAppDefault {
   val codecs = NatsCodec.fromFormat(JsonFormat)
   import codecs.derived
+
+  val add = ServiceEndpoint[List[Int], String]("add")
 
   val run =
     ZIO.serviceWithZIO[Nats] { nats =>
@@ -816,12 +1017,7 @@ object ServiceIntegrationTest extends ZIOAppDefault {
           // Start service
           svc <- nats.service(
             ServiceConfig("calculator", "1.0.0"),
-            ServiceEndpointConfig("add") -> { req =>
-              for {
-                nums <- req.decode[List[Int]]
-                _    <- req.respond(nums.sum.toString)
-              } yield ()
-            }
+            add.implement(nums => ZIO.succeed(nums.sum.toString))
           )
 
           // Call it as a client using normal request-reply
@@ -837,21 +1033,70 @@ object ServiceIntegrationTest extends ZIOAppDefault {
 }
 ```
 
-### Error Handling in Handlers
+### Infallible Handler (No Errors Possible)
 
 ```scala
+import zio.*
+import zio.nats.*
+
+object TimestampServiceApp extends ZIOAppDefault {
+
+  val now = ServiceEndpoint[String, String]("now")
+
+  val run =
+    ZIO.serviceWithZIO[Nats] { nats =>
+      ZIO.scoped {
+        for {
+          // Handler returns UIO — can't fail. The Nothing error mapper is
+          // resolved automatically, so no ServiceErrorMapper is needed.
+          _ <- nats.service(
+            ServiceConfig("clock", "1.0.0"),
+            now.implement(_ => Clock.instant.map(_.toString))
+          )
+          _ <- ZIO.never
+        } yield ()
+      }
+    }.provide(Nats.live, NatsConfig.default)
+}
+```
+
+---
+
+## API Comparison: Before and After
+
+### Before (untyped)
+
+```scala
+// No compile-time safety on types. User manually decodes and responds.
+// Easy to forget respond, decode wrong type, or respond with wrong type.
 val handler: ServiceRequest => IO[NatsError, Unit] = { req =>
   for {
-    query <- req.decode[UserQuery]
-    user  <- lookupUser(query.id).some.orElseFail(
-               NatsError.GeneralError(s"User ${query.id} not found", new Exception("not found"))
-             )
-    _     <- req.respond(user)
+    query <- req.decode[UserQuery]       // manual decode — could be wrong type
+    user   = UserResponse(query.id, "Alice", "alice@example.com")
+    _     <- req.respond(user)            // manual respond — could forget this
   } yield ()
-  // If the handler fails with NatsError, the framework automatically sends
-  // a 500 error response with the error message in Nats-Service-Error headers.
-  // For explicit error codes, use req.respondError("Not found", 404) instead.
 }
+
+nats.service(
+  ServiceConfig("users", "1.0.0"),
+  ServiceEndpointConfig("lookup") -> handler   // types erased
+)
+```
+
+### After (typed endpoints)
+
+```scala
+// Compile-time guarantee: handler MUST accept UserQuery and return UserResponse.
+// Framework handles decode/encode. Can't forget to respond.
+val lookup = ServiceEndpoint[UserQuery, UserResponse]("lookup")
+
+nats.service(
+  ServiceConfig("users", "1.0.0"),
+  lookup.implement { query =>              // query: UserQuery (already decoded)
+    ZIO.succeed(UserResponse(query.id, "Alice", "alice@example.com"))
+    // ↑ return value IS the response — framework encodes and sends it
+  }
+)
 ```
 
 ---
@@ -860,8 +1105,9 @@ val handler: ServiceRequest => IO[NatsError, Unit] = { req =>
 
 | File | Action | Contents |
 |---|---|---|
-| `zio-nats/src/main/scala/zio/nats/service/ServiceConfig.scala` | **New** | `ServiceConfig`, `ServiceEndpointConfig`, `ServiceGroup` case classes with `toJava` |
-| `zio-nats/src/main/scala/zio/nats/service/ServiceModels.scala` | **New** | `ServiceRequest`, `PingResponse`, `InfoResponse`, `StatsResponse`, `EndpointStats`, `EndpointInfo` |
+| `zio-nats/src/main/scala/zio/nats/service/ServiceEndpoint.scala` | **New** | `ServiceEndpoint[In, Out]`, `BoundEndpoint`, `BoundEndpointLive` |
+| `zio-nats/src/main/scala/zio/nats/service/ServiceConfig.scala` | **New** | `ServiceConfig`, `ServiceGroup`, `QueueGroupPolicy`, `ServiceErrorMapper` |
+| `zio-nats/src/main/scala/zio/nats/service/ServiceModels.scala` | **New** | `ServiceRequest[A]`, `PingResponse`, `InfoResponse`, `StatsResponse`, `EndpointStats`, `EndpointInfo` |
 | `zio-nats/src/main/scala/zio/nats/service/NatsService.scala` | **New** | `NatsService` trait + `NatsServiceLive` |
 | `zio-nats/src/main/scala/zio/nats/service/ServiceDiscovery.scala` | **New** | `ServiceDiscovery` trait + `ServiceDiscoveryLive` + companion with `make`/`live` |
 | `zio-nats/src/main/scala/zio/nats/NatsError.scala` | **Edit** | Add `ServiceError`, `ServiceOperationFailed`, `ServiceStartFailed` |
@@ -879,12 +1125,15 @@ Tests use the existing testcontainers setup from `NatsTestLayers`.
 | Test | What it validates |
 |---|---|
 | **Start and stop** | Service starts, is discoverable via ping, stops cleanly when scope closes |
-| **Echo endpoint** | Send request, receive echoed response via `nats.request` |
-| **Typed endpoint** | Decode JSON request, encode JSON response, verify round-trip |
-| **Multi-endpoint** | Multiple endpoints on one service, each handles correctly |
-| **Grouped endpoints** | ServiceGroup prefixes subjects correctly |
-| **Error response** | Handler calls `respondError`, client receives error headers |
-| **Unhandled error** | Handler fails with NatsError, automatic 500 response sent |
+| **Echo endpoint** | `ServiceEndpoint[String, String]` echoes back, verify round-trip |
+| **Typed endpoint** | `ServiceEndpoint[UserQuery, UserResponse]` with JSON codecs, verify decode/encode |
+| **Multi-endpoint** | Multiple `BoundEndpoint`s on one service, each handles correctly |
+| **Grouped endpoints** | `ServiceGroup` prefixes subjects correctly |
+| **Domain error mapping** | Handler fails with custom error type, `ServiceErrorMapper` produces correct code |
+| **NatsError mapping** | Handler fails with `NatsError`, default mapper sends 500 |
+| **Decode failure** | Bad payload sent, framework returns 500 with decode error message |
+| **Infallible handler** | `UIO` handler with `Nothing` error type compiles and works |
+| **Request metadata** | `implementWithRequest` receives correct subject and headers |
 | **Stats** | After N requests, `endpointStats` reflects correct counts |
 | **Reset** | After reset, stats counters return to zero |
 | **Discovery ping** | `ServiceDiscovery.ping()` finds running services |
@@ -899,8 +1148,10 @@ Tests use the existing testcontainers setup from `NatsTestLayers`.
 ## Notes & Caveats
 
 - **`ServiceGroup` nesting:** jnats `Group.appendGroup` mutates and returns `this`. The `buildGroup` helper must walk the parent chain and build from root to leaf. Test carefully.
-- **`queueGroup` triple option:** The `Option[Option[String]]` on `ServiceEndpointConfig` is admittedly ugly. Consider a sealed trait `QueueGroupPolicy` (`Default`, `Disabled`, `Custom(name)`) if it hurts readability.
-- **Thread safety of `Unsafe.run`:** jnats dispatches handler callbacks on its own dispatcher threads. `runtime.unsafe.run` is safe to call from any thread. The handler ZIO runs on the ZIO runtime's executor, not the jnats dispatcher thread.
-- **Handler concurrency:** Each request gets its own `Unsafe.run` invocation, so handlers run concurrently by default. No additional concurrency control is needed unless the user wants it (they can use `Semaphore`, `Ref`, etc. in their handler).
+- **`QueueGroupPolicy` enum:** Replaces the awkward `Option[Option[String]]` from the initial design. `Default`, `Disabled`, `Custom(name)` are self-documenting.
+- **Handler concurrency:** Each request forks its own fiber, so handlers run concurrently by default. No additional concurrency control is needed unless the user wants it (they can use `Semaphore`, `Ref`, etc. in their handler).
 - **Custom stats data supplier:** jnats supports `Supplier<JsonValue>` for custom endpoint stats. Consider adding this later as an advanced option. Not needed for v1.
 - **`CompletableFuture` from `startService()`:** The future completes when the service *stops*, not when it starts. The service is ready immediately after `build()` + `startService()`. Do not `await` this future during setup.
+- **ZIO-HTTP comparison:** Our `ServiceEndpoint[In, Out]` + `.implement` pattern is directly inspired by ZIO-HTTP's `Endpoint[PathInput, Input, Err, Output, Auth]` + `.implement`. The key simplification is that NATS has one payload (no path/query/header accumulation via `Combiner`) and a simple error model (message + code, no structured error body via `HttpCodec`).
+- **Fiber fork vs blocking run:** The initial design used `runtime.unsafe.run().getOrThrowFiberFailure()` which blocks jnats dispatcher threads. The updated design uses `runtime.unsafe.fork` (inspired by ZIO-HTTP's Netty bridge) so the dispatcher thread is free immediately. The response is sent asynchronously from the ZIO fiber.
+- **Supersedes `NatsRpc`:** The existing `NatsRpc.respond[A, B](subject)(handler)` in `NatsRpc.scala` solves the same problem — typed request-reply handlers — but without discovery, monitoring, stats, grouped endpoints, queue group load balancing, or typed error mapping. Once the service framework ships, `NatsRpc` should be deprecated (and eventually removed). The migration path is straightforward: `NatsRpc.respond[A, B](subject)(handler)` becomes `ServiceEndpoint[A, B](name).implement(handler)` registered on a `NatsService`.
