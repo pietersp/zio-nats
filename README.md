@@ -10,7 +10,7 @@ A ZIO 2 wrapper for the [jnats](https://github.com/nats-io/nats.java) NATS clien
 - Full API coverage: core pub/sub, JetStream, Key-Value, Object Store
 - `ZStream`-based subscriptions and consumers — no callbacks in user code
 - Typed error model (`NatsError` sealed ADT)
-- Type-safe serialization — built-in `Chunk[Byte]`/`String` codecs in core; optional [zio-blocks](https://zio.dev/zio-blocks) integration via `zio-nats-zio-blocks`
+- Type-safe serialization — built-in `Chunk[Byte]`/`String` codecs; [zio-blocks](https://zio.dev/zio-blocks) integration included by default
 - Zero raw jnats types in user code — `import zio.nats.*` is all you need
 - Scala 3
 
@@ -19,17 +19,16 @@ A ZIO 2 wrapper for the [jnats](https://github.com/nats-io/nats.java) NATS clien
 Add to `build.sbt`:
 
 ```scala
-// Core library — pub/sub, JetStream, KV, Object Store, Service Framework
-// Built-in codecs for Chunk[Byte] and String only; no zio-blocks dependency
+// Full library — pub/sub, JetStream, KV, Object Store, Service Framework,
+// and zio-blocks type-safe serialization included by default.
 libraryDependencies += "dev.zio" %% "zio-nats" % "<version>"
-
-// Optional: zio-blocks integration for type-safe serialization
-// Adds NatsCodec.fromFormat(JsonFormat / AvroFormat / etc.)
-libraryDependencies += "dev.zio" %% "zio-nats-zio-blocks" % "<version>"
 
 // Testkit (for integration tests — brings in testcontainers)
 libraryDependencies += "dev.zio" %% "zio-nats-testkit" % "<version>" % Test
 ```
+
+> **Advanced users:** To use a custom serializer instead of zio-blocks, depend on `zio-nats-core`
+> and implement `NatsCodec[A]` directly — it has no zio-blocks dependency.
 
 ## Quick start
 
@@ -181,12 +180,6 @@ zio-nats supports type-safe publish/subscribe using [zio-blocks Schema](https://
 
 ### Setup
 
-Add `zio-nats-zio-blocks` (which brings in `zio-blocks-schema` transitively):
-
-```scala
-libraryDependencies += "dev.zio" %% "zio-nats-zio-blocks" % "<version>"
-```
-
 Define schemas for your types and install a codec builder:
 
 ```scala
@@ -277,8 +270,7 @@ given auditCodec: NatsCodec[AuditEvent] =
 `zio-nats-zio-blocks` brings in `zio-blocks-schema` (JSON) transitively. For other formats add the corresponding artifact alongside it:
 
 ```scala
-// build.sbt — zio-nats-zio-blocks is always required; add format artifacts as needed
-libraryDependencies += "dev.zio" %% "zio-nats-zio-blocks"        % "<version>" // always
+// build.sbt — add format artifacts as needed alongside zio-nats
 libraryDependencies += "dev.zio" %% "zio-blocks-schema-avro"     % "0.0.29"    // Avro
 libraryDependencies += "dev.zio" %% "zio-blocks-schema-toon"     % "0.0.29"    // Toon
 libraryDependencies += "dev.zio" %% "zio-blocks-schema-msgpack"  % "0.0.29"    // MessagePack

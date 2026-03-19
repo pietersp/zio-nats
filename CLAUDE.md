@@ -30,12 +30,13 @@ Tests use real NATS via testcontainers (Docker required). They start automatical
 
 ## Project Layout
 
-Five sbt subprojects:
+Six sbt subprojects:
 
 | Subproject | Purpose |
 |-----------|---------|
-| `zio-nats` | Core library — all public API; no zio-blocks dependency |
+| `zio-nats-core` | Core library — all public API; no zio-blocks dependency |
 | `zio-nats-zio-blocks` | Optional zio-blocks integration (`NatsCodec.fromFormat`, `Builder`) |
+| `zio-nats` | Batteries-included wrapper — empty JAR, depends on `zio-nats-core` + `zio-nats-zio-blocks` |
 | `zio-nats-testkit` | `NatsTestLayers` for integration tests |
 | `zio-nats-test` | Integration test suite (122 tests) |
 | `examples` | Runnable demos |
@@ -61,7 +62,7 @@ Connection lifecycle events are exposed via `Nats.lifecycleEvents: ZStream[Nats,
 ### Typed Serialization
 
 `NatsCodec[A]` is the serialization typeclass. It is resolved implicitly at compile time. The core
-module (`zio-nats`) has **no zio-blocks dependency** — it only provides built-in codecs for
+module (`zio-nats-core`) has **no zio-blocks dependency** — it only provides built-in codecs for
 `Chunk[Byte]` and `String`.
 
 - Built-in instances (core): `NatsCodec[Chunk[Byte]]` (identity) and `NatsCodec[String]` (UTF-8).
@@ -147,32 +148,32 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 
 | File | Contents |
 |------|----------|
-| `zio-nats/src/main/scala/zio/nats/Nats.scala` | Core pub/sub service + `NatsLive`; `lifecycleEvents` stream |
-| `zio-nats/src/main/scala/zio/nats/NatsCodec.scala` | Serialization typeclass; built-in `bytesCodec` and `stringCodec` only (no zio-blocks) |
+| `zio-nats-core/src/main/scala/zio/nats/Nats.scala` | Core pub/sub service + `NatsLive`; `lifecycleEvents` stream |
+| `zio-nats-core/src/main/scala/zio/nats/NatsCodec.scala` | Serialization typeclass; built-in `bytesCodec` and `stringCodec` only (no zio-blocks) |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocks.scala` | `NatsCodecZioBlocks.Builder` — derives `NatsCodec[A]` from a zio-blocks `Format` + `Schema`; caches in `ConcurrentHashMap` |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocksExtensions.scala` | Extension methods `NatsCodec.fromFormat` and `NatsCodec.derived` (available via `import zio.nats.*`) |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/serialization/NatsSerializer.scala` | `CompiledCodec[A]` sealed trait, `makeFor[A](format)` factory (eager, can throw), `BinaryCompiledCodec` / `TextCompiledCodec` impls |
-| `zio-nats/src/main/scala/zio/nats/NatsError.scala` | Error hierarchy |
-| `zio-nats/src/main/scala/zio/nats/NatsCoreTypes.scala` | `Subject` (opaque), `QueueGroup` (opaque), `Headers`, `PublishParams`, `StorageType`, `ConnectionStatus`, `NatsServerInfo` |
-| `zio-nats/src/main/scala/zio/nats/NatsModels.scala` | `Envelope[+A]`, `ConnectionStats` |
-| `zio-nats/src/main/scala/zio/nats/NatsEvent.scala` | `NatsEvent` enum |
-| `zio-nats/src/main/scala/zio/nats/jetstream/JetStream.scala` | JetStream publish + `JetStreamLive` |
-| `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamManagement.scala` | JetStream stream/consumer admin |
-| `zio-nats/src/main/scala/zio/nats/jetstream/Consumer.scala` | `Consumer`, `OrderedConsumer` traits + live impls |
-| `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamMessage.scala` | `JetStreamMessage` with ack operations |
-| `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamModels.scala` | `JsEnvelope`, `PublishAck`, `PublishOptions`, `FetchOptions`, `ConsumeOptions`, summaries, etc. |
-| `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamConfig.scala` | `StreamConfig`, `ConsumerConfig`, `OrderedConsumerConfig`, `MirrorConfig`, `SourceConfig`, `ExternalConfig` |
-| `zio-nats/src/main/scala/zio/nats/kv/KeyValue.scala` | KV service + management |
-| `zio-nats/src/main/scala/zio/nats/kv/KeyValueModels.scala` | `KeyValueEntry`, `KvEnvelope`, `KvEvent`, `KeyValueOperation`, watch options, bucket status |
-| `zio-nats/src/main/scala/zio/nats/kv/KeyValueConfig.scala` | `KeyValueConfig`, `RepublishConfig` |
-| `zio-nats/src/main/scala/zio/nats/objectstore/ObjectStore.scala` | ObjectStore service + management |
-| `zio-nats/src/main/scala/zio/nats/objectstore/ObjectStoreModels.scala` | `ObjectMeta`, `ObjectData`, `ObjectSummary`, watch options, bucket status |
-| `zio-nats/src/main/scala/zio/nats/objectstore/ObjectStoreConfig.scala` | `ObjectStoreConfig` |
-| `zio-nats/src/main/scala/zio/nats/config/NatsConfig.scala` | Connection config (host, port, TLS, reconnect) |
-| `zio-nats/src/main/scala/zio/nats/package.scala` | Type aliases (`NatsIO[A]`), all sub-package re-exports |
-| `zio-nats/src/main/scala/zio/nats/service/ServiceEndpoint.scala` | `ServiceEndpoint[In, Out]`, `BoundEndpoint`, `BoundEndpointLive` |
-| `zio-nats/src/main/scala/zio/nats/service/ServiceConfig.scala` | `ServiceConfig`, `ServiceGroup`, `QueueGroupPolicy`, `ServiceErrorMapper` |
-| `zio-nats/src/main/scala/zio/nats/service/ServiceModels.scala` | `ServiceRequest[A]`, `PingResponse`, `InfoResponse`, `StatsResponse`, `EndpointStats`, `EndpointInfo` |
-| `zio-nats/src/main/scala/zio/nats/service/NatsService.scala` | `NatsService` trait + `NatsServiceLive` |
-| `zio-nats/src/main/scala/zio/nats/service/ServiceDiscovery.scala` | `ServiceDiscovery` trait + `ServiceDiscoveryLive` + companion |
+| `zio-nats-core/src/main/scala/zio/nats/NatsError.scala` | Error hierarchy |
+| `zio-nats-core/src/main/scala/zio/nats/NatsCoreTypes.scala` | `Subject` (opaque), `QueueGroup` (opaque), `Headers`, `PublishParams`, `StorageType`, `ConnectionStatus`, `NatsServerInfo` |
+| `zio-nats-core/src/main/scala/zio/nats/NatsModels.scala` | `Envelope[+A]`, `ConnectionStats` |
+| `zio-nats-core/src/main/scala/zio/nats/NatsEvent.scala` | `NatsEvent` enum |
+| `zio-nats-core/src/main/scala/zio/nats/jetstream/JetStream.scala` | JetStream publish + `JetStreamLive` |
+| `zio-nats-core/src/main/scala/zio/nats/jetstream/JetStreamManagement.scala` | JetStream stream/consumer admin |
+| `zio-nats-core/src/main/scala/zio/nats/jetstream/Consumer.scala` | `Consumer`, `OrderedConsumer` traits + live impls |
+| `zio-nats-core/src/main/scala/zio/nats/jetstream/JetStreamMessage.scala` | `JetStreamMessage` with ack operations |
+| `zio-nats-core/src/main/scala/zio/nats/jetstream/JetStreamModels.scala` | `JsEnvelope`, `PublishAck`, `PublishOptions`, `FetchOptions`, `ConsumeOptions`, summaries, etc. |
+| `zio-nats-core/src/main/scala/zio/nats/jetstream/JetStreamConfig.scala` | `StreamConfig`, `ConsumerConfig`, `OrderedConsumerConfig`, `MirrorConfig`, `SourceConfig`, `ExternalConfig` |
+| `zio-nats-core/src/main/scala/zio/nats/kv/KeyValue.scala` | KV service + management |
+| `zio-nats-core/src/main/scala/zio/nats/kv/KeyValueModels.scala` | `KeyValueEntry`, `KvEnvelope`, `KvEvent`, `KeyValueOperation`, watch options, bucket status |
+| `zio-nats-core/src/main/scala/zio/nats/kv/KeyValueConfig.scala` | `KeyValueConfig`, `RepublishConfig` |
+| `zio-nats-core/src/main/scala/zio/nats/objectstore/ObjectStore.scala` | ObjectStore service + management |
+| `zio-nats-core/src/main/scala/zio/nats/objectstore/ObjectStoreModels.scala` | `ObjectMeta`, `ObjectData`, `ObjectSummary`, watch options, bucket status |
+| `zio-nats-core/src/main/scala/zio/nats/objectstore/ObjectStoreConfig.scala` | `ObjectStoreConfig` |
+| `zio-nats-core/src/main/scala/zio/nats/config/NatsConfig.scala` | Connection config (host, port, TLS, reconnect) |
+| `zio-nats-core/src/main/scala/zio/nats/package.scala` | Type aliases (`NatsIO[A]`), all sub-package re-exports |
+| `zio-nats-core/src/main/scala/zio/nats/service/ServiceEndpoint.scala` | `ServiceEndpoint[In, Out]`, `BoundEndpoint`, `BoundEndpointLive` |
+| `zio-nats-core/src/main/scala/zio/nats/service/ServiceConfig.scala` | `ServiceConfig`, `ServiceGroup`, `QueueGroupPolicy`, `ServiceErrorMapper` |
+| `zio-nats-core/src/main/scala/zio/nats/service/ServiceModels.scala` | `ServiceRequest[A]`, `PingResponse`, `InfoResponse`, `StatsResponse`, `EndpointStats`, `EndpointInfo` |
+| `zio-nats-core/src/main/scala/zio/nats/service/NatsService.scala` | `NatsService` trait + `NatsServiceLive` |
+| `zio-nats-core/src/main/scala/zio/nats/service/ServiceDiscovery.scala` | `ServiceDiscovery` trait + `ServiceDiscoveryLive` + companion |
 | `zio-nats-testkit/src/main/scala/zio/nats/NatsTestLayers.scala` | Test layers (Docker NATS) |

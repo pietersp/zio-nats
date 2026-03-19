@@ -18,17 +18,17 @@ inThisBuild(
 )
 
 lazy val root = (project in file("."))
-  .aggregate(zioNats, zioNatsZioBlocks, zioNatsTestkit, zioNatsTest, zioNatsExamples)
+  .aggregate(zioNatsCore, zioNatsZioBlocks, zioNats, zioNatsTestkit, zioNatsTest, zioNatsExamples)
   .settings(
     name               := "zio-nats-root",
     publish / skip     := true,
     crossScalaVersions := Nil
   )
 
-lazy val zioNats = (project in file("zio-nats"))
+lazy val zioNatsCore = (project in file("zio-nats-core"))
   .enablePlugins(ScoverageSbtPlugin)
   .settings(
-    name := "zio-nats",
+    name := "zio-nats-core",
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio"         % zioVersion,
       "dev.zio" %% "zio-streams" % zioVersion,
@@ -38,7 +38,7 @@ lazy val zioNats = (project in file("zio-nats"))
 
 lazy val zioNatsZioBlocks = (project in file("zio-nats-zio-blocks"))
   .enablePlugins(ScoverageSbtPlugin)
-  .dependsOn(zioNats)
+  .dependsOn(zioNatsCore)
   .settings(
     name := "zio-nats-zio-blocks",
     libraryDependencies ++= Seq(
@@ -46,8 +46,16 @@ lazy val zioNatsZioBlocks = (project in file("zio-nats-zio-blocks"))
     )
   )
 
+lazy val zioNats = (project in file("zio-nats"))
+  .dependsOn(zioNatsCore, zioNatsZioBlocks)
+  .settings(
+    name                      := "zio-nats",
+    Compile / sources         := Seq.empty,
+    Compile / resources       := Seq.empty
+  )
+
 lazy val zioNatsTestkit = (project in file("zio-nats-testkit"))
-  .dependsOn(zioNats)
+  .dependsOn(zioNatsCore)
   .settings(
     name := "zio-nats-testkit",
     libraryDependencies ++= Seq(
@@ -57,7 +65,7 @@ lazy val zioNatsTestkit = (project in file("zio-nats-testkit"))
   )
 
 lazy val zioNatsTest = (project in file("zio-nats-test"))
-  .dependsOn(zioNats, zioNatsZioBlocks, zioNatsTestkit)
+  .dependsOn(zioNatsCore, zioNatsZioBlocks, zioNatsTestkit)
   .settings(
     name           := "zio-nats-test",
     publish / skip := true,
@@ -85,7 +93,7 @@ lazy val zioNatsTest = (project in file("zio-nats-test"))
   )
 
 lazy val zioNatsExamples = (project in file("examples"))
-  .dependsOn(zioNats, zioNatsZioBlocks)
+  .dependsOn(zioNatsCore, zioNatsZioBlocks)
   .settings(
     name           := "zio-nats-examples",
     publish / skip := true
