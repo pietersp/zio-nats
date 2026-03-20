@@ -51,9 +51,11 @@ All services are plain Scala traits backed by `*Live` implementations in the sam
 
 ```
 NatsConfig ──► Nats.live ──► JetStream.live
-                         ──► KeyValue.bucket(name)
+                         ──► KeyValue.bucket(name)   // ZIO variant
+                         ──► KeyValue.live(name)     // ZLayer variant
                          ──► KeyValueManagement.live
                          ──► ObjectStore.bucket(name)
+                         ──► ObjectStore.live(name)  // ZLayer variant
                          ──► ObjectStoreManagement.live
 ```
 
@@ -191,10 +193,10 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | `zio-nats-core/src/main/scala/zio/nats/jetstream/JetStreamMessage.scala` | `JetStreamMessage` with ack operations |
 | `zio-nats-core/src/main/scala/zio/nats/jetstream/JetStreamModels.scala` | `JsEnvelope`, `PublishAck`, `PublishOptions`, `FetchOptions`, `ConsumeOptions`, summaries, etc. |
 | `zio-nats-core/src/main/scala/zio/nats/jetstream/JetStreamConfig.scala` | `StreamConfig`, `ConsumerConfig`, `OrderedConsumerConfig`, `MirrorConfig`, `SourceConfig`, `ExternalConfig` |
-| `zio-nats-core/src/main/scala/zio/nats/kv/KeyValue.scala` | KV service + management |
+| `zio-nats-core/src/main/scala/zio/nats/kv/KeyValue.scala` | KV service + management; `KeyValue.bucket` (ZIO) and `KeyValue.live` (ZLayer) constructors |
 | `zio-nats-core/src/main/scala/zio/nats/kv/KeyValueModels.scala` | `KeyValueEntry`, `KvEnvelope`, `KvEvent`, `KeyValueOperation`, watch options, bucket status |
 | `zio-nats-core/src/main/scala/zio/nats/kv/KeyValueConfig.scala` | `KeyValueConfig`, `RepublishConfig` |
-| `zio-nats-core/src/main/scala/zio/nats/objectstore/ObjectStore.scala` | ObjectStore service + management |
+| `zio-nats-core/src/main/scala/zio/nats/objectstore/ObjectStore.scala` | ObjectStore service + management; `ObjectStore.bucket` (ZIO) and `ObjectStore.live` (ZLayer) constructors |
 | `zio-nats-core/src/main/scala/zio/nats/objectstore/ObjectStoreModels.scala` | `ObjectMeta`, `ObjectData`, `ObjectSummary`, watch options, bucket status |
 | `zio-nats-core/src/main/scala/zio/nats/objectstore/ObjectStoreConfig.scala` | `ObjectStoreConfig` |
 | `zio-nats-core/src/main/scala/zio/nats/config/NatsConfig.scala` | Connection config (host, port, TLS, reconnect) |

@@ -205,6 +205,24 @@ object KeyValue {
         .mapBoth(NatsError.fromThrowable, new KeyValueLive(_))
     }
 
+  /**
+   * A [[ZLayer]] that opens an existing KV bucket and provides a [[KeyValue]]
+   * service backed by it.
+   *
+   * This is the idiomatic ZIO way to wire a KV bucket into an application's
+   * dependency graph. For programmatic use inside a for-comprehension, use
+   * [[bucket]] instead.
+   *
+   * @param bucketName The name of the KV bucket to open.
+   */
+  def live(bucketName: String): ZLayer[Nats, NatsError, KeyValue] =
+    ZLayer {
+      ZIO.serviceWithZIO[Nats] { nats =>
+        ZIO.attempt(nats.underlying.keyValue(bucketName))
+          .mapBoth(NatsError.fromThrowable, new KeyValueLive(_))
+      }
+    }
+
 }
 
 object KeyValueManagement {

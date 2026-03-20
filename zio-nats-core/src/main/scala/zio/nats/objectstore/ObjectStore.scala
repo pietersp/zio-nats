@@ -159,6 +159,24 @@ object ObjectStore {
     ZIO.serviceWithZIO[Nats] { nats =>
       ZIO.attempt(nats.underlying.objectStore(bucketName)).mapBoth(NatsError.fromThrowable, new ObjectStoreLive(_))
     }
+
+  /**
+   * A [[ZLayer]] that opens an existing Object Store bucket and provides an
+   * [[ObjectStore]] service backed by it.
+   *
+   * This is the idiomatic ZIO way to wire an Object Store bucket into an
+   * application's dependency graph. For programmatic use inside a
+   * for-comprehension, use [[bucket]] instead.
+   *
+   * @param bucketName The name of the Object Store bucket to open.
+   */
+  def live(bucketName: String): ZLayer[Nats, NatsError, ObjectStore] =
+    ZLayer {
+      ZIO.serviceWithZIO[Nats] { nats =>
+        ZIO.attempt(nats.underlying.objectStore(bucketName))
+          .mapBoth(NatsError.fromThrowable, new ObjectStoreLive(_))
+      }
+    }
 }
 
 object ObjectStoreManagement {

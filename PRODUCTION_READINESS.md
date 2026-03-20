@@ -54,11 +54,11 @@ No `sbt-mima-plugin`. Should be added now so it is in place from version 0.1.0 o
 
 ### API Purity — jnats Type Leaks
 
-#### P0-4: Java enum type aliases leak jnats types
+#### P0-4: Java enum type aliases leak jnats types — DONE
 
-In `package.scala` (lines 29–77), `AckPolicy`, `DeliverPolicy`, `ReplayPolicy`, `DiscardPolicy`, `RetentionPolicy`, `CompressionOption`, and `PriorityPolicy` are `type` aliases to `io.nats.client.api.*` Java enums. While companion objects re-export values, the types themselves are raw Java enums. Code like `val p: AckPolicy = AckPolicy.Explicit` compiles, but `p` is an `io.nats.client.api.AckPolicy` at the type level.
+~~In `package.scala` (lines 29–77), `AckPolicy`, `DeliverPolicy`, `ReplayPolicy`, `DiscardPolicy`, `RetentionPolicy`, `CompressionOption`, and `PriorityPolicy` are `type` aliases to `io.nats.client.api.*` Java enums. While companion objects re-export values, the types themselves are raw Java enums. Code like `val p: AckPolicy = AckPolicy.Explicit` compiles, but `p` is an `io.nats.client.api.AckPolicy` at the type level.~~
 
-**Fix:** Replace with proper Scala 3 enums and `private[nats]` conversion methods to/from jnats enums.
+Replaced with proper Scala 3 enums in `zio-nats-core/src/main/scala/zio/nats/JetStreamEnums.scala`. Each enum has a `private[nats] def toJava` conversion. The Java enum type aliases and companion objects in `package.scala` have been removed. `JetStreamConfig.scala` updated to call `.toJava` at every builder call site.
 
 #### P0-5: `NatsConfig.authHandler` exposes `io.nats.client.AuthHandler` — WON'T DO
 
@@ -70,13 +70,13 @@ In `package.scala` (lines 29–77), `AckPolicy`, `DeliverPolicy`, `ReplayPolicy`
 
 ### ZIO Ecosystem Conventions
 
-#### P0-7: No ZIO accessor methods on companion objects
+#### P0-7: No ZIO accessor methods on companion objects — WON'T DO
 
-Every official ZIO library provides `ZIO.serviceWithZIO`-based accessor methods so users write `Nats.publish(subject, value)` instead of `ZIO.serviceWithZIO[Nats](_.publish(subject, value))`.
+~~Every official ZIO library provides `ZIO.serviceWithZIO`-based accessor methods so users write `Nats.publish(subject, value)` instead of `ZIO.serviceWithZIO[Nats](_.publish(subject, value))`.~~
 
-**Fix:** Add accessor methods to `Nats`, `JetStream`, `KeyValue`, `KeyValueManagement`, `ObjectStore`, and `ObjectStoreManagement` companion objects.
+Accessor methods have been [officially deprecated by the ZIO team](https://zio.dev/reference/service-pattern/accessor-methods/#why-are-accessor-methods-deprecated). They cause confusing type errors (the error points to the accessor call site rather than the service method), and `ZIO.serviceWithZIO[Nats](_.publish(...))` is now the idiomatic approach. We will not add accessor methods.
 
-#### P0-8: `KeyValue.bucket()` and `ObjectStore.bucket()` return `ZIO`, not `ZLayer`
+#### ~~P0-8: `KeyValue.bucket()` and `ObjectStore.bucket()` return `ZIO`, not `ZLayer`~~ **DONE**
 
 Other ZIO ecosystem libraries provide `ZLayer` constructors for sub-services. Currently `KeyValue.bucket("name")` returns `ZIO[Nats, NatsError, KeyValue]`.
 
@@ -187,10 +187,10 @@ In `JetStreamConfig.scala`. While `java.time` types are standard in Scala, some 
 Suggested order:
 
 1. **P0-1, P0-2, P0-3** — CI/CD, publishing, MiMa (infrastructure first)
-2. **P0-4** — Scala 3 enums for policies (largest API change, affects many files)
-3. **P0-5, P0-6** — NatsConfig jnats leaks (localized to one file)
-4. **P0-7** — ZIO accessor methods (mechanical but touches every service companion)
-5. **P0-8** — ZLayer variants for bucket services (small addition)
+2. ~~**P0-4** — Scala 3 enums for policies (largest API change, affects many files)~~ **DONE**
+3. ~~**P0-5, P0-6** — NatsConfig jnats leaks (localized to one file)~~ **WON'T DO** (see above)
+4. ~~**P0-7** — ZIO accessor methods (mechanical but touches every service companion)~~ **WON'T DO** (officially deprecated by ZIO team)
+5. ~~**P0-8** — ZLayer variants for bucket services (small addition)~~ **DONE**
 
 ### Phase 2 — P1 (before or shortly after 1.0)
 
@@ -212,9 +212,10 @@ Address as capacity allows. P2-1 (Scala 2.13) and P2-2 (docs site) have the high
 
 | File | Relevant Items |
 |------|---------------|
-| `zio-nats/src/main/scala/zio/nats/package.scala` | P0-4 (Java enum aliases, lines 29–77), P1-3 (`toNatsData`, lines 19–22) |
+| `zio-nats/src/main/scala/zio/nats/package.scala` | ~~P0-4 (Java enum aliases, lines 29–77)~~ (done), P1-3 (`toNatsData`, lines 19–22) |
+| `zio-nats-core/src/main/scala/zio/nats/JetStreamEnums.scala` | P0-4 replacement — 7 Scala 3 enums with `private[nats] def toJava` |
 | `zio-nats/src/main/scala/zio/nats/config/NatsConfig.scala` | P0-5 (`authHandler`, line 75), P0-6 (`optionsCustomizer`, line 82) |
-| `zio-nats/src/main/scala/zio/nats/Nats.scala` | P0-7 (accessor methods), P1-1 (hardcoded timeout, line 85), P1-2 (`underlying`, line 154) |
+| `zio-nats/src/main/scala/zio/nats/Nats.scala` | ~~P0-7 (accessor methods)~~ (won't do), P1-1 (hardcoded timeout, line 85), P1-2 (`underlying`, line 154) |
 | `zio-nats/src/main/scala/zio/nats/kv/KeyValue.scala` | P0-8 (ZLayer variant), P1-11 (Long→Int truncation, lines 288/317–319), P1-12 (`consumeKeys` leak, lines 411–424) |
 | `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamConfig.scala` | P2-6 (`ConsumerConfig.startTime`) |
 | `project/plugins.sbt` | P0-2 (sbt-ci-release), P0-3 (sbt-mima-plugin) |

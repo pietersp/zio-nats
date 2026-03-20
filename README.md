@@ -90,10 +90,12 @@ NatsConfig
             ├── JetStream.live              ← JetStream publishing + consumer access
             ├── JetStreamManagement.live    ← stream + consumer admin
             ├── KeyValueManagement.live     ← KV bucket admin
-            └── ObjectStoreManagement.live  ← Object Store admin
+            ├── KeyValue.live(name)         ← KV bucket service (ZLayer)
+            ├── ObjectStoreManagement.live  ← Object Store admin
+            └── ObjectStore.live(name)      ← Object Store bucket service (ZLayer)
 ```
 
-`KeyValue.bucket(name)` and `ObjectStore.bucket(name)` are effects that return service instances bound to a specific bucket.
+`KeyValue.live(name)` and `ObjectStore.live(name)` are `ZLayer`s — the idiomatic way to wire a bucket service into an application's dependency graph. `KeyValue.bucket(name)` and `ObjectStore.bucket(name)` remain available as `ZIO` effects for programmatic use inside a for-comprehension.
 
 All services are wired via `ZLayer`. Use `>+>` to keep all prior services in scope:
 
