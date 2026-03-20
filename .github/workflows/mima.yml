@@ -1,10 +1,8 @@
 name: Binary Compatibility
 
 on:
-  push:
-    branches: [main]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   mima:
