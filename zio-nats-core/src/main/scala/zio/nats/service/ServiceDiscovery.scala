@@ -96,7 +96,8 @@ object ServiceDiscovery {
   ): ZIO[Nats, NatsError, ServiceDiscovery] =
     ZIO.serviceWithZIO[Nats] { nats =>
       nats.underlying.flatMap(conn =>
-        ZIO.attempt(new JDiscovery(conn, maxWait.toMillis, maxResults))
+        ZIO
+          .attempt(new JDiscovery(conn, maxWait.toMillis, maxResults))
           .mapBoth(NatsError.fromThrowable, new ServiceDiscoveryLive(_))
       )
     }

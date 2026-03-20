@@ -10,12 +10,12 @@ import scala.util.Try
  * [[NatsCodec]][A].
  *
  * This is a top-level given in `package zio.nats`, so it is brought into scope
- * by `import zio.nats.*` when `zio-nats-jsoniter` is on the classpath —
- * no additional import or builder step required.
+ * by `import zio.nats.*` when `zio-nats-jsoniter` is on the classpath — no
+ * additional import or builder step required.
  *
  * The `NotGiven[NatsCodec[A]]` guard ensures this given does not shadow
- * built-in codecs (e.g. `NatsCodec[String]`, `NatsCodec[Chunk[Byte]]`) or
- * any explicit `given NatsCodec[A]` already in scope.
+ * built-in codecs (e.g. `NatsCodec[String]`, `NatsCodec[Chunk[Byte]]`) or any
+ * explicit `given NatsCodec[A]` already in scope.
  *
  * {{{
  * given JsonValueCodec[Person] = JsonCodecMaker.make
@@ -32,9 +32,8 @@ given fromJsonValueCodec[A](using jc: JsonValueCodec[A], ev: scala.util.NotGiven
  *
  * Bridges `JsonValueCodec[A]` (jsoniter-scala's codec type) to the library's
  * [[NatsCodec]] typeclass. The bridge `given` [[fromJsonValueCodec]] is the
- * primary integration point: after `import zio.nats.*`, any
- * `JsonValueCodec[A]` that is in implicit scope is automatically promoted to
- * a `NatsCodec[A]`.
+ * primary integration point: after `import zio.nats.*`, any `JsonValueCodec[A]`
+ * that is in implicit scope is automatically promoted to a `NatsCodec[A]`.
  *
  * ==Typical usage==
  *
@@ -63,9 +62,9 @@ object NatsCodecJsoniter {
   /**
    * Wrap a `JsonValueCodec[A]` as a [[NatsCodec]][A].
    *
-   * Encoding delegates to `writeToArray`; decoding delegates to
-   * `readFromArray` and maps any thrown exception (typically a
-   * `JsonReaderException`) to [[NatsDecodeError]].
+   * Encoding delegates to `writeToArray`; decoding delegates to `readFromArray`
+   * and maps any thrown exception (typically a `JsonReaderException`) to
+   * [[NatsDecodeError]].
    *
    * @param codec
    *   A jsoniter-scala `JsonValueCodec[A]`.

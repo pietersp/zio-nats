@@ -213,7 +213,8 @@ object KeyValue {
    * dependency graph. For programmatic use inside a for-comprehension, use
    * [[bucket]] instead.
    *
-   * @param bucketName The name of the KV bucket to open.
+   * @param bucketName
+   *   The name of the KV bucket to open.
    */
   def live(bucketName: String): ZLayer[Nats, NatsError, KeyValue] =
     ZLayer {

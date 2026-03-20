@@ -17,8 +17,8 @@ extension (companion: NatsCodec.type)
   /**
    * Wrap a `JsonValueCodec[A]` as a [[NatsCodec]][A].
    *
-   * Use this for an explicit one-off codec. For automatic bridging via
-   * implicit resolution, ensure a `given JsonValueCodec[A]` is in scope and
+   * Use this for an explicit one-off codec. For automatic bridging via implicit
+   * resolution, ensure a `given JsonValueCodec[A]` is in scope and
    * `import zio.nats.*` — [[NatsCodecJsoniter.fromJsonValueCodec]] handles the
    * rest.
    *

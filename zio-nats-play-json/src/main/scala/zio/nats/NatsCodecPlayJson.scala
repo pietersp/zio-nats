@@ -7,12 +7,12 @@ import zio.Chunk
  * Automatically bridge any `Format[A]` in implicit scope to [[NatsCodec]][A].
  *
  * This is a top-level given in `package zio.nats`, so it is brought into scope
- * by `import zio.nats.*` when `zio-nats-play-json` is on the classpath —
- * no additional import or builder step required.
+ * by `import zio.nats.*` when `zio-nats-play-json` is on the classpath — no
+ * additional import or builder step required.
  *
  * The `NotGiven[NatsCodec[A]]` guard ensures this given does not shadow
- * built-in codecs (e.g. `NatsCodec[String]`, `NatsCodec[Chunk[Byte]]`) or
- * any explicit `given NatsCodec[A]` already in scope.
+ * built-in codecs (e.g. `NatsCodec[String]`, `NatsCodec[Chunk[Byte]]`) or any
+ * explicit `given NatsCodec[A]` already in scope.
  *
  * {{{
  * given Format[Person] = Json.format[Person]
@@ -27,11 +27,10 @@ given fromPlayJsonFormat[A](using fmt: Format[A], ev: scala.util.NotGiven[NatsCo
 /**
  * play-json integration for [[NatsCodec]].
  *
- * Bridges `Format[A]` (play-json's combined read/write codec) to the
- * library's [[NatsCodec]] typeclass. The bridge `given` [[fromPlayJsonFormat]]
- * is the primary integration point: after `import zio.nats.*`, any
- * `Format[A]` that is in implicit scope is automatically promoted to a
- * `NatsCodec[A]`.
+ * Bridges `Format[A]` (play-json's combined read/write codec) to the library's
+ * [[NatsCodec]] typeclass. The bridge `given` [[fromPlayJsonFormat]] is the
+ * primary integration point: after `import zio.nats.*`, any `Format[A]` that is
+ * in implicit scope is automatically promoted to a `NatsCodec[A]`.
  *
  * JSON is serialised as UTF-8 bytes.
  *
@@ -61,9 +60,9 @@ object NatsCodecPlayJson {
   /**
    * Wrap a play-json `Format[A]` as a [[NatsCodec]][A].
    *
-   * Encoding delegates to `Json.stringify`; decoding delegates to
-   * `Json.parse` + `validate[A]`, mapping any `JsError` or thrown exception
-   * to [[NatsDecodeError]].
+   * Encoding delegates to `Json.stringify`; decoding delegates to `Json.parse`
+   * + `validate[A]`, mapping any `JsError` or thrown exception to
+   * [[NatsDecodeError]].
    *
    * @param format
    *   A play-json `Format[A]`.
@@ -77,7 +76,9 @@ object NatsCodecPlayJson {
         Json.parse(bytes.toArray).validate[A](format) match {
           case JsSuccess(value, _) => Right(value)
           case JsError(errors)     =>
-            Left(NatsDecodeError(errors.map { case (path, errs) => s"$path: ${errs.map(_.message).mkString(", ")}" }.mkString("; ")))
+            Left(NatsDecodeError(errors.map { case (path, errs) =>
+              s"$path: ${errs.map(_.message).mkString(", ")}"
+            }.mkString("; ")))
         }
       catch {
         case e: Exception => Left(NatsDecodeError(e.getMessage))

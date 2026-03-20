@@ -170,7 +170,8 @@ object ObjectStore {
    * application's dependency graph. For programmatic use inside a
    * for-comprehension, use [[bucket]] instead.
    *
-   * @param bucketName The name of the Object Store bucket to open.
+   * @param bucketName
+   *   The name of the Object Store bucket to open.
    */
   def live(bucketName: String): ZLayer[Nats, NatsError, ObjectStore] =
     ZLayer {

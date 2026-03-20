@@ -186,17 +186,18 @@ trait Nats {
   ): ZIO[Scope, NatsError, NatsService]
 
   /**
-   * Escape hatch: access the raw jnats `Connection` for advanced or
-   * unsupported use-cases not covered by the library's typed API.
+   * Escape hatch: access the raw jnats `Connection` for advanced or unsupported
+   * use-cases not covered by the library's typed API.
    *
    * Returns a `UIO[JConnection]` so it composes naturally with other ZIO
    * effects. It is intentionally exposed as an escape hatch only. Prefer the
    * typed methods on [[Nats]], [[zio.nats.jetstream.JetStream]],
-   * [[zio.nats.kv.KeyValue]], and [[zio.nats.objectstore.ObjectStore]] for
-   * all production use. Calling jnats APIs directly can bypass the library's
-   * error model and codec guarantees.
+   * [[zio.nats.kv.KeyValue]], and [[zio.nats.objectstore.ObjectStore]] for all
+   * production use. Calling jnats APIs directly can bypass the library's error
+   * model and codec guarantees.
    */
   def underlying: UIO[JConnection]
+
   /**
    * Stream of connection lifecycle events for this connection.
    *

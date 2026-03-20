@@ -10,7 +10,16 @@ import io.nats.client.api.{
   StreamConfiguration as JStreamConfiguration
 }
 import zio.Duration
-import zio.nats.{AckPolicy, CompressionOption, DeliverPolicy, DiscardPolicy, PriorityPolicy, ReplayPolicy, RetentionPolicy, StorageType}
+import zio.nats.{
+  AckPolicy,
+  CompressionOption,
+  DeliverPolicy,
+  DiscardPolicy,
+  PriorityPolicy,
+  ReplayPolicy,
+  RetentionPolicy,
+  StorageType
+}
 
 import scala.jdk.CollectionConverters.*
 
