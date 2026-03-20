@@ -75,7 +75,9 @@ module (`zio-nats-core`) has **no zio-blocks dependency** — it only provides b
   ```
 - For domain types with a jsoniter-scala `JsonValueCodec[A]`, add `zio-nats-jsoniter`. A top-level
   `given fromJsonValueCodec` in `package zio.nats` automatically bridges any `JsonValueCodec[A]` in
-  implicit scope to `NatsCodec[A]` — no builder step required:
+  implicit scope to `NatsCodec[A]` — no builder step required. A `NotGiven[NatsCodec[A]]` guard
+  prevents it from shadowing built-in codecs (`String`, `Chunk[Byte]`) or any explicit
+  `given NatsCodec[A]` already in scope:
   ```scala
   given JsonValueCodec[Person] = JsonCodecMaker.make
   // NatsCodec[Person] resolved automatically via import zio.nats.*
@@ -84,7 +86,8 @@ module (`zio-nats-core`) has **no zio-blocks dependency** — it only provides b
   For an explicit one-off codec, use the `NatsCodec.fromJsoniter(codec)` extension method.
 - For domain types with a play-json `Format[A]`, add `zio-nats-play-json`. A top-level
   `given fromPlayJsonFormat` in `package zio.nats` automatically bridges any `Format[A]` in
-  implicit scope to `NatsCodec[A]` — no builder step required:
+  implicit scope to `NatsCodec[A]` — no builder step required. Same `NotGiven[NatsCodec[A]]`
+  guard applies:
   ```scala
   given Format[Person] = Json.format[Person]
   // NatsCodec[Person] resolved automatically via import zio.nats.*
@@ -173,9 +176,9 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocks.scala` | `NatsCodecZioBlocks.Builder` — derives `NatsCodec[A]` from a zio-blocks `Format` + `Schema`; caches in `ConcurrentHashMap` |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocksExtensions.scala` | Extension methods `NatsCodec.fromFormat` and `NatsCodec.derived` (available via `import zio.nats.*`) |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/serialization/NatsSerializer.scala` | `CompiledCodec[A]` sealed trait, `makeFor[A](format)` factory (eager, can throw), `BinaryCompiledCodec` / `TextCompiledCodec` impls |
-| `zio-nats-jsoniter/src/main/scala/zio/nats/NatsCodecJsoniter.scala` | `NatsCodecJsoniter.wrap` — bridges `JsonValueCodec[A]` to `NatsCodec[A]`; top-level `given fromJsonValueCodec` for automatic resolution |
+| `zio-nats-jsoniter/src/main/scala/zio/nats/NatsCodecJsoniter.scala` | `NatsCodecJsoniter.wrap` — bridges `JsonValueCodec[A]` to `NatsCodec[A]`; top-level `given fromJsonValueCodec` with `NotGiven[NatsCodec[A]]` guard for automatic resolution |
 | `zio-nats-jsoniter/src/main/scala/zio/nats/NatsCodecJsoniterExtensions.scala` | Extension method `NatsCodec.fromJsoniter` (available via `import zio.nats.*`) |
-| `zio-nats-play-json/src/main/scala/zio/nats/NatsCodecPlayJson.scala` | `NatsCodecPlayJson.wrap` — bridges play-json `Format[A]` to `NatsCodec[A]`; top-level `given fromPlayJsonFormat` for automatic resolution |
+| `zio-nats-play-json/src/main/scala/zio/nats/NatsCodecPlayJson.scala` | `NatsCodecPlayJson.wrap` — bridges play-json `Format[A]` to `NatsCodec[A]`; top-level `given fromPlayJsonFormat` with `NotGiven[NatsCodec[A]]` guard for automatic resolution |
 | `zio-nats-play-json/src/main/scala/zio/nats/NatsCodecPlayJsonExtensions.scala` | Extension method `NatsCodec.fromPlayJson` (available via `import zio.nats.*`) |
 | `zio-nats-core/src/main/scala/zio/nats/JetStreamEnums.scala` | Scala 3 enums: `AckPolicy`, `DeliverPolicy`, `ReplayPolicy`, `DiscardPolicy`, `RetentionPolicy`, `CompressionOption`, `PriorityPolicy` — each with a `private[nats] def toJava` |
 | `zio-nats-core/src/main/scala/zio/nats/NatsError.scala` | Error hierarchy |

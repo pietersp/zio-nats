@@ -323,7 +323,9 @@ libraryDependencies += "dev.zio" %% "zio-nats-jsoniter" % "<version>"
 ### Automatic bridging (recommended)
 
 Place a `given JsonValueCodec[A]` in scope and `import zio.nats.*`. The top-level
-`given fromJsonValueCodec` bridges it to `NatsCodec[A]` automatically — no builder step required:
+`given fromJsonValueCodec` bridges it to `NatsCodec[A]` automatically — no builder step required.
+A `NotGiven[NatsCodec[A]]` guard ensures it never shadows built-in codecs (`String`,
+`Chunk[Byte]`) or any explicit `given NatsCodec[A]` you provide:
 
 ```scala
 import com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec
@@ -384,7 +386,8 @@ libraryDependencies += "dev.zio" %% "zio-nats-play-json" % "<version>"
 ### Automatic bridging (recommended)
 
 Place a `given Format[A]` in scope and `import zio.nats.*`. The top-level
-`given fromPlayJsonFormat` bridges it to `NatsCodec[A]` automatically — no builder step required:
+`given fromPlayJsonFormat` bridges it to `NatsCodec[A]` automatically — no builder step required.
+Same `NotGiven[NatsCodec[A]]` guard applies — built-in and explicit codecs always win:
 
 ```scala
 import play.api.libs.json.{Format, Json}
