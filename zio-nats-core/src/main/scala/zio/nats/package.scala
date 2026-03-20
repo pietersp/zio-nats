@@ -15,12 +15,6 @@ package object nats {
   /** Type alias: a ZIO effect that requires JetStream. */
   type JetStreamIO[+A] = ZIO[JetStream, NatsError, A]
 
-  /** Implicit conversion: String -> Chunk[Byte] (UTF-8). */
-  extension (s: String)
-    /** Encode this string as a UTF-8 byte Chunk suitable for NATS publish. */
-    def toNatsData: Chunk[Byte] =
-      Chunk.fromArray(s.getBytes(java.nio.charset.StandardCharsets.UTF_8))
-
   // ---------------------------------------------------------------------------
   // Envelope / ObjectData convenience extensions
   // ---------------------------------------------------------------------------

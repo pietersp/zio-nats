@@ -88,17 +88,23 @@ Other ZIO ecosystem libraries provide `ZLayer` constructors for sub-services. Cu
 
 ### API Design
 
-#### P1-1: Hardcoded 2-second default request timeout
+#### ~~P1-1: Hardcoded 2-second default request timeout~~ **DONE**
 
-In `Nats.scala` (line 85), the convenience overload `request[A, B](subject, request)` hardcodes a 2-second timeout. Should either be configurable via `NatsConfig` or removed in favor of always requiring an explicit timeout.
+~~In `Nats.scala` (line 85), the convenience overload `request[A, B](subject, request)` hardcodes a 2-second timeout. Should either be configurable via `NatsConfig` or removed in favor of always requiring an explicit timeout.~~
 
-#### P1-2: `Nats.underlying` returns raw `JConnection` as a `def`
+Removed the no-timeout overload entirely. All call sites must now supply an explicit `timeout: Duration`.
 
-In `Nats.scala` (line 154). While intentionally an escape hatch, returning a synchronous value is inconsistent with the rest of the effectful API. Consider wrapping in `UIO[JConnection]` or adding a prominent ScalaDoc warning.
+#### ~~P1-2: `Nats.underlying` returns raw `JConnection` as a `def`~~ **DONE**
 
-#### P1-3: `toNatsData` extension on String
+~~In `Nats.scala` (line 154). While intentionally an escape hatch, returning a synchronous value is inconsistent with the rest of the effectful API. Consider wrapping in `UIO[JConnection]` or adding a prominent ScalaDoc warning.~~
 
-In `package.scala` (lines 19–22). This extension method is redundant since `NatsCodec[String]` handles encoding. Adds API surface without clear benefit; should be deprecated or removed.
+Added a prominent ScalaDoc warning on `underlying` documenting it as an escape hatch only and cautioning against direct jnats use. Changing the type to `UIO[JConnection]` was deferred — it would cascade into all internal library call sites (`KeyValue`, `ObjectStore`, `JetStream`, `JetStreamManagement`) and is better addressed as a separate refactor if ever needed.
+
+#### ~~P1-3: `toNatsData` extension on String~~ **DONE**
+
+~~In `package.scala` (lines 19–22). This extension method is redundant since `NatsCodec[String]` handles encoding. Adds API surface without clear benefit; should be deprecated or removed.~~
+
+Removed. README examples that used `order.toNatsData` (which was already incorrect — it was only defined on `String`) updated to use direct typed publish.
 
 ### Integration
 
@@ -208,10 +214,10 @@ Address as capacity allows. P2-1 (Scala 2.13) and P2-2 (docs site) have the high
 
 | File | Relevant Items |
 |------|---------------|
-| `zio-nats/src/main/scala/zio/nats/package.scala` | ~~P0-4 (Java enum aliases, lines 29–77)~~ (done), P1-3 (`toNatsData`, lines 19–22) |
+| `zio-nats/src/main/scala/zio/nats/package.scala` | ~~P0-4 (Java enum aliases, lines 29–77)~~ (done), ~~P1-3 (`toNatsData`)~~ (done) |
 | `zio-nats-core/src/main/scala/zio/nats/JetStreamEnums.scala` | P0-4 replacement — 7 Scala 3 enums with `private[nats] def toJava` |
 | `zio-nats/src/main/scala/zio/nats/config/NatsConfig.scala` | P0-5 (`authHandler`, line 75), P0-6 (`optionsCustomizer`, line 82) |
-| `zio-nats/src/main/scala/zio/nats/Nats.scala` | ~~P0-7 (accessor methods)~~ (won't do), P1-1 (hardcoded timeout, line 85), P1-2 (`underlying`, line 154) |
+| `zio-nats/src/main/scala/zio/nats/Nats.scala` | ~~P0-7 (accessor methods)~~ (won't do), ~~P1-1 (hardcoded timeout)~~ (done), ~~P1-2 (`underlying` warning)~~ (done) |
 | `zio-nats/src/main/scala/zio/nats/kv/KeyValue.scala` | P0-8 (ZLayer variant), P1-11 (Long→Int truncation, lines 288/317–319), P1-12 (`consumeKeys` leak, lines 411–424) |
 | `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamConfig.scala` | P2-6 (`ConsumerConfig.startTime`) |
 | `project/plugins.sbt` | P0-2 (sbt-ci-release), P0-3 (sbt-mima-plugin) |

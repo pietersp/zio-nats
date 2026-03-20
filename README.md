@@ -422,12 +422,13 @@ Requires JetStream-enabled NATS: `nats-server -js` or `docker run -p 4222:4222 n
 ### Publishing
 
 ```scala
+// given NatsCodec[Order] in scope
 val layer = ZLayer.succeed(NatsConfig.default) >>> Nats.live >>> JetStream.live
 
 val publish =
   for {
     js  <- ZIO.service[JetStream]
-    ack <- js.publish(Subject("orders.new"), order.toNatsData)
+    ack <- js.publish(Subject("orders.new"), order)
     _   <- Console.printLine(s"seq=${ack.seqno}")
   } yield ()
 ```
@@ -437,7 +438,7 @@ Publish with duplicate detection via message ID, using `JsPublishParams`:
 ```scala
 val ack = js.publish(
   Subject("orders.new"),
-  order.toNatsData,
+  order,
   JsPublishParams(options = Some(PublishOptions(messageId = Some("order-42"))))
 )
 ```
@@ -447,7 +448,7 @@ Publish with headers:
 ```scala
 val ack = js.publish(
   Subject("orders.new"),
-  order.toNatsData,
+  order,
   JsPublishParams(headers = Headers("X-Source" -> "checkout"))
 )
 ```
@@ -457,7 +458,7 @@ Publish asynchronously (fire-and-forget, collect acks later):
 ```scala
 // Returns IO[NatsError, Task[PublishAck]] — the inner Task resolves when the server acks
 val futureAck: IO[NatsError, Task[PublishAck]] =
-  js.publishAsync(Subject("orders.new"), order.toNatsData)
+  js.publishAsync(Subject("orders.new"), order)
 ```
 
 ### Management

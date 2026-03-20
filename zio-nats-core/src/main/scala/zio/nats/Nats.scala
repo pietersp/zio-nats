@@ -75,18 +75,6 @@ trait Nats {
     timeout: Duration
   ): IO[NatsError, Envelope[B]]
 
-  /**
-   * Typed request — convenience overload with a 2-second default timeout.
-   *
-   * {{{
-   *   nats.request[UserQuery, UserResponse](subject, query)
-   * }}}
-   */
-  def request[A: NatsCodec, B: NatsCodec](
-    subject: Subject,
-    request: A
-  ): IO[NatsError, Envelope[B]] = this.request[A, B](subject, request, 2.seconds)
-
   // -------------------------------------------------------------------------
   // Subscribe
   // -------------------------------------------------------------------------
@@ -198,8 +186,15 @@ trait Nats {
   ): ZIO[Scope, NatsError, NatsService]
 
   /**
-   * Escape hatch: access the raw jnats Connection for advanced or unsupported
-   * use-cases.
+   * Escape hatch: access the raw jnats `Connection` for advanced or
+   * unsupported use-cases not covered by the library's typed API.
+   *
+   * '''Warning:''' this method is synchronous and returns a raw jnats type.
+   * It is intentionally exposed as an escape hatch only. Prefer the typed
+   * methods on [[Nats]], [[zio.nats.jetstream.JetStream]],
+   * [[zio.nats.kv.KeyValue]], and [[zio.nats.objectstore.ObjectStore]] for
+   * all production use. Calling jnats APIs directly can bypass the library's
+   * error model and codec guarantees.
    */
   def underlying: JConnection
 
