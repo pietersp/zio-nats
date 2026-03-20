@@ -52,7 +52,7 @@ No `sbt-ci-release` or `sbt-sonatype` plugin in `project/plugins.sbt` (currently
 
 `sbt-mima-plugin` added to `project/plugins.sbt`. Enabled on all 5 published subprojects (`zio-nats-core`, `zio-nats-zio-blocks`, `zio-nats-jsoniter`, `zio-nats-play-json`, `zio-nats-testkit`). GitHub Actions workflow created at `.github/workflows/mima.yml`.
 
-**Important:** `mimaPreviousArtifacts` is currently `Set.empty` on all subprojects. Before the first public release, update each to the actual version (e.g. `Set("dev.zio" %% "zio-nats-core" % "0.1.0")`). Without this, MiMa has no baseline to compare against and will not detect regressions.
+**Important:** `mimaPreviousArtifacts` is currently `Set.empty` on all subprojects. Before the first public release, update each to the actual version (e.g. `Set("io.github.pietersp" %% "zio-nats-core" % "0.1.0")`). Without this, MiMa has no baseline to compare against and will not detect regressions.
 
 ### API Purity — jnats Type Leaks
 

@@ -9,7 +9,7 @@ val playJsonVersion       = "3.0.4"
 
 inThisBuild(
   List(
-    organization       := "dev.zio",
+    organization       := "io.github.pietersp",
     homepage           := Some(url("https://github.com/pietersp/zio-nats")),
     licenses           := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),
     scalaVersion       := scala3,

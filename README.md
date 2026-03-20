@@ -22,26 +22,26 @@ Add to `build.sbt`:
 // ── Option A: batteries-included ────────────────────────────────────────────
 // Includes pub/sub, JetStream, KV, Object Store, Service Framework,
 // and zio-blocks type-safe serialization.
-libraryDependencies += "dev.zio" %% "zio-nats" % "<version>"
+libraryDependencies += "io.github.pietersp" %% "zio-nats" % "<version>"
 
 // ── Option B: core only (no zio-blocks) ─────────────────────────────────────
 // Use this when you want jsoniter-scala or a fully custom NatsCodec[A]
 // instead of zio-blocks.
-libraryDependencies += "dev.zio" %% "zio-nats-core" % "<version>"
+libraryDependencies += "io.github.pietersp" %% "zio-nats-core" % "<version>"
 
 // ── Optional add-on: jsoniter-scala serialization ───────────────────────────
 // Pair with zio-nats-core (instead of zio-blocks) or add alongside zio-nats
 // (to use jsoniter for selected types while keeping zio-blocks for others).
-libraryDependencies += "dev.zio" %% "zio-nats-jsoniter" % "<version>"
+libraryDependencies += "io.github.pietersp" %% "zio-nats-jsoniter" % "<version>"
 
 // ── Optional add-on: play-json serialization ─────────────────────────────────
 // Pair with zio-nats-core (instead of zio-blocks) or add alongside zio-nats
 // (to use play-json for selected types while keeping zio-blocks for others).
-libraryDependencies += "dev.zio" %% "zio-nats-play-json" % "<version>"
+libraryDependencies += "io.github.pietersp" %% "zio-nats-play-json" % "<version>"
 
 // ── Testkit ──────────────────────────────────────────────────────────────────
 // Integration test helpers — starts a NATS container via testcontainers.
-libraryDependencies += "dev.zio" %% "zio-nats-testkit" % "<version>" % Test
+libraryDependencies += "io.github.pietersp" %% "zio-nats-testkit" % "<version>" % Test
 ```
 
 
@@ -314,12 +314,12 @@ Add the dependency — choose the base artifact that matches your setup:
 
 ```scala
 // Replace zio-blocks entirely: core + jsoniter
-libraryDependencies += "dev.zio" %% "zio-nats-core"    % "<version>"
-libraryDependencies += "dev.zio" %% "zio-nats-jsoniter" % "<version>"
+libraryDependencies += "io.github.pietersp" %% "zio-nats-core"    % "<version>"
+libraryDependencies += "io.github.pietersp" %% "zio-nats-jsoniter" % "<version>"
 
 // Or add jsoniter alongside zio-blocks (selected types use jsoniter, rest use zio-blocks)
-libraryDependencies += "dev.zio" %% "zio-nats"          % "<version>"
-libraryDependencies += "dev.zio" %% "zio-nats-jsoniter" % "<version>"
+libraryDependencies += "io.github.pietersp" %% "zio-nats"          % "<version>"
+libraryDependencies += "io.github.pietersp" %% "zio-nats-jsoniter" % "<version>"
 ```
 
 ### Automatic bridging (recommended)
@@ -377,12 +377,12 @@ Add the dependency — choose the base artifact that matches your setup:
 
 ```scala
 // Replace zio-blocks entirely: core + play-json
-libraryDependencies += "dev.zio" %% "zio-nats-core"     % "<version>"
-libraryDependencies += "dev.zio" %% "zio-nats-play-json" % "<version>"
+libraryDependencies += "io.github.pietersp" %% "zio-nats-core"     % "<version>"
+libraryDependencies += "io.github.pietersp" %% "zio-nats-play-json" % "<version>"
 
 // Or add play-json alongside zio-blocks (selected types use play-json, rest use zio-blocks)
-libraryDependencies += "dev.zio" %% "zio-nats"           % "<version>"
-libraryDependencies += "dev.zio" %% "zio-nats-play-json" % "<version>"
+libraryDependencies += "io.github.pietersp" %% "zio-nats"           % "<version>"
+libraryDependencies += "io.github.pietersp" %% "zio-nats-play-json" % "<version>"
 ```
 
 ### Automatic bridging (recommended)
@@ -771,7 +771,7 @@ Sub-sealed traits for domain grouping:
 Add the testkit dependency:
 
 ```scala
-libraryDependencies += "dev.zio" %% "zio-nats-testkit" % "<version>" % Test
+libraryDependencies += "io.github.pietersp" %% "zio-nats-testkit" % "<version>" % Test
 ```
 
 `NatsTestLayers.nats` starts a NATS container (via testcontainers) and provides a `Nats` service wired to it. Use `.provideShared` to start the container once per suite:
