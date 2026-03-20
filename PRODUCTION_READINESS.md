@@ -48,9 +48,11 @@ No GitHub Actions workflows exist. The `.github/workflows` directory is missing 
 
 No `sbt-ci-release` or `sbt-sonatype` plugin in `project/plugins.sbt` (currently only `sbt-scalafmt` and `sbt-scoverage`). Needs GPG signing setup, POM metadata (developers, SCM info), and Sonatype credentials in CI secrets.
 
-#### P0-3: Binary compatibility checking (MiMa)
+#### ~~P0-3: Binary compatibility checking (MiMa)~~ **DONE**
 
-No `sbt-mima-plugin`. Should be added now so it is in place from version 0.1.0 onward, preventing accidental binary-incompatible changes in future releases.
+`sbt-mima-plugin` added to `project/plugins.sbt`. Enabled on all 5 published subprojects (`zio-nats-core`, `zio-nats-zio-blocks`, `zio-nats-jsoniter`, `zio-nats-play-json`, `zio-nats-testkit`). GitHub Actions workflow created at `.github/workflows/mima.yml`.
+
+**Important:** `mimaPreviousArtifacts` is currently `Set.empty` on all subprojects. Before the first public release, update each to the actual version (e.g. `Set("dev.zio" %% "zio-nats-core" % "0.1.0")`). Without this, MiMa has no baseline to compare against and will not detect regressions.
 
 ### API Purity — jnats Type Leaks
 
@@ -188,7 +190,8 @@ In `JetStreamConfig.scala`. While `java.time` types are standard in Scala, some 
 
 Suggested order:
 
-1. **P0-1, P0-2, P0-3** — CI/CD, publishing, MiMa (infrastructure first)
+1. **P0-1, P0-2** — CI/CD, publishing (infrastructure first)
+2. ~~**P0-3** — MiMa binary compatibility~~ **DONE**
 2. ~~**P0-4** — Scala 3 enums for policies (largest API change, affects many files)~~ **DONE**
 3. ~~**P0-5, P0-6** — NatsConfig jnats leaks (localized to one file)~~ **WON'T DO** (see above)
 4. ~~**P0-7** — ZIO accessor methods (mechanical but touches every service companion)~~ **WON'T DO** (officially deprecated by ZIO team)
@@ -220,4 +223,5 @@ Address as capacity allows. P2-1 (Scala 2.13) and P2-2 (docs site) have the high
 | `zio-nats/src/main/scala/zio/nats/Nats.scala` | ~~P0-7 (accessor methods)~~ (won't do), ~~P1-1 (hardcoded timeout)~~ (done), ~~P1-2 (`underlying` warning)~~ (done) |
 | `zio-nats/src/main/scala/zio/nats/kv/KeyValue.scala` | P0-8 (ZLayer variant), P1-11 (Long→Int truncation, lines 288/317–319), P1-12 (`consumeKeys` leak, lines 411–424) |
 | `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamConfig.scala` | P2-6 (`ConsumerConfig.startTime`) |
-| `project/plugins.sbt` | P0-2 (sbt-ci-release), P0-3 (sbt-mima-plugin) |
+| `project/plugins.sbt` | P0-2 (sbt-ci-release), P0-3 (sbt-mima-plugin, done) |
+| `.github/workflows/mima.yml` | P0-3 GitHub Actions workflow |

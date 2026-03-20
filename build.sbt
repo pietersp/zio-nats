@@ -24,28 +24,31 @@ lazy val root = (project in file("."))
   .settings(
     name               := "zio-nats-root",
     publish / skip     := true,
-    crossScalaVersions := Nil
+    crossScalaVersions := Nil,
+    mimaPreviousArtifacts := Set.empty
   )
 
 lazy val zioNatsCore = (project in file("zio-nats-core"))
-  .enablePlugins(ScoverageSbtPlugin)
+  .enablePlugins(ScoverageSbtPlugin, MimaPlugin)
   .settings(
     name := "zio-nats-core",
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio"         % zioVersion,
       "dev.zio" %% "zio-streams" % zioVersion,
       "io.nats"  % "jnats"       % jnatsVersion
-    )
+    ),
+    mimaPreviousArtifacts := Set.empty
   )
 
 lazy val zioNatsZioBlocks = (project in file("zio-nats-zio-blocks"))
-  .enablePlugins(ScoverageSbtPlugin)
+  .enablePlugins(ScoverageSbtPlugin, MimaPlugin)
   .dependsOn(zioNatsCore)
   .settings(
     name := "zio-nats-zio-blocks",
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio-blocks-schema" % zioBlocksVersion
-    )
+    ),
+    mimaPreviousArtifacts := Set.empty
   )
 
 lazy val zioNats = (project in file("zio-nats"))
@@ -53,35 +56,42 @@ lazy val zioNats = (project in file("zio-nats"))
   .settings(
     name                      := "zio-nats",
     Compile / sources         := Seq.empty,
-    Compile / resources       := Seq.empty
+    Compile / resources       := Seq.empty,
+    mimaPreviousArtifacts     := Set.empty
   )
 
 lazy val zioNatsJsoniter = (project in file("zio-nats-jsoniter"))
   .dependsOn(zioNatsCore)
+  .enablePlugins(MimaPlugin)
   .settings(
     name := "zio-nats-jsoniter",
     libraryDependencies ++= Seq(
       "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core" % jsoniterScalaVersion
-    )
+    ),
+    mimaPreviousArtifacts := Set.empty
   )
 
 lazy val zioNatsPlayJson = (project in file("zio-nats-play-json"))
   .dependsOn(zioNatsCore)
+  .enablePlugins(MimaPlugin)
   .settings(
     name := "zio-nats-play-json",
     libraryDependencies ++= Seq(
       "org.playframework" %% "play-json" % playJsonVersion
-    )
+    ),
+    mimaPreviousArtifacts := Set.empty
   )
 
 lazy val zioNatsTestkit = (project in file("zio-nats-testkit"))
   .dependsOn(zioNatsCore)
+  .enablePlugins(MimaPlugin)
   .settings(
     name := "zio-nats-testkit",
     libraryDependencies ++= Seq(
       "dev.zio"      %% "zio-test"                  % zioVersion,
       "com.dimafeng" %% "testcontainers-scala-core" % testcontainersVersion
-    )
+    ),
+    mimaPreviousArtifacts := Set.empty
   )
 
 lazy val zioNatsTest = (project in file("zio-nats-test"))
@@ -89,6 +99,7 @@ lazy val zioNatsTest = (project in file("zio-nats-test"))
   .settings(
     name           := "zio-nats-test",
     publish / skip := true,
+    mimaPreviousArtifacts := Set.empty,
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio-test"                                          % zioVersion              % Test,
       "dev.zio" %% "zio-test-sbt"                                      % zioVersion              % Test,
@@ -118,5 +129,6 @@ lazy val zioNatsExamples = (project in file("examples"))
   .dependsOn(zioNatsCore, zioNatsZioBlocks)
   .settings(
     name           := "zio-nats-examples",
-    publish / skip := true
+    publish / skip := true,
+    mimaPreviousArtifacts := Set.empty
   )
