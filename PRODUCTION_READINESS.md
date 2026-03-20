@@ -26,7 +26,7 @@ The library already does many things well:
 
 9. **Testkit subproject** — `NatsTestLayers` is published separately so downstream users can write their own integration tests against containerized NATS.
 
-10. **Request-reply service** — `NatsRpc.respond` provides a ready-made pattern for building typed RPC services over NATS.
+10. **Service Framework (Micro protocol)** — `ServiceEndpoint` / `NatsService` / `ServiceDiscovery` implement the full NATS Micro protocol with typed endpoints, queue-group policies, stats, and cluster-wide discovery.
 
 ---
 
@@ -118,7 +118,7 @@ No OpenTelemetry / ZIO Telemetry integration. For production microservices, trac
 
 #### P1-7: Sleep-based test synchronization
 
-25 instances of `ZIO.sleep(200–500.millis)` across test files (`NatsPubSubSpec.scala`, `NatsRpcSpec.scala`, `KeyValueSpec.scala`, `ObjectStoreSpec.scala`, `NatsErrorSpec.scala`). Causes flaky tests and slow CI. Should use `Promise`, `Ref`, `TestClock`, or subscription-ready signals.
+Many instances of `ZIO.sleep(200–500.millis)` across test files (`NatsPubSubSpec.scala`, `KeyValueSpec.scala`, `ObjectStoreSpec.scala`, `NatsErrorSpec.scala`). Causes flaky tests and slow CI. Should use `Promise`, `Ref`, `TestClock`, or subscription-ready signals.
 
 #### P1-8: No lifecycle event tests
 
@@ -173,10 +173,6 @@ Connection lifecycle is tied to `ZLayer` scope, but no integration with ZIO's gr
 #### P2-6: `ConsumerConfig.startTime` uses `java.time.ZonedDateTime`
 
 In `JetStreamConfig.scala`. While `java.time` types are standard in Scala, some users may prefer `java.time.Instant`. Minor and cosmetic.
-
-#### P2-7: Request-reply service could be richer
-
-`NatsRpc` exists but is minimal. A full service abstraction would include routing (multiple handlers on different subjects), typed error propagation, and timeout configuration per handler.
 
 ---
 
