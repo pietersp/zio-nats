@@ -178,9 +178,9 @@ No mdoc, Laika, or microsite setup. Official ZIO libraries have generated docume
 
 ### Feature Gaps
 
-#### P2-4: Graceful shutdown / drain integration
+#### ~~P2-4: Graceful shutdown / drain integration~~ **DONE**
 
-Connection lifecycle is tied to `ZLayer` scope, but no integration with ZIO's graceful shutdown signal. Applications should be able to drain subscriptions before the connection layer is torn down.
+`NatsConfig.drainTimeout` (default 30s) controls the drain timeout. When the `Nats.live` ZLayer's scope ends, the connection is automatically drained (with that timeout) before closing — no manual intervention required. The `drain()` method has been removed from the `Nats` trait since drain is now handled automatically by the ZLayer scope.
 
 #### P2-5: More specific ObjectStore errors
 
@@ -226,8 +226,8 @@ Address as capacity allows. P2-1 (Scala 2.13) and P2-2 (docs site) have the high
 | File | Relevant Items |
 |------|---------------|
 | `zio-nats-core/src/main/scala/zio/nats/package.scala` | ~~P0-4 (Java enum aliases, lines 29–77)~~ (done), ~~P1-3 (`toNatsData`)~~ (done) |
-| `zio-nats-core/src/main/scala/zio/nats/config/NatsConfig.scala` | P0-5 (`authHandler`, line 75), P0-6 (`optionsCustomizer`, line 82) |
-| `zio-nats-core/src/main/scala/zio/nats/Nats.scala` | ~~P0-7 (accessor methods)~~ (won't do), ~~P1-1 (hardcoded timeout)~~ (done), ~~P1-2 (`underlying` warning)~~ (done) |
+| `zio-nats-core/src/main/scala/zio/nats/config/NatsConfig.scala` | P0-5 (`authHandler`, line 75), P0-6 (`optionsCustomizer`, line 82), ~~P2-4 (`drainTimeout`)~~ (done) |
+| `zio-nats-core/src/main/scala/zio/nats/Nats.scala` | ~~P0-7 (accessor methods)~~ (won't do), ~~P1-1 (hardcoded timeout)~~ (done), ~~P1-2 (`underlying` warning)~~ (done), ~~P2-4 (drain on scope exit)~~ (done) |
 | `zio-nats-core/src/main/scala/zio/nats/kv/KeyValue.scala` | P0-8 (ZLayer variant), P1-11 (Long→Int truncation, lines 288/317–319), P1-12 (`consumeKeys` leak, lines 411–424) |
 | `zio-nats-core/src/main/scala/zio/nats/jetstream/JetStreamConfig.scala` | P2-6 (`ConsumerConfig.startTime`) |
 | `project/plugins.sbt` | P0-1 (sbt-ci-release, done), P0-3 (sbt-mima-plugin, done) |

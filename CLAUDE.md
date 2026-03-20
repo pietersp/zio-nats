@@ -28,6 +28,21 @@ sbt is managed via Coursier; invoke it as:
 
 Tests use real NATS via testcontainers (Docker required). They start automatically; no manual NATS setup needed for `test`.
 
+## Testing Guidelines
+
+**Test correctness over speed.** A fast test that doesn't verify the right behavior is worse than no test at all — it gives false confidence.
+
+Key pitfalls to avoid:
+- **Test natural completion, not interrupt behavior** — `take(n)` causes the stream to complete normally; the scope exits and drain is called regardless of interrupt. This doesn't verify that interrupt triggers drain.
+- **Don't assume timing** — `ZIO.sleep` can be unreliable; use `Promise`, `Latch`, or `Ref` for synchronization.
+- **Verify the fiber actually did something before asserting** — check that the fiber was actually running and did work, not just that the test didn't error.
+
+When adding interrupt/cancellation tests:
+- Use `ZIO.scoped { ... }.fork` to create a fiber with its own scope
+- Have the subscription run indefinitely (no `take`) so it keeps working until interrupted
+- Publish messages while the subscriber is active
+- Interrupt the fiber and verify work was done before interrupt
+
 ## Project Layout
 
 Seven sbt subprojects:

@@ -109,9 +109,6 @@ trait Nats {
   /** Flush the outbound buffer to the server within `timeout`. */
   def flush(timeout: Duration = 1.second): IO[NatsError, Unit]
 
-  /** Gracefully drain all subscriptions and close the connection. */
-  def drain(timeout: Duration = 30.seconds): IO[NatsError, Unit]
-
   /** Current connection status. Never fails. */
   def status: UIO[ConnectionStatus]
 
@@ -237,7 +234,7 @@ object Nats {
     for {
       hub   <- Hub.unbounded[NatsEvent]
       jQueue = new LinkedBlockingQueue[NatsEvent]()
-      conn  <- connect(buildOptions(config, jQueue))
+      conn  <- connect(buildOptions(config, jQueue), config.drainTimeout)
       _     <- relayEvents(jQueue, hub)
     } yield new NatsLive(conn, hub)
 
@@ -264,11 +261,14 @@ object Nats {
       })
       .build()
 
-  /** Acquire a jnats connection; release closes it when the Scope ends. */
-  private def connect(options: Options): ZIO[Scope, NatsError, JConnection] =
+  /**
+   * Acquire a jnats connection; release drains and closes it when the Scope
+   * ends.
+   */
+  private def connect(options: Options, drainTimeout: Duration): ZIO[Scope, NatsError, JConnection] =
     ZIO.acquireRelease(
       ZIO.attemptBlocking(io.nats.client.Nats.connect(options)).mapError(NatsError.fromThrowable)
-    )(conn => ZIO.attemptBlocking(conn.close()).ignoreLogged)
+    )(conn => ZIO.attemptBlocking(conn.drain(drainTimeout.asJava)).ignoreLogged)
 
   /**
    * Drain `queue` into `hub` on a background fiber for the lifetime of the
@@ -397,12 +397,6 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
     ZIO
       .attemptBlocking(conn.flush(timeout.asJava))
       .mapError(NatsError.fromThrowable)
-
-  override def drain(timeout: Duration): IO[NatsError, Unit] =
-    ZIO
-      .fromCompletionStage(conn.drain(timeout.asJava))
-      .mapError(NatsError.fromThrowable)
-      .unit
 
   override def status: UIO[ConnectionStatus] =
     ZIO.succeed(ConnectionStatus.fromJava(conn.getStatus))

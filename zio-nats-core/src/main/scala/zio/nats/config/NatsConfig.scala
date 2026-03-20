@@ -56,6 +56,9 @@ import javax.net.ssl.SSLContext
  *   If true, initiate TLS immediately on connect rather than waiting for a
  *   server upgrade (`tls_required` servers). Equivalent to jnats
  *   `Options.Builder.tlsFirst()` (default: false).
+ * @param drainTimeout
+ *   Maximum time to wait for subscriptions to drain when the connection's
+ *   ZLayer scope ends (default: 30 seconds).
  * @param optionsCustomizer
  *   Escape hatch: apply any additional `Options.Builder` settings not covered
  *   by the fields above.
@@ -79,6 +82,7 @@ final case class NatsConfig(
   credentialPath: Option[Path] = None,
   tlsContext: Option[SSLContext] = None,
   tlsFirst: Boolean = false,
+  drainTimeout: Duration = 30.seconds,
   optionsCustomizer: Options.Builder => Options.Builder = identity
 ) {
 
