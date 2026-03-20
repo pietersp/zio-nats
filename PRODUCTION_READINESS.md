@@ -36,13 +36,14 @@ These must be resolved before any public release.
 
 ### Infrastructure
 
-#### P0-1: CI/CD pipeline
+#### ~~P0-1: CI/CD pipeline~~ **DONE**
 
-Partial workflow exists at `.github/workflows/mima.yml` (MiMa binary compatibility check). Still missing:
-- Compile + test on PR
-- scalafmt check on PR
-- Publish-on-tag to Maven Central
-- Test matrix for supported JDK versions
+GitHub Actions workflows created:
+- `.github/workflows/ci.yml` — compile, test, and scalafmt check on PR
+- `.github/workflows/release.yml` — publish-on-tag to Maven Central via sbt-ci-release
+- `.github/workflows/mima.yml` — binary compatibility check on PR (existing)
+
+sbt-ci-release plugin added to `project/plugins.sbt`. POM metadata (developers, SCM info) added to `build.sbt`.
 
 #### P0-2: Maven Central publishing
 
@@ -192,8 +193,8 @@ In `JetStreamConfig.scala`. While `java.time` types are standard in Scala, some 
 
 Suggested order:
 
-1. **P0-1, P0-2** — CI/CD, publishing (infrastructure first)
-2. ~~**P0-3** — MiMa binary compatibility~~ **DONE**
+1. ~~**P0-1** — CI/CD pipeline~~ **DONE**
+2. **P0-2** — Maven Central publishing (plugin added; secrets must be configured in GitHub Actions before first release)
 2. ~~**P0-4** — Scala 3 enums for policies (largest API change, affects many files)~~ **DONE**
 3. ~~**P0-5, P0-6** — NatsConfig jnats leaks (localized to one file)~~ **WON'T DO** (see above)
 4. ~~**P0-7** — ZIO accessor methods (mechanical but touches every service companion)~~ **WON'T DO** (officially deprecated by ZIO team)
@@ -224,5 +225,7 @@ Address as capacity allows. P2-1 (Scala 2.13) and P2-2 (docs site) have the high
 | `zio-nats-core/src/main/scala/zio/nats/Nats.scala` | ~~P0-7 (accessor methods)~~ (won't do), ~~P1-1 (hardcoded timeout)~~ (done), ~~P1-2 (`underlying` warning)~~ (done) |
 | `zio-nats-core/src/main/scala/zio/nats/kv/KeyValue.scala` | P0-8 (ZLayer variant), P1-11 (Long→Int truncation, lines 288/317–319), P1-12 (`consumeKeys` leak, lines 411–424) |
 | `zio-nats-core/src/main/scala/zio/nats/jetstream/JetStreamConfig.scala` | P2-6 (`ConsumerConfig.startTime`) |
-| `project/plugins.sbt` | P0-2 (sbt-ci-release), P0-3 (sbt-mima-plugin, done) |
-| `.github/workflows/mima.yml` | P0-3 GitHub Actions workflow |
+| `project/plugins.sbt` | P0-1 (sbt-ci-release, done), P0-3 (sbt-mima-plugin, done) |
+| `.github/workflows/ci.yml` | P0-1 CI workflow (compile, test, scalafmt) |
+| `.github/workflows/release.yml` | P0-1 release workflow (publish-on-tag) |
+| `.github/workflows/mima.yml` | P0-3 MiMa workflow |

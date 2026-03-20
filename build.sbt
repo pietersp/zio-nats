@@ -15,7 +15,13 @@ inThisBuild(
     scalaVersion       := scala3,
     crossScalaVersions := Seq(scala3),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    scalacOptions ++= Seq("-deprecation", "-feature")
+    scalacOptions ++= Seq("-deprecation", "-feature"),
+    developers := List(
+      Developer("pietersp", "Pieter", "", url("https://github.com/pietersp"))
+    ),
+    scmInfo := Some(
+      ScmInfo(url("https://github.com/pietersp/zio-nats"), "scm:git@github.com:pietersp/zio-nats.git")
+    )
   )
 )
 
