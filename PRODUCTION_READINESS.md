@@ -1,6 +1,6 @@
 # Production-Readiness Assessment
 
-Comprehensive review of the zio-nats library's readiness for release as an official ZIO ecosystem NATS library (comparable to zio-kafka, zio-redis).
+Comprehensive review of the zio-nats library's readiness for release as a production-ready ZIO 2 NATS client library.
 
 ---
 
@@ -38,7 +38,7 @@ These must be resolved before any public release.
 
 #### P0-1: CI/CD pipeline
 
-No GitHub Actions workflows exist. The `.github/workflows` directory is missing entirely. Needs at minimum:
+Partial workflow exists at `.github/workflows/mima.yml` (MiMa binary compatibility check). Still missing:
 - Compile + test on PR
 - scalafmt check on PR
 - Publish-on-tag to Maven Central
@@ -46,7 +46,9 @@ No GitHub Actions workflows exist. The `.github/workflows` directory is missing 
 
 #### P0-2: Maven Central publishing
 
-No `sbt-ci-release` or `sbt-sonatype` plugin in `project/plugins.sbt` (currently only `sbt-scalafmt` and `sbt-scoverage`). Needs GPG signing setup, POM metadata (developers, SCM info), and Sonatype credentials in CI secrets.
+No `sbt-ci-release` or `sbt-sonatype` plugin in `project/plugins.sbt` (currently `sbt-scalafmt`, `sbt-scoverage`, and `sbt-mima-plugin`). Needs GPG signing setup, POM metadata (developers, SCM info), and Sonatype credentials in CI secrets.
+
+**Note:** `organization` is set to `io.github.pietersp` in `build.sbt`. When configuring Sonatype, the `groupId` must match this value (i.e., `io.github.pietersp`). The first release requires a Sonatype JIRA ticket to claim this groupId.
 
 #### ~~P0-3: Binary compatibility checking (MiMa)~~ **DONE**
 
@@ -217,11 +219,10 @@ Address as capacity allows. P2-1 (Scala 2.13) and P2-2 (docs site) have the high
 
 | File | Relevant Items |
 |------|---------------|
-| `zio-nats/src/main/scala/zio/nats/package.scala` | ~~P0-4 (Java enum aliases, lines 29–77)~~ (done), ~~P1-3 (`toNatsData`)~~ (done) |
-| `zio-nats-core/src/main/scala/zio/nats/JetStreamEnums.scala` | P0-4 replacement — 7 Scala 3 enums with `private[nats] def toJava` |
-| `zio-nats/src/main/scala/zio/nats/config/NatsConfig.scala` | P0-5 (`authHandler`, line 75), P0-6 (`optionsCustomizer`, line 82) |
-| `zio-nats/src/main/scala/zio/nats/Nats.scala` | ~~P0-7 (accessor methods)~~ (won't do), ~~P1-1 (hardcoded timeout)~~ (done), ~~P1-2 (`underlying` warning)~~ (done) |
-| `zio-nats/src/main/scala/zio/nats/kv/KeyValue.scala` | P0-8 (ZLayer variant), P1-11 (Long→Int truncation, lines 288/317–319), P1-12 (`consumeKeys` leak, lines 411–424) |
-| `zio-nats/src/main/scala/zio/nats/jetstream/JetStreamConfig.scala` | P2-6 (`ConsumerConfig.startTime`) |
+| `zio-nats-core/src/main/scala/zio/nats/package.scala` | ~~P0-4 (Java enum aliases, lines 29–77)~~ (done), ~~P1-3 (`toNatsData`)~~ (done) |
+| `zio-nats-core/src/main/scala/zio/nats/config/NatsConfig.scala` | P0-5 (`authHandler`, line 75), P0-6 (`optionsCustomizer`, line 82) |
+| `zio-nats-core/src/main/scala/zio/nats/Nats.scala` | ~~P0-7 (accessor methods)~~ (won't do), ~~P1-1 (hardcoded timeout)~~ (done), ~~P1-2 (`underlying` warning)~~ (done) |
+| `zio-nats-core/src/main/scala/zio/nats/kv/KeyValue.scala` | P0-8 (ZLayer variant), P1-11 (Long→Int truncation, lines 288/317–319), P1-12 (`consumeKeys` leak, lines 411–424) |
+| `zio-nats-core/src/main/scala/zio/nats/jetstream/JetStreamConfig.scala` | P2-6 (`ConsumerConfig.startTime`) |
 | `project/plugins.sbt` | P0-2 (sbt-ci-release), P0-3 (sbt-mima-plugin, done) |
 | `.github/workflows/mima.yml` | P0-3 GitHub Actions workflow |
