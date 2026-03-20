@@ -150,13 +150,15 @@ All tests run sequentially with single producers and consumers. No tests for con
 
 ### Code Quality
 
-#### P1-11: `MessageTtl.seconds(d.toSeconds.toInt)` truncates Long to Int
+#### ~~P1-11: `MessageTtl.seconds(d.toSeconds.toInt)` truncates Long to Int~~ **DONE**
 
-In `KeyValue.scala` (lines 288, 317–319). `Duration.toSeconds` returns `Long`; `.toInt` silently truncates. For durations over ~68 years this would overflow. Should validate or use a safe conversion.
+In `KeyValue.scala` (lines 288, 317–319). `Duration.toSeconds` returns `Long`; `.toInt` silently truncates. Fixed by adding `toMessageTtl(d)` helper that clamps to `Int.MaxValue` seconds (~68 years max TTL). Longer durations are clamped to the maximum.
 
-#### P1-12: `consumeKeys` LinkedBlockingQueue has no cancellation
+#### P1-12: `consumeKeys` LinkedBlockingQueue has no cancellation — WON'T DO
 
-In `KeyValue.scala` (lines 411–424). The `LinkedBlockingQueue` returned by jnats `kv.consumeKeys()` is acquired in `ZStream.unwrap` but not wrapped in `acquireRelease`. If the stream is interrupted, the jnats-side iterator may leak resources.
+In `KeyValue.scala` (lines 411–424). Initial concern was that the `LinkedBlockingQueue` acquired in `ZStream.unwrap` has no cancellation safety — if the stream is interrupted, the jnats-side iterator may leak resources.
+
+**Investigation revealed:** `consumeKeys()` is a **finite, bounded operation** — it fetches all current keys and returns, not a continuous watcher. The jnats implementation processes all pending keys then queues a sentinel (`isDone = true`) and exits. The `finally { sub.unsubscribe(); }` block ensures the subscription is cleaned up when `visitSubject` returns. Both `keys()` and `consumeKeys()` provide identical semantics for the same use case; `consumeKeys()` offers a ZStream-friendly API for composability with stream operators. No resource leak exists under normal interruption.
 
 ---
 
@@ -211,7 +213,6 @@ Suggested order:
 
 1. **P1-7** — Fix sleep-based tests (improves development velocity)
 2. **P1-8, P1-9, P1-10** — Test coverage gaps
-3. **P1-11, P1-12** — Code quality fixes
 4. **P1-1, P1-2, P1-3** — API refinements
 5. **P1-4, P1-5, P1-6** — Integrations (can be separate modules)
 
@@ -228,7 +229,7 @@ Address as capacity allows. P2-1 (Scala 2.13) and P2-2 (docs site) have the high
 | `zio-nats-core/src/main/scala/zio/nats/package.scala` | ~~P0-4 (Java enum aliases, lines 29–77)~~ (done), ~~P1-3 (`toNatsData`)~~ (done) |
 | `zio-nats-core/src/main/scala/zio/nats/config/NatsConfig.scala` | P0-5 (`authHandler`, line 75), P0-6 (`optionsCustomizer`, line 82), ~~P2-4 (`drainTimeout`)~~ (done) |
 | `zio-nats-core/src/main/scala/zio/nats/Nats.scala` | ~~P0-7 (accessor methods)~~ (won't do), ~~P1-1 (hardcoded timeout)~~ (done), ~~P1-2 (`underlying` warning)~~ (done), ~~P2-4 (drain on scope exit)~~ (done) |
-| `zio-nats-core/src/main/scala/zio/nats/kv/KeyValue.scala` | P0-8 (ZLayer variant), P1-11 (Long→Int truncation, lines 288/317–319), P1-12 (`consumeKeys` leak, lines 411–424) |
+| `zio-nats-core/src/main/scala/zio/nats/kv/KeyValue.scala` | P0-8 (ZLayer variant), ~~P1-11 (Long→Int truncation)~~ (done), ~~P1-12 (`consumeKeys` leak)~~ (won't do) |
 | `zio-nats-core/src/main/scala/zio/nats/jetstream/JetStreamConfig.scala` | P2-6 (`ConsumerConfig.startTime`) |
 | `project/plugins.sbt` | P0-1 (sbt-ci-release, done), P0-3 (sbt-mima-plugin, done) |
 | `.github/workflows/ci.yml` | P0-1 CI workflow (compile, test, scalafmt) |

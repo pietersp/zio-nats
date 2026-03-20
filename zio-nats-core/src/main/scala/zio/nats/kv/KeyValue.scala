@@ -290,6 +290,14 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
   // Put / Create / Update
   // ---------------------------------------------------------------------------
 
+  /**
+   * Convert a `Duration` to a jnats `MessageTtl`. NATS KV supports a maximum
+   * TTL of approximately 68 years (Int.MaxValue seconds). Longer durations are
+   * clamped to this maximum.
+   */
+  private def toMessageTtl(d: Duration): MessageTtl =
+    MessageTtl.seconds(d.toSeconds.min(Int.MaxValue).toInt)
+
   private def encode[A: NatsCodec](key: String, value: A): IO[NatsError, Array[Byte]] =
     ZIO
       .attempt(NatsCodec[A].encode(value).toArray)
@@ -304,7 +312,7 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
         case None    => ZIO.attemptBlocking(kv.create(key, bytes)).mapError(NatsError.fromThrowable)
         case Some(d) =>
           ZIO
-            .attemptBlocking(kv.create(key, bytes, MessageTtl.seconds(d.toSeconds.toInt)))
+            .attemptBlocking(kv.create(key, bytes, toMessageTtl(d)))
             .mapError(NatsError.fromThrowable)
       }
     }
@@ -333,9 +341,9 @@ private[nats] final class KeyValueLive(kv: JKeyValue) extends KeyValue {
       case (None, None)      => ZIO.attemptBlocking(kv.purge(key)).mapError(NatsError.fromThrowable)
       case (Some(rev), None) => ZIO.attemptBlocking(kv.purge(key, rev)).mapError(NatsError.fromThrowable)
       case (None, Some(d))   =>
-        ZIO.attemptBlocking(kv.purge(key, MessageTtl.seconds(d.toSeconds.toInt))).mapError(NatsError.fromThrowable)
+        ZIO.attemptBlocking(kv.purge(key, toMessageTtl(d))).mapError(NatsError.fromThrowable)
       case (Some(rev), Some(d)) =>
-        ZIO.attemptBlocking(kv.purge(key, rev, MessageTtl.seconds(d.toSeconds.toInt))).mapError(NatsError.fromThrowable)
+        ZIO.attemptBlocking(kv.purge(key, rev, toMessageTtl(d))).mapError(NatsError.fromThrowable)
     }
 
   // ---------------------------------------------------------------------------
