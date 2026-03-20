@@ -236,7 +236,8 @@ object StreamConfig {
  * @param startSeq
  *   Starting sequence (used with DeliverPolicy.ByStartSequence).
  * @param startTime
- *   Starting time (used with DeliverPolicy.ByStartTime).
+ *   Starting time (used with DeliverPolicy.ByStartTime, as
+ *   [[java.time.Instant]]).
  * @param ackPolicy
  *   How messages must be acknowledged: Explicit (default), All, or None.
  * @param ackWait
@@ -283,7 +284,7 @@ case class ConsumerConfig(
   filterSubjects: List[String] = Nil,
   deliverPolicy: DeliverPolicy = DeliverPolicy.All,
   startSeq: Long = 0,
-  startTime: Option[java.time.ZonedDateTime] = None,
+  startTime: Option[java.time.Instant] = None,
   ackPolicy: AckPolicy = AckPolicy.Explicit,
   ackWait: Duration = zio.Duration.fromSeconds(30),
   maxDeliver: Long = -1,
@@ -324,7 +325,7 @@ object ConsumerConfig {
     if (config.filterSubjects.nonEmpty) builder.filterSubjects(config.filterSubjects.asJava)
 
     if (config.startSeq > 0) builder.startSequence(config.startSeq)
-    config.startTime.foreach(t => builder.startTime(t))
+    config.startTime.foreach(t => builder.startTime(t.atZone(java.time.ZoneOffset.UTC)))
     if (config.ackWait.toMillis > 0) builder.ackWait(config.ackWait.toMillis)
     if (config.maxDeliver > 0) builder.maxDeliver(config.maxDeliver)
     if (config.maxAckPending > 0) builder.maxAckPending(config.maxAckPending)
@@ -365,7 +366,8 @@ object ConsumerConfig {
  * @param startSequence
  *   Starting stream sequence (used with DeliverPolicy.ByStartSequence).
  * @param startTime
- *   Starting time (used with DeliverPolicy.ByStartTime).
+ *   Starting time (used with DeliverPolicy.ByStartTime, as
+ *   [[java.time.Instant]]).
  * @param replayPolicy
  *   Replay policy (default: Instant).
  * @param headersOnly
@@ -377,7 +379,7 @@ case class OrderedConsumerConfig(
   filterSubjects: List[String] = Nil,
   deliverPolicy: Option[DeliverPolicy] = None,
   startSequence: Option[Long] = None,
-  startTime: Option[java.time.ZonedDateTime] = None,
+  startTime: Option[java.time.Instant] = None,
   replayPolicy: Option[ReplayPolicy] = None,
   headersOnly: Boolean = false,
   consumerNamePrefix: Option[String] = None
@@ -391,7 +393,7 @@ object OrderedConsumerConfig {
     if (config.filterSubjects.nonEmpty) occ.filterSubjects(config.filterSubjects.asJava)
     config.deliverPolicy.foreach(p => occ.deliverPolicy(p.toJava))
     config.startSequence.foreach(s => occ.startSequence(s))
-    config.startTime.foreach(t => occ.startTime(t))
+    config.startTime.foreach(t => occ.startTime(t.atZone(java.time.ZoneOffset.UTC)))
     config.replayPolicy.foreach(p => occ.replayPolicy(p.toJava))
     if (config.headersOnly) occ.headersOnly(true)
     config.consumerNamePrefix.foreach(occ.consumerNamePrefix)

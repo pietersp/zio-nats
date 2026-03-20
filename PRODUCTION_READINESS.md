@@ -182,13 +182,13 @@ No mdoc, Laika, or microsite setup. Official ZIO libraries have generated docume
 
 `NatsConfig.drainTimeout` (default 30s) controls the drain timeout. When the `Nats.live` ZLayer's scope ends, the connection is automatically drained (with that timeout) before closing — no manual intervention required. The `drain()` method has been removed from the `Nats` trait since drain is now handled automatically by the ZLayer scope.
 
-#### P2-5: More specific ObjectStore errors
+#### ~~P2-5: More specific ObjectStore errors~~ **DONE**
 
-`ObjectStoreError` currently only has `ObjectStoreOperationFailed`. Could benefit from `ObjectNotFound`, `ObjectAlreadyExists`, etc., matching the KV error model which has `KeyNotFound`.
+`ObjectStoreError` now has `ObjectNotFound` and `ObjectAlreadyExists`, matching the KV error model which has `KeyNotFound`.
 
-#### P2-6: `ConsumerConfig.startTime` uses `java.time.ZonedDateTime`
+#### ~~P2-6: `ConsumerConfig.startTime` uses `java.time.ZonedDateTime`~~ **DONE**
 
-In `JetStreamConfig.scala`. While `java.time` types are standard in Scala, some users may prefer `java.time.Instant`. Minor and cosmetic.
+`ConsumerConfig.startTime` and `OrderedConsumerConfig.startTime` now use `java.time.Instant` instead of `java.time.ZonedDateTime`. Converted to `ZonedDateTime` (UTC) when calling jnats.
 
 ---
 

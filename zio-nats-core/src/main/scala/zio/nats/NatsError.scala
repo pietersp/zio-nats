@@ -81,6 +81,14 @@ object NatsError {
     initCause(cause)
   }
 
+  final case class ObjectNotFound(name: String) extends ObjectStoreError {
+    val message: String = s"Object not found: $name"
+  }
+
+  final case class ObjectAlreadyExists(name: String) extends ObjectStoreError {
+    val message: String = s"Object already exists: $name"
+  }
+
   // --- Service errors ---
 
   sealed trait ServiceError extends NatsError
