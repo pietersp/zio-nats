@@ -45,11 +45,16 @@ GitHub Actions workflows created:
 
 sbt-ci-release plugin added to `project/plugins.sbt`. POM metadata (developers, SCM info) added to `build.sbt`.
 
-#### P0-2: Maven Central publishing
+#### P0-2: Maven Central publishing — IN PROGRESS (not yet complete)
 
-No `sbt-ci-release` or `sbt-sonatype` plugin in `project/plugins.sbt` (currently `sbt-scalafmt`, `sbt-scoverage`, and `sbt-mima-plugin`). Needs GPG signing setup, POM metadata (developers, SCM info), and Sonatype credentials in CI secrets.
+`sbt-ci-release` plugin added to `project/plugins.sbt`. `release.yml` workflow created. POM metadata (developers, SCM info) added to `build.sbt`. **Still required before first release:**
 
-**Note:** `organization` is set to `io.github.pietersp` in `build.sbt`. When configuring Sonatype, the `groupId` must match this value (i.e., `io.github.pietersp`). The first release requires a Sonatype JIRA ticket to claim this groupId.
+1. **GPG key setup** — generate a key, upload public key to keyserver, configure GitHub Actions secrets (`PGP_SECRET`, `PGP_PASSPHRASE`)
+2. **Sonatype account** — credentials in GitHub Actions (`SONATYPE_USERNAME`, `SONATYPE_PASSWORD`)
+3. **Claim groupId** — create Sonatype JIRA ticket to claim `io.github.pietersp` groupId
+4. **Update `mimaPreviousArtifacts`** — set actual version before first release (e.g. `0.1.0`)
+
+**Note:** `organization` is set to `io.github.pietersp` in `build.sbt`. When configuring Sonatype, the `groupId` must match this value.
 
 #### ~~P0-3: Binary compatibility checking (MiMa)~~ **DONE**
 
@@ -194,7 +199,7 @@ In `JetStreamConfig.scala`. While `java.time` types are standard in Scala, some 
 Suggested order:
 
 1. ~~**P0-1** — CI/CD pipeline~~ **DONE**
-2. **P0-2** — Maven Central publishing (plugin added; secrets must be configured in GitHub Actions before first release)
+2. **P0-2** — Maven Central publishing (IN PROGRESS — plugin and workflow added; GPG, Sonatype credentials, and groupId claim still needed)
 2. ~~**P0-4** — Scala 3 enums for policies (largest API change, affects many files)~~ **DONE**
 3. ~~**P0-5, P0-6** — NatsConfig jnats leaks (localized to one file)~~ **WON'T DO** (see above)
 4. ~~**P0-7** — ZIO accessor methods (mechanical but touches every service companion)~~ **WON'T DO** (officially deprecated by ZIO team)
