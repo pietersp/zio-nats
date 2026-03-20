@@ -189,15 +189,14 @@ trait Nats {
    * Escape hatch: access the raw jnats `Connection` for advanced or
    * unsupported use-cases not covered by the library's typed API.
    *
-   * '''Warning:''' this method is synchronous and returns a raw jnats type.
-   * It is intentionally exposed as an escape hatch only. Prefer the typed
-   * methods on [[Nats]], [[zio.nats.jetstream.JetStream]],
+   * Returns a `UIO[JConnection]` so it composes naturally with other ZIO
+   * effects. It is intentionally exposed as an escape hatch only. Prefer the
+   * typed methods on [[Nats]], [[zio.nats.jetstream.JetStream]],
    * [[zio.nats.kv.KeyValue]], and [[zio.nats.objectstore.ObjectStore]] for
    * all production use. Calling jnats APIs directly can bypass the library's
    * error model and codec guarantees.
    */
-  def underlying: JConnection
-
+  def underlying: UIO[JConnection]
   /**
    * Stream of connection lifecycle events for this connection.
    *
@@ -465,7 +464,7 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
         .mapError(NatsError.fromThrowable)
     )(svc => ZIO.attempt(svc.stop()).ignoreLogged)
 
-  override def underlying: JConnection = conn
+  override def underlying: UIO[JConnection] = ZIO.succeed(conn)
 
   override def lifecycleEvents: ZStream[Any, Nothing, NatsEvent] = ZStream.fromHub(hub)
 }

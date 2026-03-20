@@ -200,9 +200,9 @@ object KeyValue {
    */
   def bucket(bucketName: String): ZIO[Nats, NatsError, KeyValue] =
     ZIO.serviceWithZIO[Nats] { nats =>
-      ZIO
-        .attempt(nats.underlying.keyValue(bucketName))
-        .mapBoth(NatsError.fromThrowable, new KeyValueLive(_))
+      nats.underlying.flatMap(conn =>
+        ZIO.attempt(conn.keyValue(bucketName)).mapBoth(NatsError.fromThrowable, new KeyValueLive(_))
+      )
     }
 
   /**
@@ -218,8 +218,9 @@ object KeyValue {
   def live(bucketName: String): ZLayer[Nats, NatsError, KeyValue] =
     ZLayer {
       ZIO.serviceWithZIO[Nats] { nats =>
-        ZIO.attempt(nats.underlying.keyValue(bucketName))
-          .mapBoth(NatsError.fromThrowable, new KeyValueLive(_))
+        nats.underlying.flatMap(conn =>
+          ZIO.attempt(conn.keyValue(bucketName)).mapBoth(NatsError.fromThrowable, new KeyValueLive(_))
+        )
       }
     }
 
@@ -231,9 +232,8 @@ object KeyValueManagement {
     ZLayer {
       for {
         nats <- ZIO.service[Nats]
-        kvm  <- ZIO
-                 .attempt(nats.underlying.keyValueManagement())
-                 .mapError(NatsError.fromThrowable)
+        conn <- nats.underlying
+        kvm  <- ZIO.attempt(conn.keyValueManagement()).mapError(NatsError.fromThrowable)
       } yield new KeyValueManagementLive(kvm)
     }
 }

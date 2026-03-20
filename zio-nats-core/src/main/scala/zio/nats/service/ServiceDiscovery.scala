@@ -95,9 +95,10 @@ object ServiceDiscovery {
     maxResults: Int = 10
   ): ZIO[Nats, NatsError, ServiceDiscovery] =
     ZIO.serviceWithZIO[Nats] { nats =>
-      ZIO
-        .attempt(new JDiscovery(nats.underlying, maxWait.toMillis, maxResults))
-        .mapBoth(NatsError.fromThrowable, new ServiceDiscoveryLive(_))
+      nats.underlying.flatMap(conn =>
+        ZIO.attempt(new JDiscovery(conn, maxWait.toMillis, maxResults))
+          .mapBoth(NatsError.fromThrowable, new ServiceDiscoveryLive(_))
+      )
     }
 
   /**

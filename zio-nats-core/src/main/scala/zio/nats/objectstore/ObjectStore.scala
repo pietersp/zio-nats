@@ -157,7 +157,9 @@ object ObjectStore {
    */
   def bucket(bucketName: String): ZIO[Nats, NatsError, ObjectStore] =
     ZIO.serviceWithZIO[Nats] { nats =>
-      ZIO.attempt(nats.underlying.objectStore(bucketName)).mapBoth(NatsError.fromThrowable, new ObjectStoreLive(_))
+      nats.underlying.flatMap(conn =>
+        ZIO.attempt(conn.objectStore(bucketName)).mapBoth(NatsError.fromThrowable, new ObjectStoreLive(_))
+      )
     }
 
   /**
@@ -173,8 +175,9 @@ object ObjectStore {
   def live(bucketName: String): ZLayer[Nats, NatsError, ObjectStore] =
     ZLayer {
       ZIO.serviceWithZIO[Nats] { nats =>
-        ZIO.attempt(nats.underlying.objectStore(bucketName))
-          .mapBoth(NatsError.fromThrowable, new ObjectStoreLive(_))
+        nats.underlying.flatMap(conn =>
+          ZIO.attempt(conn.objectStore(bucketName)).mapBoth(NatsError.fromThrowable, new ObjectStoreLive(_))
+        )
       }
     }
 }
@@ -185,9 +188,8 @@ object ObjectStoreManagement {
     ZLayer {
       for {
         nats <- ZIO.service[Nats]
-        osm  <- ZIO
-                 .attempt(nats.underlying.objectStoreManagement())
-                 .mapError(NatsError.fromThrowable)
+        conn <- nats.underlying
+        osm  <- ZIO.attempt(conn.objectStoreManagement()).mapError(NatsError.fromThrowable)
       } yield new ObjectStoreManagementLive(osm)
     }
 }

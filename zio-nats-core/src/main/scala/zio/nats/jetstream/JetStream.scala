@@ -69,9 +69,8 @@ object JetStream {
     ZLayer {
       for {
         nats <- ZIO.service[Nats]
-        js   <- ZIO
-                .attempt(nats.underlying.jetStream())
-                .mapError(NatsError.fromThrowable)
+        conn <- nats.underlying
+        js   <- ZIO.attempt(conn.jetStream()).mapError(NatsError.fromThrowable)
       } yield new JetStreamLive(js)
     }
 }

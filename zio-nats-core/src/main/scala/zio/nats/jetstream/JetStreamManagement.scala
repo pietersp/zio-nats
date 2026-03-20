@@ -111,9 +111,8 @@ object JetStreamManagement {
     ZLayer {
       for {
         nats <- ZIO.service[Nats]
-        jsm  <- ZIO
-                 .attempt(nats.underlying.jetStreamManagement())
-                 .mapError(NatsError.fromThrowable)
+        conn <- nats.underlying
+        jsm  <- ZIO.attempt(conn.jetStreamManagement()).mapError(NatsError.fromThrowable)
       } yield new JetStreamManagementLive(jsm)
     }
 }
