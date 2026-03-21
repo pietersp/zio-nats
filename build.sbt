@@ -14,6 +14,7 @@ inThisBuild(
     licenses           := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),
     scalaVersion       := scala3,
     crossScalaVersions := Seq(scala3),
+    version            := "0.1.0-SNAPSHOT",
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     scalacOptions ++= Seq("-deprecation", "-feature"),
     developers := List(

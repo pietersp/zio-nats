@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Use [[NatsCodecZioBlocks.Builder]] (or the `NatsCodec.fromFormat` extension
  * method provided by `NatsCodecZioBlocksExtensions`) to derive [[NatsCodec]]
- * instances from any zio-blocks [[Format]].
+ * instances from any zio-blocks [[zio.blocks.schema.codec.Format]].
  *
  * {{{
  * val codecs = NatsCodec.fromFormat(JsonFormat)
@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
 object NatsCodecZioBlocks {
 
   /**
-   * Derives [[NatsCodec]] instances from a zio-blocks [[Format]].
+   * Derives [[NatsCodec]] instances from a zio-blocks [[zio.blocks.schema.codec.Format]].
    *
    * Import `builder.derived` to bring a default codec for all Schema-annotated
    * types into scope.

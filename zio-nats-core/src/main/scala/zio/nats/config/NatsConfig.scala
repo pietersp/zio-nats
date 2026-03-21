@@ -48,10 +48,10 @@ import javax.net.ssl.SSLContext
  *   Path to a `.creds` file for NKey/JWT authentication. Validated at
  *   construction (file must exist on the filesystem).
  * @param tlsContext
- *   Custom [[SSLContext]] for TLS/mTLS connections. When set, the connection
- *   will use TLS using the provided context. Use the standard
- *   `javax.net.ssl.SSLContext` API to configure certificates, trust stores, and
- *   client keys without any jnats imports.
+  *   Custom [[javax.net.ssl.SSLContext]] for TLS/mTLS connections. When set, the connection
+  *   will use TLS using the provided context. Use the standard
+  *   `javax.net.ssl.SSLContext` API to configure certificates, trust stores, and
+  *   client keys without any jnats imports.
  * @param tlsFirst
  *   If true, initiate TLS immediately on connect rather than waiting for a
  *   server upgrade (`tls_required` servers). Equivalent to jnats

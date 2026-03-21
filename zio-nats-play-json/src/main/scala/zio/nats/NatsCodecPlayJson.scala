@@ -28,8 +28,8 @@ given fromPlayJsonFormat[A](using fmt: Format[A], ev: scala.util.NotGiven[NatsCo
  * play-json integration for [[NatsCodec]].
  *
  * Bridges `Format[A]` (play-json's combined read/write codec) to the library's
- * [[NatsCodec]] typeclass. The bridge `given` [[fromPlayJsonFormat]] is the
- * primary integration point: after `import zio.nats.*`, any `Format[A]` that is
+ * [[NatsCodec]] typeclass. The bridge `given fromPlayJsonFormat`
+ * is the primary integration point: after `import zio.nats.*`, any `Format[A]` that is
  * in implicit scope is automatically promoted to a `NatsCodec[A]`.
  *
  * JSON is serialised as UTF-8 bytes.
@@ -48,11 +48,10 @@ given fromPlayJsonFormat[A](using fmt: Format[A], ev: scala.util.NotGiven[NatsCo
  * nats.publish(Subject("persons"), Person("Alice", 30))
  * }}}
  *
- * For an explicit one-off codec, use the [[NatsCodec.fromPlayJson]] extension
- * method:
+ * For an explicit one-off codec, use [[zio.nats.NatsCodecPlayJson.fromPlayJson]]:
  *
  * {{{
- * val codec: NatsCodec[Person] = NatsCodec.fromPlayJson(Json.format[Person])
+ * val codec: NatsCodec[Person] = NatsCodecPlayJson.fromPlayJson(Json.format[Person])
  * }}}
  */
 object NatsCodecPlayJson {
@@ -84,5 +83,18 @@ object NatsCodecPlayJson {
         case e: Exception => Left(NatsDecodeError(e.getMessage))
       }
   }
+
+  /**
+   * Wrap a play-json `Format[A]` as a [[NatsCodec]][A].
+   *
+   * Use this for an explicit one-off codec. For automatic bridging via implicit
+   * resolution, ensure a `given Format[A]` is in scope and `import zio.nats.*`
+   * — the `fromPlayJsonFormat` given handles the rest.
+   *
+   * @param format
+   *   A play-json `Format[A]` (typically obtained via `Json.format[Person]` or
+   *   a manually written `Format` instance).
+   */
+  def fromPlayJson[A](format: Format[A]): NatsCodec[A] = wrap(format)
 
 }

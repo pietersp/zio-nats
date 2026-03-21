@@ -35,7 +35,7 @@ object NatsCodecPlayJsonSpec extends ZIOSpecDefault {
 
     test("fromPlayJson wraps an explicit codec") {
       val gadget  = Gadget("sprocket", 3.14)
-      val codec   = NatsCodec.fromPlayJson(Json.format[Gadget])
+      val codec   = NatsCodecPlayJson.fromPlayJson(Json.format[Gadget])
       val encoded = codec.encode(gadget)
       val decoded = codec.decode(encoded)
       assertTrue(decoded == Right(gadget))

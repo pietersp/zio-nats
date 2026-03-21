@@ -348,10 +348,10 @@ nats.subscribe[Person](Subject("persons")).payload
 
 ### Explicit one-off codec
 
-Use `NatsCodec.fromJsoniter` when you need a codec without putting one into implicit scope:
+Use `NatsCodecJsoniter.fromJsoniter` when you need a codec without putting one into implicit scope:
 
 ```scala
-val codec: NatsCodec[Person] = NatsCodec.fromJsoniter(JsonCodecMaker.make[Person])
+val codec: NatsCodec[Person] = NatsCodecJsoniter.fromJsoniter(JsonCodecMaker.make[Person])
 ```
 
 ### Coexistence with zio-blocks
@@ -409,10 +409,10 @@ nats.subscribe[Person](Subject("persons")).payload
 
 ### Explicit one-off codec
 
-Use `NatsCodec.fromPlayJson` when you need a codec without putting one into implicit scope:
+Use `NatsCodecPlayJson.fromPlayJson` when you need a codec without putting one into implicit scope:
 
 ```scala
-val codec: NatsCodec[Person] = NatsCodec.fromPlayJson(Json.format[Person])
+val codec: NatsCodec[Person] = NatsCodecPlayJson.fromPlayJson(Json.format[Person])
 ```
 
 ## JetStream

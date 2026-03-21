@@ -31,8 +31,8 @@ given fromJsonValueCodec[A](using jc: JsonValueCodec[A], ev: scala.util.NotGiven
  * jsoniter-scala integration for [[NatsCodec]].
  *
  * Bridges `JsonValueCodec[A]` (jsoniter-scala's codec type) to the library's
- * [[NatsCodec]] typeclass. The bridge `given` [[fromJsonValueCodec]] is the
- * primary integration point: after `import zio.nats.*`, any `JsonValueCodec[A]`
+ * [[NatsCodec]] typeclass. The bridge `given fromJsonValueCodec`
+ * is the primary integration point: after `import zio.nats.*`, any `JsonValueCodec[A]`
  * that is in implicit scope is automatically promoted to a `NatsCodec[A]`.
  *
  * ==Typical usage==
@@ -46,15 +46,14 @@ given fromJsonValueCodec[A](using jc: JsonValueCodec[A], ev: scala.util.NotGiven
  *   given JsonValueCodec[Person] = JsonCodecMaker.make
  * }
  *
- * // NatsCodec[Person] is now available via NatsCodecJsoniter.fromJsonValueCodec
+ * // NatsCodec[Person] is now available via the fromJsonValueCodec given
  * nats.publish(Subject("persons"), Person("Alice", 30))
  * }}}
  *
- * For an explicit one-off codec, use the [[NatsCodec.fromJsoniter]] extension
- * method:
+ * For an explicit one-off codec, use [[zio.nats.NatsCodecJsoniter.fromJsoniter]]:
  *
  * {{{
- * val codec: NatsCodec[Person] = NatsCodec.fromJsoniter(JsonCodecMaker.make[Person])
+ * val codec: NatsCodec[Person] = NatsCodecJsoniter.fromJsoniter(JsonCodecMaker.make[Person])
  * }}}
  */
 object NatsCodecJsoniter {
@@ -77,5 +76,18 @@ object NatsCodecJsoniter {
       Try(readFromArray[A](bytes.toArray)(codec)).toEither.left
         .map(e => NatsDecodeError(e.getMessage))
   }
+
+  /**
+   * Wrap a jsoniter-scala `JsonValueCodec[A]` as a [[NatsCodec]][A].
+   *
+   * Use this for an explicit one-off codec. For automatic bridging via implicit
+   * resolution, ensure a `given JsonValueCodec[A]` is in scope and
+   * `import zio.nats.*` — the `fromJsonValueCodec` given handles the rest.
+   *
+   * @param codec
+   *   A jsoniter-scala `JsonValueCodec[A]` (typically obtained via
+   *   `JsonCodecMaker.make`).
+   */
+  def fromJsoniter[A](codec: JsonValueCodec[A]): NatsCodec[A] = wrap(codec)
 
 }

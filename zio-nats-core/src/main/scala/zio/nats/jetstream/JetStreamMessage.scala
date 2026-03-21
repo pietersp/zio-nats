@@ -26,7 +26,7 @@ import scala.jdk.CollectionConverters._
  * @param payload
  *   Raw message payload bytes.
  * @param underlying
- *   The underlying jnats [[JMessage]] (used for ack only).
+ *   The underlying jnats [[io.nats.client.Message]] (used for ack only).
  */
 final class JetStreamMessage(
   val subject: Subject,

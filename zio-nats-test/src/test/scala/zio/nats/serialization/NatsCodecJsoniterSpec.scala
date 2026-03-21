@@ -30,7 +30,7 @@ object NatsCodecJsoniterSpec extends ZIOSpecDefault {
 
     test("fromJsoniter wraps an explicit codec") {
       val widget  = Widget("cog", 7)
-      val codec   = NatsCodec.fromJsoniter(JsonCodecMaker.make[Widget])
+      val codec   = NatsCodecJsoniter.fromJsoniter(JsonCodecMaker.make[Widget])
       val encoded = codec.encode(widget)
       val decoded = codec.decode(encoded)
       assertTrue(decoded == Right(widget))
