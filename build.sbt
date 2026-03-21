@@ -1,3 +1,5 @@
+import xerial.sbt.Sonatype._
+
 val scala3 = "3.3.7"
 
 val zioVersion            = "2.1.24"
@@ -23,7 +25,7 @@ inThisBuild(
     scmInfo := Some(
       ScmInfo(url("https://github.com/pietersp/zio-nats"), "scm:git@github.com:pietersp/zio-nats.git")
     ),
-    sonatypeCredentialHost := xerial.sbt.Sonatype.sonatypeCentralHost
+    sonatypeCredentialHost := sonatypeCentralHost
   )
 )
 
