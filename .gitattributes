@@ -1,0 +1,2 @@
+# Normalize text files, enforce LF endings in the repository
+* text=auto eol=lf
