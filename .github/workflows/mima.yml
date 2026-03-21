@@ -16,7 +16,9 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: coursier/setup-action@v1 # picks up JVM from setup-java above
+      - uses: coursier/setup-action@v1
+        with:
+          apps: sbt
 
       - name: Run MiMa
         run: sbt -batch "zioNatsCore/mimaReportBinaryIssues; zioNatsZioBlocks/mimaReportBinaryIssues; zioNatsJsoniter/mimaReportBinaryIssues; zioNatsPlayJson/mimaReportBinaryIssues; zioNatsTestkit/mimaReportBinaryIssues"
