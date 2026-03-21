@@ -22,8 +22,7 @@ inThisBuild(
     ),
     scmInfo := Some(
       ScmInfo(url("https://github.com/pietersp/zio-nats"), "scm:git@github.com:pietersp/zio-nats.git")
-    ),
-    sonatypeCredentialHost := "central.sonatype.com"
+    )
   )
 )
 
