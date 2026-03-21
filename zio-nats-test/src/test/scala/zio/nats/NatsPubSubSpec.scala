@@ -163,21 +163,21 @@ object NatsPubSubSpec extends ZIOSpecDefault {
     test("connection drains gracefully on scope exit") {
       val subject = Subject("drain.test")
       for {
-        nats       <- ZIO.service[Nats]
-        container  <- ZIO.service[NatsContainer]
+        nats      <- ZIO.service[Nats]
+        container <- ZIO.service[NatsContainer]
         natsConfig = NatsConfig(servers = List(container.clientUrl), drainTimeout = 2.seconds)
-        received   <- Ref.make(List.empty[String])
+        received  <- Ref.make(List.empty[String])
         // Start a subscriber that runs indefinitely (no take), so it keeps receiving
         // messages until we interrupt it. When the fiber is interrupted, the scope
         // ends and drain is triggered automatically.
         subscriberFiber <- ZIO.scoped {
-          Nats.make(natsConfig).flatMap { subNats =>
-            subNats
-              .subscribe[Chunk[Byte]](subject)
-              .tap(env => received.update(_ :+ env.message.dataAsString))
-              .runDrain
-          }
-        }.fork
+                             Nats.make(natsConfig).flatMap { subNats =>
+                               subNats
+                                 .subscribe[Chunk[Byte]](subject)
+                                 .tap(env => received.update(_ :+ env.message.dataAsString))
+                                 .runDrain
+                             }
+                           }.fork
         // Wait for subscription to be active and registered with the server
         _ <- ZIO.sleep(1.second)
         // Publish messages while subscriber is running
@@ -188,7 +188,7 @@ object NatsPubSubSpec extends ZIOSpecDefault {
         // which ends the scope and automatically triggers drain on the connection
         _ <- subscriberFiber.interrupt
         // Give drain time to complete (up to the 2 second timeout)
-        _ <- ZIO.sleep(300.millis)
+        _    <- ZIO.sleep(300.millis)
         msgs <- received.get
         // Verify we received some messages before interrupt, and that drain completed
         // without error (verified by no exceptions being thrown)
