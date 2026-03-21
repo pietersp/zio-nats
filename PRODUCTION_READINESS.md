@@ -45,16 +45,15 @@ GitHub Actions workflows created:
 
 sbt-ci-release plugin added to `project/plugins.sbt`. POM metadata (developers, SCM info) added to `build.sbt`.
 
-#### P0-2: Maven Central publishing — IN PROGRESS (not yet complete)
+#### ~~P0-2: Maven Central publishing~~ **DONE**
 
-`sbt-ci-release` plugin added to `project/plugins.sbt`. `release.yml` workflow created. POM metadata (developers, SCM info) added to `build.sbt`. **Still required before first release:**
+`sbt-ci-release` plugin added to `project/plugins.sbt`. `release.yml` workflow created. POM metadata (developers, SCM info) added to `build.sbt`.
 
-1. **GPG key setup** — generate a key, upload public key to keyserver, configure GitHub Actions secrets (`PGP_SECRET`, `PGP_PASSPHRASE`)
-2. **Sonatype account** — credentials in GitHub Actions (`SONATYPE_USERNAME`, `SONATYPE_PASSWORD`)
-3. **Claim groupId** — create Sonatype JIRA ticket to claim `io.github.pietersp` groupId
-4. **Update `mimaPreviousArtifacts`** — set actual version before first release (e.g. `0.1.0`)
+- GPG signing subkey exported and stored as `PGP_SECRET` / `PGP_PASSPHRASE` in GitHub Actions secrets. Public key uploaded to `keyserver.ubuntu.com`.
+- Sonatype Central Portal account created via GitHub login. `io.github.pietersp` namespace verified automatically. User token stored as `SONATYPE_USERNAME` / `SONATYPE_PASSWORD` in GitHub Actions secrets.
+- `sbt-ci-release 1.11.2` targets the new Central Portal API (legacy OSSRH sunset June 2025).
 
-**Note:** `organization` is set to `io.github.pietersp` in `build.sbt`. When configuring Sonatype, the `groupId` must match this value.
+**Note:** `mimaPreviousArtifacts` is currently `Set.empty` on all subprojects. After the first release, update each to the actual published version (e.g. `"io.github.pietersp" %% "zio-nats-core" % "0.1.0"`) so MiMa has a baseline to compare against.
 
 #### ~~P0-3: Binary compatibility checking (MiMa)~~ **DONE**
 
@@ -214,7 +213,7 @@ No mdoc, Laika, or microsite setup. Official ZIO libraries have generated docume
 Suggested order:
 
 1. ~~**P0-1** — CI/CD pipeline~~ **DONE**
-2. **P0-2** — Maven Central publishing (IN PROGRESS — plugin and workflow added; GPG, Sonatype credentials, and groupId claim still needed)
+2. ~~**P0-2** — Maven Central publishing~~ **DONE**
 2. ~~**P0-4** — Scala 3 enums for policies (largest API change, affects many files)~~ **DONE**
 3. ~~**P0-5, P0-6** — NatsConfig jnats leaks (localized to one file)~~ **WON'T DO** (see above)
 4. ~~**P0-7** — ZIO accessor methods (mechanical but touches every service companion)~~ **WON'T DO** (officially deprecated by ZIO team)
