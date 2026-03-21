@@ -7,7 +7,7 @@ on:
 jobs:
   ci:
     name: Compile, Test, Format Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # Docker pre-installed; required for testcontainers
     steps:
       - uses: actions/checkout@v4
 
@@ -16,15 +16,14 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: coursier/setup-action@v1
-        with:
-          coursier-cache-version: ${{ github.sha }}
+      - uses: coursier/setup-action@v1 # picks up JVM from setup-java above
 
       - name: Check formatting
-        run: sbt "scalafmtCheckAll"
+        run: sbt -batch --client "scalafmtCheckAll"
 
-      - name: Compile
-        run: sbt "compile"
+      - name: Test # also compiles all subprojects
+        run: sbt -batch --client "zioNatsTest/test"
 
-      - name: Test
-        run: sbt "zioNatsTest/test"
+      - name: Cleanup
+        run: sbt --client shutdown
+        if: always()

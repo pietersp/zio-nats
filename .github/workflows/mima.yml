@@ -10,13 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
-      - uses: coursier/setup-action@v1
-        with:
-          coursier-cache-version: ${{ github.sha }}
+
+      - uses: coursier/setup-action@v1 # picks up JVM from setup-java above
+
       - name: Run MiMa
-        run: |
-          sbt "zioNatsCore/mimaReportBinaryIssues; zioNatsZioBlocks/mimaReportBinaryIssues; zioNatsJsoniter/mimaReportBinaryIssues; zioNatsPlayJson/mimaReportBinaryIssues; zioNatsTestkit/mimaReportBinaryIssues"
+        run: sbt -batch "zioNatsCore/mimaReportBinaryIssues; zioNatsZioBlocks/mimaReportBinaryIssues; zioNatsJsoniter/mimaReportBinaryIssues; zioNatsPlayJson/mimaReportBinaryIssues; zioNatsTestkit/mimaReportBinaryIssues"
