@@ -5,3 +5,16 @@ target/
 .bloop/
 *.class
 *.log
+
+# Claude Code — ignore personal settings and skills; commit .claude/commands/ if added
+.claude/settings.local.json
+.claude/skills/
+
+# Agent skills (personal, not project-specific)
+.agents/skills/
+
+# Environment variables
+.env
+
+# Coursier cache accidentally created in project root (Windows null-home fallback)
+null/
