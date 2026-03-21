@@ -31,9 +31,9 @@ given fromJsonValueCodec[A](using jc: JsonValueCodec[A], ev: scala.util.NotGiven
  * jsoniter-scala integration for [[NatsCodec]].
  *
  * Bridges `JsonValueCodec[A]` (jsoniter-scala's codec type) to the library's
- * [[NatsCodec]] typeclass. The bridge `given fromJsonValueCodec`
- * is the primary integration point: after `import zio.nats.*`, any `JsonValueCodec[A]`
- * that is in implicit scope is automatically promoted to a `NatsCodec[A]`.
+ * [[NatsCodec]] typeclass. The bridge `given fromJsonValueCodec` is the primary
+ * integration point: after `import zio.nats.*`, any `JsonValueCodec[A]` that is
+ * in implicit scope is automatically promoted to a `NatsCodec[A]`.
  *
  * ==Typical usage==
  *
@@ -50,7 +50,8 @@ given fromJsonValueCodec[A](using jc: JsonValueCodec[A], ev: scala.util.NotGiven
  * nats.publish(Subject("persons"), Person("Alice", 30))
  * }}}
  *
- * For an explicit one-off codec, use [[zio.nats.NatsCodecJsoniter.fromJsoniter]]:
+ * For an explicit one-off codec, use
+ * [[zio.nats.NatsCodecJsoniter.fromJsoniter]]:
  *
  * {{{
  * val codec: NatsCodec[Person] = NatsCodecJsoniter.fromJsoniter(JsonCodecMaker.make[Person])

@@ -23,7 +23,8 @@ import java.util.concurrent.ConcurrentHashMap
 object NatsCodecZioBlocks {
 
   /**
-   * Derives [[NatsCodec]] instances from a zio-blocks [[zio.blocks.schema.codec.Format]].
+   * Derives [[NatsCodec]] instances from a zio-blocks
+   * [[zio.blocks.schema.codec.Format]].
    *
    * Import `builder.derived` to bring a default codec for all Schema-annotated
    * types into scope.
