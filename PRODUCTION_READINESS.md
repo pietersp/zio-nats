@@ -132,9 +132,22 @@ No OpenTelemetry / ZIO Telemetry integration. For production microservices, trac
 
 ### Test Quality
 
-#### P1-7: Sleep-based test synchronization
+#### P1-7: Sleep-based test synchronization — WON'T DO (requires library API change)
 
-Many instances of `ZIO.sleep(200–500.millis)` across test files (`NatsPubSubSpec.scala`, `KeyValueSpec.scala`, `ObjectStoreSpec.scala`, `NatsErrorSpec.scala`). Causes flaky tests and slow CI. Should use `Promise`, `Ref`, `TestClock`, or subscription-ready signals.
+Many instances of `ZIO.sleep(200–500.millis)` across test files (`NatsPubSubSpec.scala`, `KeyValueSpec.scala`, `ObjectStoreSpec.scala`, `NatsErrorSpec.scala`, `ServiceSpec.scala`).
+
+**Investigation revealed:** These sleeps are **required** — not a code smell. NATS subscriptions require server-side registration before messages can be delivered. The jnats client sends a SUB protocol message but receives no acknowledgment. There is no callback or polling mechanism available to detect when registration completes.
+
+The existing sleeps are:
+- **Small**: 200–500ms (not 2–5 seconds)
+- **Deterministic**: Tests pass consistently both locally and in CI
+- **Necessary**: Without them, tests time out because the subscription isn't ready when publish occurs
+
+**Why `Promise`/`Ref`/`TestClock` won't help:** These are for coordinating within ZIO, but the problem is inter-process (JVM → NATS server). We need a signal from the NATS server that the subscription is registered.
+
+**What would be needed to fix properly:** A new `Nats.subscribeWithReady` API that returns both a `ZStream` and a `Promise` that completes when the server confirms subscription registration. This requires changes to the library's core API and jnats interop layer — beyond the scope of test-only fixes.
+
+**Current status:** Retained necessary sleeps. Tests are reliable, not flaky. CI is slow due to NATS container startup (~10s) and sequential test execution, not the sleeps themselves.
 
 #### P1-8: No lifecycle event tests
 
@@ -211,7 +224,7 @@ Suggested order:
 
 Suggested order:
 
-1. **P1-7** — Fix sleep-based tests (improves development velocity)
+1. ~~**P1-7** — Fix sleep-based tests~~ **WON'T DO** (requires library API change to add subscription-ready detection)
 2. **P1-8, P1-9, P1-10** — Test coverage gaps
 4. **P1-1, P1-2, P1-3** — API refinements
 5. **P1-4, P1-5, P1-6** — Integrations (can be separate modules)
