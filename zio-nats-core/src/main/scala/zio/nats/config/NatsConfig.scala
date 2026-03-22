@@ -2,6 +2,7 @@ package zio.nats.config
 
 import io.nats.client.Options
 import zio.*
+import java.nio.file.Paths
 
 /**
  * Configuration for a NATS connection.
@@ -153,4 +154,213 @@ object NatsConfig {
 
   /** ZLayer providing a default [[NatsConfig]] connecting to `nats://localhost:4222`. */
   val live: ULayer[NatsConfig] = ZLayer.succeed(default)
+
+  // ---------------------------------------------------------------------------
+  // ZIO Config descriptors
+  // ---------------------------------------------------------------------------
+
+  // Private case classes used to group config fields before combining them.
+  // Using case classes (not tuples) ensures Zippable does not try to flatten
+  // their fields into the outer zip chain.
+  private final case class ConnGroup(
+    servers: List[String], connectionName: Option[String], connectionTimeout: Duration,
+    reconnectWait: Duration, maxReconnects: Int, pingInterval: Duration,
+    requestCleanupInterval: Duration, bufferSize: Int, noEcho: Boolean,
+    utf8Support: Boolean, inboxPrefix: String
+  )
+  private final case class TunGroup(
+    reconnectJitter: Duration, reconnectJitterTls: Duration, reconnectBufferSize: Long,
+    maxMessagesInOutgoingQueue: Int, discardMessagesWhenOutgoingQueueFull: Boolean,
+    writeQueuePushTimeout: Duration, socketWriteTimeout: Duration, socketReadTimeout: Int,
+    maxControlLine: Int, maxPingsOut: Int, drainTimeout: Duration
+  )
+
+  // Auth: each variant validates the type field and reads its required sub-fields.
+  // Variants are chained with orElse; a final Config.succeed provides the default
+  // when the auth section is absent entirely.
+  // Note: an unrecognised type value (e.g. "custom") also falls back to NoAuth.
+  private val authConfig: Config[NatsAuth] = {
+    val noAuth: Config[NatsAuth] =
+      Config.string("type").nested("auth")
+        .validate("auth.type must be 'no-auth'")(_.trim == "no-auth")
+        .map(_ => NatsAuth.NoAuth)
+
+    val token: Config[NatsAuth] =
+      Config.string("type").nested("auth")
+        .validate("auth.type must be 'token'")(_.trim == "token")
+        .zip(Config.string("value").nested("auth"))
+        .map { case (_, v) => NatsAuth.Token(v) }
+
+    val userPassword: Config[NatsAuth] =
+      Config.string("type").nested("auth")
+        .validate("auth.type must be 'user-password'")(_.trim == "user-password")
+        .zip(Config.string("username").nested("auth") zip Config.string("password").nested("auth"))
+        .map { case (_, (u, p)) => NatsAuth.UserPassword(u, p) }
+
+    val credentialFile: Config[NatsAuth] =
+      Config.string("type").nested("auth")
+        .validate("auth.type must be 'credential-file'")(_.trim == "credential-file")
+        .zip(Config.string("path").nested("auth"))
+        .map { case (_, p) => NatsAuth.CredentialFile(Paths.get(p)) }
+
+    noAuth
+      .orElse(token)
+      .orElse(userPassword)
+      .orElse(credentialFile)
+      .orElse(Config.succeed(NatsAuth.NoAuth))
+  }
+
+  // TLS: same orElse + validate pattern as authConfig.
+  private val tlsConfig: Config[NatsTls] = {
+    val disabled: Config[NatsTls] =
+      Config.string("type").nested("tls")
+        .validate("tls.type must be 'disabled'")(_.trim == "disabled")
+        .map(_ => NatsTls.Disabled)
+
+    val systemDefault: Config[NatsTls] =
+      Config.string("type").nested("tls")
+        .validate("tls.type must be 'system-default'")(_.trim == "system-default")
+        .map(_ => NatsTls.SystemDefault)
+
+    val keyStore: Config[NatsTls] = {
+      // Config.zip uses Zippable which produces flat tuples, not nested pairs.
+      type KsFields = (String, String, Option[String], Option[String], Option[String], Boolean)
+      val ksConfig: Config[KsFields] =
+        Config.string("key-store-path").nested("tls") zip
+        Config.string("key-store-password").nested("tls") zip
+        Config.string("trust-store-path").optional.nested("tls") zip
+        Config.string("trust-store-password").optional.nested("tls") zip
+        Config.string("algorithm").optional.nested("tls") zip
+        Config.boolean("tls-first").withDefault(false).nested("tls")
+      Config.string("type").nested("tls")
+        .validate("tls.type must be 'key-store'")(_.trim == "key-store")
+        .zip(ksConfig)
+        .map { case (_, (ksp, kspw, tsp, tspw, alg, first)) =>
+          NatsTls.KeyStore(Paths.get(ksp), kspw, tsp.map(Paths.get(_)), tspw, alg, first)
+        }
+    }
+
+    disabled
+      .orElse(systemDefault)
+      .orElse(keyStore)
+      .orElse(Config.succeed(NatsTls.Disabled))
+  }
+
+  /**
+   * ZIO [[Config]] descriptor for [[NatsConfig]].
+   *
+   * All fields default to their [[NatsConfig]] case class defaults — only values
+   * you want to override need to be present. Duration fields use ISO-8601 format
+   * (e.g. `PT5S` for 5 seconds, `PT2M` for 2 minutes). The `servers` field uses
+   * indexed keys (`servers.0`, `servers.1`, ...).
+   *
+   * `NatsAuth.Custom` and `NatsTls.Custom` are not reachable via text config —
+   * construct [[NatsConfig]] programmatically when you need those variants.
+   *
+   * This descriptor is flat (no nesting). Use [[fromConfig]] for the conventional
+   * `nats`-nested layer, or apply your own nesting:
+   * {{{
+   *   ZIO.config(NatsConfig.config.nested("myapp").nested("nats"))
+   * }}}
+   */
+  val config: Config[NatsConfig] = {
+    // Each group is mapped to a private case class so Zippable never tries to
+    // flatten the fields across groups.  The final zip is a clean 4-element tuple.
+    val connGroupConfig: Config[ConnGroup] =
+      (Config.listOf("servers", Config.string).withDefault(List("nats://localhost:4222")) zip
+       Config.string("connection-name").optional zip
+       Config.duration("connection-timeout").withDefault(2.seconds) zip
+       Config.duration("reconnect-wait").withDefault(2.seconds) zip
+       Config.int("max-reconnects").withDefault(60) zip
+       Config.duration("ping-interval").withDefault(2.minutes) zip
+       Config.duration("request-cleanup-interval").withDefault(5.seconds) zip
+       Config.int("buffer-size").withDefault(64 * 1024) zip
+       Config.boolean("no-echo").withDefault(false) zip
+       Config.boolean("utf8-support").withDefault(false) zip
+       Config.string("inbox-prefix").withDefault("_INBOX.")
+      ).map { case (servers, connectionName, connectionTimeout, reconnectWait, maxReconnects,
+                    pingInterval, requestCleanupInterval, bufferSize, noEcho, utf8Support,
+                    inboxPrefix) =>
+        ConnGroup(servers, connectionName, connectionTimeout, reconnectWait, maxReconnects,
+                  pingInterval, requestCleanupInterval, bufferSize, noEcho, utf8Support, inboxPrefix)
+      }
+
+    val tunGroupConfig: Config[TunGroup] =
+      (Config.duration("reconnect-jitter").withDefault(100.millis) zip
+       Config.duration("reconnect-jitter-tls").withDefault(1.second) zip
+       Config.long("reconnect-buffer-size").withDefault(8L * 1024 * 1024) zip
+       Config.int("max-messages-in-outgoing-queue").withDefault(0) zip
+       Config.boolean("discard-messages-when-outgoing-queue-full").withDefault(false) zip
+       Config.duration("write-queue-push-timeout").withDefault(Duration.Zero) zip
+       Config.duration("socket-write-timeout").withDefault(Duration.Zero) zip
+       Config.int("socket-read-timeout").withDefault(0) zip // milliseconds
+       Config.int("max-control-line").withDefault(0) zip
+       Config.int("max-pings-out").withDefault(2) zip
+       Config.duration("drain-timeout").withDefault(30.seconds)
+      ).map { case (reconnectJitter, reconnectJitterTls, reconnectBufferSize,
+                    maxMessagesInOutgoingQueue, discardMessagesWhenOutgoingQueueFull,
+                    writeQueuePushTimeout, socketWriteTimeout, socketReadTimeout,
+                    maxControlLine, maxPingsOut, drainTimeout) =>
+        TunGroup(reconnectJitter, reconnectJitterTls, reconnectBufferSize,
+                 maxMessagesInOutgoingQueue, discardMessagesWhenOutgoingQueueFull,
+                 writeQueuePushTimeout, socketWriteTimeout, socketReadTimeout,
+                 maxControlLine, maxPingsOut, drainTimeout)
+      }
+
+    (connGroupConfig zip tunGroupConfig zip authConfig zip tlsConfig).map {
+      case (conn, tun, auth, tls) =>
+        NatsConfig(
+          servers                              = conn.servers,
+          connectionName                       = conn.connectionName,
+          connectionTimeout                    = conn.connectionTimeout,
+          reconnectWait                        = conn.reconnectWait,
+          maxReconnects                        = conn.maxReconnects,
+          pingInterval                         = conn.pingInterval,
+          requestCleanupInterval               = conn.requestCleanupInterval,
+          bufferSize                           = conn.bufferSize,
+          noEcho                               = conn.noEcho,
+          utf8Support                          = conn.utf8Support,
+          inboxPrefix                          = conn.inboxPrefix,
+          auth                                 = auth,
+          tls                                  = tls,
+          reconnectJitter                      = tun.reconnectJitter,
+          reconnectJitterTls                   = tun.reconnectJitterTls,
+          reconnectBufferSize                  = tun.reconnectBufferSize,
+          maxMessagesInOutgoingQueue           = tun.maxMessagesInOutgoingQueue,
+          discardMessagesWhenOutgoingQueueFull = tun.discardMessagesWhenOutgoingQueueFull,
+          writeQueuePushTimeout                = tun.writeQueuePushTimeout,
+          socketWriteTimeout                   = tun.socketWriteTimeout,
+          socketReadTimeout                    = tun.socketReadTimeout,
+          maxControlLine                       = tun.maxControlLine,
+          maxPingsOut                          = tun.maxPingsOut,
+          drainTimeout                         = tun.drainTimeout
+        )
+    }
+  }
+
+  /**
+   * ZLayer that loads [[NatsConfig]] from the environment via ZIO Config,
+   * reading from the `nats` key namespace.
+   *
+   * With the default [[zio.ConfigProvider]] (env vars + system properties),
+   * keys are normalised to `UPPER_SNAKE_CASE` under the `NATS_` prefix:
+   * {{{
+   *   NATS_SERVERS_0=nats://broker:4222
+   *   NATS_AUTH_TYPE=token
+   *   NATS_AUTH_VALUE=s3cr3t
+   *   NATS_CONNECTION_TIMEOUT=PT5S
+   * }}}
+   *
+   * All fields have defaults; only values you want to override need to be set.
+   *
+   * For HOCON loading, add `dev.zio::zio-config-typesafe` and provide
+   * `Runtime.setConfigProvider(TypesafeConfigProvider.fromResourcePath())`.
+   *
+   * For custom nesting use [[config]] directly:
+   * {{{
+   *   ZIO.config(NatsConfig.config.nested("myapp").nested("nats"))
+   * }}}
+   */
+  val fromConfig: ZLayer[Any, Config.Error, NatsConfig] =
+    ZLayer.fromZIO(ZIO.config(config.nested("nats")))
 }

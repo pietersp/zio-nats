@@ -161,6 +161,79 @@ NatsConfig(tls = NatsTls.Custom(mySSLContext))
 
 Authentication and TLS are independent — use either, both, or neither. They operate at different layers: TLS secures the TCP connection; auth identifies your client to the NATS permission system.
 
+## Loading config from the environment
+
+`NatsConfig.fromConfig` is a `ZLayer` that reads connection settings from ZIO's built-in config system (no extra dependencies — `zio.Config` is in `zio-core`).
+
+```scala
+// Replace NatsConfig.live with NatsConfig.fromConfig in your layer graph
+val app: ZIO[Nats, Throwable, Unit] = ???
+
+app.provide(
+  Nats.live,
+  NatsConfig.fromConfig   // reads from NATS_ env vars by default
+)
+```
+
+With the default `ConfigProvider` (environment variables + system properties), keys are normalised to `UPPER_SNAKE_CASE` under the `NATS_` prefix:
+
+| Setting | Env var |
+|---------|---------|
+| `servers` (first) | `NATS_SERVERS_0=nats://broker:4222` |
+| `auth.type` | `NATS_AUTH_TYPE=token` |
+| `auth.value` (token) | `NATS_AUTH_VALUE=s3cr3t` |
+| `connection-timeout` | `NATS_CONNECTION_TIMEOUT=PT5S` |
+| `max-reconnects` | `NATS_MAX_RECONNECTS=60` |
+| `tls.type` | `NATS_TLS_TYPE=system-default` |
+
+All fields have defaults; only values you want to override need to be set.
+
+**Duration format** — ISO-8601: `PT5S` = 5 seconds, `PT2M` = 2 minutes, `PT0.1S` = 100 ms.
+
+**Auth type values**: `no-auth`, `token`, `user-password`, `credential-file`.
+
+**TLS type values**: `disabled`, `system-default`, `key-store`.
+
+### HOCON loading
+
+Add `dev.zio::zio-config-typesafe` and install `TypesafeConfigProvider` at startup:
+
+```scala
+import zio.config.typesafe.TypesafeConfigProvider
+
+override val bootstrap: ZLayer[Any, Config.Error, Unit] =
+  Runtime.setConfigProvider(TypesafeConfigProvider.fromResourcePath())
+```
+
+Then add `application.conf`:
+
+```hocon
+nats {
+  servers = ["nats://broker:4222"]
+  connection-timeout = "PT5S"
+  auth {
+    type  = token
+    value = ${?NATS_TOKEN}   # still read from env if desired
+  }
+}
+```
+
+### Custom nesting
+
+The descriptor is flat — apply your own nesting if your config lives elsewhere:
+
+```scala
+ZIO.config(NatsConfig.config.nested("myapp").nested("messaging"))
+```
+
+### Programmatic config
+
+`NatsTls.Custom` and `NatsAuth.Custom` hold runtime Java objects and are intentionally not reachable from text config. Build `NatsConfig` directly when you need them:
+
+```scala
+NatsConfig(auth = NatsAuth.Custom(myAuthHandler), tls = NatsTls.Custom(mySSLContext))
+```
+
 ## Pub/Sub & Request-Reply
 
 ### Publish
