@@ -1,6 +1,6 @@
 package zio.nats.config
 
-import io.nats.client.Options
+import io.nats.client.{AuthHandler, Options}
 import java.nio.file.Path
 
 /**
@@ -11,8 +11,9 @@ import java.nio.file.Path
  * unlike the previous flat-field approach where multiple auth fields could be
  * set with undefined precedence.
  *
- * For advanced use cases requiring a custom [[io.nats.client.AuthHandler]]
- * (e.g. dynamic credential rotation), use [[zio.nats.Nats.customized]] instead.
+ * `NoAuth`, `Token`, `UserPassword`, and `CredentialFile` are fully
+ * text-configurable. `Custom` accepts a pre-built [[io.nats.client.AuthHandler]]
+ * for dynamic credential rotation or credentials loaded at runtime.
  *
  * {{{
  *   // Anonymous
@@ -26,6 +27,9 @@ import java.nio.file.Path
  *
  *   // NKey/JWT from a .creds file
  *   NatsConfig(auth = NatsAuth.CredentialFile(Paths.get("/run/secrets/nats.creds")))
+ *
+ *   // Runtime AuthHandler (e.g. dynamic credential rotation)
+ *   NatsConfig(auth = NatsAuth.Custom(myAuthHandler))
  * }}}
  */
 enum NatsAuth:
@@ -58,9 +62,23 @@ enum NatsAuth:
    */
   case CredentialFile(path: Path)
 
+  /**
+   * Authentication via a programmatic [[io.nats.client.AuthHandler]].
+   *
+   * Use for dynamic credential rotation or credentials that are not available
+   * as static text (e.g. NKey signing with a key loaded from a secrets manager
+   * at runtime). For static credentials, prefer [[Token]], [[UserPassword]], or
+   * [[CredentialFile]].
+   *
+   * @param handler
+   *   A fully configured [[io.nats.client.AuthHandler]].
+   */
+  case Custom(handler: AuthHandler)
+
   private[nats] def applyTo(builder: Options.Builder): Options.Builder =
     this match
       case NoAuth             => builder
       case Token(v)           => builder.token(v.toCharArray)
       case UserPassword(u, p) => builder.userInfo(u.toCharArray, p.toCharArray)
       case CredentialFile(p)  => builder.credentialPath(p.toString)
+      case Custom(h)          => builder.authHandler(h)

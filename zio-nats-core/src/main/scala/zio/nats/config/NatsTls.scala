@@ -2,17 +2,16 @@ package zio.nats.config
 
 import io.nats.client.Options
 import java.nio.file.Path
+import javax.net.ssl.SSLContext
 
 /**
  * TLS configuration for a NATS connection.
  *
  * `Disabled` and `SystemDefault` require no files and are fully text-configurable.
  * `KeyStore` covers standard TLS and mTLS via JVM keystore/truststore files and is
- * also fully text-configurable via [[zio.nats.NatsConfig.fromConfig]].
- *
- * For exotic setups that require a pre-built [[javax.net.ssl.SSLContext]] (e.g.
- * certificates loaded from a secrets manager at runtime), use
- * [[zio.nats.Nats.customized]] instead.
+ * also fully text-configurable via [[zio.nats.config.NatsConfig]].
+ * `Custom` accepts a pre-built [[javax.net.ssl.SSLContext]] for certificates loaded
+ * at runtime (e.g. from a secrets manager).
  *
  * {{{
  *   // No TLS (default)
@@ -23,18 +22,14 @@ import java.nio.file.Path
  *
  *   // mTLS with client keystore and custom truststore
  *   NatsConfig(tls = NatsTls.KeyStore(
- *     keyStorePath     = Paths.get("/certs/client.jks"),
- *     keyStorePassword = "changeit",
- *     trustStorePath   = Some(Paths.get("/certs/truststore.jks")),
+ *     keyStorePath       = Paths.get("/certs/client.jks"),
+ *     keyStorePassword   = "changeit",
+ *     trustStorePath     = Some(Paths.get("/certs/truststore.jks")),
  *     trustStorePassword = Some("changeit")
  *   ))
  *
- *   // Connect with TLS immediately (tlsFirst), keystore required
- *   NatsConfig(tls = NatsTls.KeyStore(
- *     keyStorePath     = Paths.get("/certs/client.jks"),
- *     keyStorePassword = "changeit",
- *     tlsFirst         = true
- *   ))
+ *   // Runtime SSLContext (e.g. certificates fetched from Vault at startup)
+ *   NatsConfig(tls = NatsTls.Custom(mySSLContext))
  * }}}
  */
 enum NatsTls:
@@ -73,10 +68,22 @@ enum NatsTls:
     tlsFirst: Boolean = false
   )
 
+  /**
+   * TLS using a pre-built [[javax.net.ssl.SSLContext]].
+   *
+   * Use when certificates are loaded at runtime (e.g. from a secrets manager,
+   * HSM, or injected as in-memory PEM bytes) and cannot be expressed as files
+   * on disk. For static file-based TLS, prefer [[KeyStore]].
+   *
+   * @param context
+   *   A fully configured [[javax.net.ssl.SSLContext]].
+   */
+  case Custom(context: SSLContext)
+
   private[nats] def applyTo(builder: Options.Builder): Options.Builder =
     this match
       case Disabled      => builder
-      case SystemDefault => builder.sslContext(javax.net.ssl.SSLContext.getDefault)
+      case SystemDefault => builder.sslContext(SSLContext.getDefault)
       case KeyStore(ksp, kspw, tsp, tspw, alg, first) =>
         var b = builder
           .keystorePath(ksp.toString)
@@ -86,3 +93,4 @@ enum NatsTls:
         alg.foreach(a => b = b.tlsAlgorithm(a))
         if first then b = b.tlsFirst()
         b
+      case Custom(ctx) => builder.sslContext(ctx)

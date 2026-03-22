@@ -1,7 +1,6 @@
 package zio.nats
 
-import io.nats.client.{AuthHandler, Connection => JConnection, ConnectionListener, ErrorListener, Options}
-import javax.net.ssl.SSLContext
+import io.nats.client.{Connection => JConnection, ConnectionListener, ErrorListener, Options}
 import io.nats.service.{Service => JService}
 import zio._
 import zio.nats.config.NatsConfig
@@ -230,37 +229,19 @@ object Nats {
    *
    * Connection lifecycle events are available via [[Nats#lifecycleEvents]] on
    * the returned service.
-   *
-   * @param authHandler
-   *   Optional programmatic auth handler — for dynamic credential rotation.
-   *   For static auth, use [[NatsAuth]] in [[NatsConfig]] instead.
-   * @param tlsContext
-   *   Optional pre-built [[SSLContext]] — for certificates loaded at runtime.
-   *   For file-based TLS, use [[NatsTls]] in [[NatsConfig]] instead.
    */
-  def make(
-    config: NatsConfig,
-    authHandler: Option[AuthHandler] = None,
-    tlsContext: Option[SSLContext] = None
-  ): ZIO[Scope, NatsError, Nats] =
+  def make(config: NatsConfig): ZIO[Scope, NatsError, Nats] =
     for {
       hub   <- Hub.unbounded[NatsEvent]
       jQueue = new LinkedBlockingQueue[NatsEvent]()
-      conn  <- connect(buildOptions(config, jQueue, authHandler, tlsContext), config.drainTimeout)
+      conn  <- connect(buildOptions(config, jQueue), config.drainTimeout)
       _     <- relayEvents(jQueue, hub)
     } yield new NatsLive(conn, hub)
 
   /** Wire jnats connection- and error-listeners to push events into `queue`. */
-  private def buildOptions(
-    config: NatsConfig,
-    queue: LinkedBlockingQueue[NatsEvent],
-    authHandler: Option[AuthHandler],
-    tlsContext: Option[SSLContext]
-  ): Options = {
-    var b = config.toOptionsBuilder
-    authHandler.foreach(h => b = b.authHandler(h))
-    tlsContext.foreach(ctx => b = b.sslContext(ctx))
-    b.connectionListener { (conn: JConnection, eventType: ConnectionListener.Events) =>
+  private def buildOptions(config: NatsConfig, queue: LinkedBlockingQueue[NatsEvent]): Options = {
+    config.toOptionsBuilder
+    .connectionListener { (conn: JConnection, eventType: ConnectionListener.Events) =>
       val url   = Option(conn.getConnectedUrl).getOrElse("unknown")
       val event = eventType match {
         case ConnectionListener.Events.CONNECTED          => NatsEvent.Connected(url)
@@ -313,36 +294,6 @@ object Nats {
       for {
         config <- ZIO.service[NatsConfig]
         nats   <- make(config)
-      } yield nats
-    }
-
-  /**
-   * Like [[live]], but accepts a pre-built [[SSLContext]] or
-   * [[io.nats.client.AuthHandler]] that cannot be expressed as text config.
-   *
-   * Use when:
-   *  - TLS certificates are loaded from a secrets manager at runtime (`tlsContext`)
-   *  - Dynamic credential rotation requires a custom `AuthHandler` (`authHandler`)
-   *
-   * For static config (keystore files, tokens, `.creds` files), prefer
-   * [[NatsTls]] and [[NatsAuth]] in [[NatsConfig]] — those are fully
-   * text-configurable.
-   *
-   * {{{
-   *   app.provide(
-   *     Nats.customized(tlsContext = Some(myCtx)),
-   *     NatsConfig.live
-   *   )
-   * }}}
-   */
-  def customized(
-    authHandler: Option[AuthHandler] = None,
-    tlsContext: Option[SSLContext] = None
-  ): ZLayer[NatsConfig, NatsError, Nats] =
-    ZLayer.scoped {
-      for {
-        config <- ZIO.service[NatsConfig]
-        nats   <- make(config, authHandler, tlsContext)
       } yield nats
     }
 

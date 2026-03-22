@@ -13,15 +13,14 @@ import zio.*
  * Set the `auth` field to one of the [[NatsAuth]] variants. Only one
  * authentication method can be active at a time; impossible combinations
  * (e.g. token and user/password simultaneously) cannot be constructed.
- *
- * For dynamic credential rotation via a custom `io.nats.client.AuthHandler`,
- * use [[zio.nats.Nats.customized]].
+ * Use [[NatsAuth.Custom]] for dynamic credential rotation via a programmatic
+ * `io.nats.client.AuthHandler`.
  *
  * === TLS ===
  *
- * Set the `tls` field to one of the [[NatsTls]] variants. For exotic setups
- * requiring a pre-built `javax.net.ssl.SSLContext`, use
- * [[zio.nats.Nats.customized]].
+ * Set the `tls` field to one of the [[NatsTls]] variants. Use
+ * [[NatsTls.Custom]] for a pre-built `javax.net.ssl.SSLContext` when
+ * certificates are loaded at runtime (e.g. from a secrets manager).
  *
  * @param servers
  *   List of NATS server URLs (default: `nats://localhost:4222`).
@@ -114,10 +113,7 @@ final case class NatsConfig(
   /** Build jnats Options from this config. */
   private[nats] def toOptions: Options = toOptionsBuilder.build()
 
-  /**
-   * Build a jnats `Options.Builder` from this config (allows further
-   * customization in [[zio.nats.Nats.customized]]).
-   */
+  /** Build a jnats `Options.Builder` from this config. */
   private[nats] def toOptionsBuilder: Options.Builder = {
     var builder = new Options.Builder()
     servers.foreach(s => builder = builder.server(s))

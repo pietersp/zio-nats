@@ -108,6 +108,59 @@ val appLayer =
   KeyValueManagement.live
 ```
 
+## Authentication & TLS
+
+Both are configured directly on `NatsConfig` — always use `Nats.live`.
+
+### Authentication
+
+Pick one `NatsAuth` variant:
+
+```scala
+// Anonymous (default)
+NatsConfig()
+
+// Static token
+NatsConfig(auth = NatsAuth.Token("s3cr3t"))
+
+// Username + password
+NatsConfig(auth = NatsAuth.UserPassword("alice", "p4ssw0rd"))
+
+// NKey/JWT from a .creds file (e.g. Synadia Cloud)
+NatsConfig(auth = NatsAuth.CredentialFile(Paths.get("/run/secrets/nats.creds")))
+
+// Programmatic AuthHandler — for dynamic credential rotation or credentials
+// that cannot be expressed as static text (e.g. NKey signing with a key
+// fetched from Vault at startup)
+NatsConfig(auth = NatsAuth.Custom(myAuthHandler))
+```
+
+### TLS
+
+Pick one `NatsTls` variant:
+
+```scala
+// No TLS (default)
+NatsConfig()
+
+// TLS using the JVM's system trust store — for servers with public CA certs
+NatsConfig(tls = NatsTls.SystemDefault)
+
+// mTLS via JVM keystore/truststore files
+NatsConfig(tls = NatsTls.KeyStore(
+  keyStorePath       = Paths.get("/certs/client.jks"),
+  keyStorePassword   = "changeit",
+  trustStorePath     = Some(Paths.get("/certs/ca.jks")),
+  trustStorePassword = Some("changeit")
+))
+
+// Pre-built SSLContext — for certificates loaded at runtime
+// (e.g. fetched from AWS Secrets Manager, Vault, or an HSM)
+NatsConfig(tls = NatsTls.Custom(mySSLContext))
+```
+
+Authentication and TLS are independent — use either, both, or neither. They operate at different layers: TLS secures the TCP connection; auth identifies your client to the NATS permission system.
+
 ## Pub/Sub & Request-Reply
 
 ### Publish
@@ -168,13 +221,13 @@ Messages are load-balanced across all subscribers in the same queue group:
 
 ```scala
 // Typed — decoded payload in Envelope
-nats.subscribe[WorkItem](Subject("work.queue"), QueueGroup("workers"))
+nats.subscribe[WorkItem](Subject("work.queue"), Some(QueueGroup("workers")))
   .map(_.value)
   .tap(item => process(item))
   .runDrain
 
 // Raw bytes
-nats.subscribe[Chunk[Byte]](Subject("work.queue"), QueueGroup("workers"))
+nats.subscribe[Chunk[Byte]](Subject("work.queue"), Some(QueueGroup("workers")))
   .tap(env => process(env.message))
   .runDrain
 ```
@@ -720,7 +773,7 @@ Event ADT:
 | `Connected(url)`         | Initial connection established     |
 | `Disconnected(url)`      | Connection lost                    |
 | `Reconnected(url)`       | Reconnection successful            |
-| `ServersDiscovered(url)` | New cluster route discovered       |
+| `ServersDiscovered`      | New cluster route discovered       |
 | `Closed`                 | Connection permanently closed      |
 | `LameDuckMode`           | Server entering lame-duck shutdown |
 | `Error(message)`         | Non-fatal error string from server |
@@ -737,7 +790,6 @@ nats.statistics                    // URIO[Nats, ConnectionStats]
 nats.outgoingPendingMessageCount   // URIO[Nats, Long]
 nats.outgoingPendingBytes          // URIO[Nats, Long]
 nats.flush(timeout = 1.second)     // IO[NatsError, Unit]
-nats.drain(timeout = 30.seconds)   // IO[NatsError, Unit]
 ```
 
 `ConnectionStats` fields: `.inMsgs`, `.outMsgs`, `.inBytes`, `.outBytes`, `.reconnects`, `.droppedCount`, and more.
@@ -786,7 +838,7 @@ object MySpec extends ZIOSpecDefault {
     test("publishes and receives") {
       for {
         nats  <- ZIO.service[Nats]
-        fiber <- nats.subscribeRaw(Subject("t")).take(1).runCollect.fork
+        fiber <- nats.subscribe[Chunk[Byte]](Subject("t")).take(1).runCollect.fork
         _     <- ZIO.sleep(200.millis)
         _     <- nats.publish(Subject("t"), "hi")
         msgs  <- fiber.join
@@ -822,10 +874,12 @@ NatsConfig(
   // auth                              = NatsAuth.Token("s3cr3t"),
   // auth                              = NatsAuth.UserPassword("alice", "p4ss"),
   // auth                              = NatsAuth.CredentialFile(Paths.get("/app/nats.creds")),
+  // auth                              = NatsAuth.Custom(myAuthHandler),   // runtime AuthHandler
   // TLS — pick one variant:
   tls                                  = NatsTls.Disabled,
   // tls                               = NatsTls.SystemDefault,
   // tls                               = NatsTls.KeyStore(keyStorePath = ..., keyStorePassword = "..."),
+  // tls                               = NatsTls.Custom(mySSLContext),     // runtime SSLContext
   // Reconnect tuning
   reconnectJitter                      = 100.millis,
   reconnectJitterTls                   = 1.second,
@@ -858,16 +912,6 @@ NatsConfig("nats://host:4222")
 program.provide(Nats.default)
 ```
 
-For programmatic auth or TLS (e.g. credentials loaded from a secrets manager at runtime),
-use `Nats.customized`:
-
-```scala
-program.provide(
-  Nats.customized(tlsContext = Some(myCtx)),
-  NatsConfig.live
-)
-```
-
 ### Migration from previous versions
 
 | Before | After |
@@ -875,10 +919,10 @@ program.provide(
 | `NatsConfig(token = Some("x"))` | `NatsConfig(auth = NatsAuth.Token("x"))` |
 | `NatsConfig(username = Some("u"), password = Some("p"))` | `NatsConfig(auth = NatsAuth.UserPassword("u", "p"))` |
 | `NatsConfig(credentialPath = Some(p))` | `NatsConfig(auth = NatsAuth.CredentialFile(p))` |
-| `NatsConfig(authHandler = Some(h))` | `Nats.customized(authHandler = Some(h))` |
+| `NatsConfig(authHandler = Some(h))` | `NatsConfig(auth = NatsAuth.Custom(h))` |
 | `NatsConfig(tlsFirst = true)` | `NatsConfig(tls = NatsTls.KeyStore(..., tlsFirst = true))` |
-| `NatsConfig(tlsContext = Some(ctx))` | `Nats.customized(tlsContext = Some(ctx))` |
-| `NatsConfig(optionsCustomizer = f)` | Not supported — use named fields or `Nats.customized` |
+| `NatsConfig(tlsContext = Some(ctx))` | `NatsConfig(tls = NatsTls.Custom(ctx))` |
+| `NatsConfig(optionsCustomizer = f)` | Not supported — use named fields directly |
 | `StreamConfig(maxMsgSize = n: Long)` | `StreamConfig(maxMsgSize = n: Int)` |
 | `KeyValueConfig(maxValueSize = n: Long)` | `KeyValueConfig(maxValueSize = n: Int)` |
 
