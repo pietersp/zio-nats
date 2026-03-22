@@ -186,9 +186,9 @@ The library uses Scala 3 features (opaque types, enums, extension methods, `give
 
 No mdoc, Laika, or microsite setup. Official ZIO libraries have generated documentation sites hosted on GitHub Pages.
 
-#### P2-3: Scalafix rules
+#### P2-3: Scalafix rules — WON'T DO
 
-`sbt-scalafmt` is configured but no scalafix rules are present. Could provide migration rules for future breaking changes.
+No breaking changes have occurred yet, so there is nothing to migrate. If breaking changes are introduced in the future, migration rules can be added at that point.
 
 ### Feature Gaps
 
