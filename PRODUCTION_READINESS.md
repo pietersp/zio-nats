@@ -178,9 +178,9 @@ In `KeyValue.scala` (lines 411–424). Initial concern was that the `LinkedBlock
 
 ### Ecosystem Breadth
 
-#### P2-1: Scala 2.13 cross-compilation
+#### P2-1: Scala 2.13 cross-compilation — WON'T DO
 
-Currently Scala 3 only (`crossScalaVersions := Seq(scala3)` in `build.sbt`). Many ZIO ecosystem users remain on 2.13. The library uses Scala 3 features (opaque types, enums, extension methods, `given`/`using`) extensively, making cross-compilation non-trivial.
+The library uses Scala 3 features (opaque types, enums, extension methods, `given`/`using`) extensively throughout the codebase. Cross-compilation would require a near-complete rewrite with no clear benefit — the ZIO 2 ecosystem has largely moved to Scala 3.
 
 #### P2-2: Documentation site
 
@@ -230,7 +230,7 @@ Suggested order:
 
 ### Phase 3 — P2 (1.x maintenance)
 
-Address as capacity allows. P2-1 (Scala 2.13) and P2-2 (docs site) have the highest impact in this tier.
+Address as capacity allows. P2-2 (docs site) has the highest impact in this tier.
 
 ---
 
