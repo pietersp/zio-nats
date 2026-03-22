@@ -965,7 +965,7 @@ NatsConfig(
   writeQueuePushTimeout                = Duration.Zero, // Zero = block indefinitely
   // Socket tuning
   socketWriteTimeout                   = Duration.Zero,
-  socketReadTimeout                    = 0,         // milliseconds; 0 = no timeout
+  socketReadTimeout                    = Duration.Zero,
   // Protocol
   maxControlLine                       = 0,         // 0 = jnats default
   maxPingsOut                          = 2,

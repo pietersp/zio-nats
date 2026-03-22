@@ -73,7 +73,8 @@ import java.nio.file.Paths
  *   Socket-level write timeout to prevent hanging on a dead connection
  *   (default: [[Duration.Zero]] = no timeout).
  * @param socketReadTimeout
- *   Socket-level read timeout in milliseconds (default: 0 = no timeout).
+ *   Socket-level read timeout to prevent hanging on a dead connection
+ *   (default: [[Duration.Zero]] = no timeout).
  * @param maxControlLine
  *   Maximum length of a NATS protocol control line in bytes; must match the
  *   server's `max_control_line` setting (default: 0 = jnats default).
@@ -105,7 +106,7 @@ final case class NatsConfig(
   discardMessagesWhenOutgoingQueueFull: Boolean = false,
   writeQueuePushTimeout: Duration = Duration.Zero,
   socketWriteTimeout: Duration = Duration.Zero,
-  socketReadTimeout: Int = 0,
+  socketReadTimeout: Duration = Duration.Zero,
   maxControlLine: Int = 0,
   maxPingsOut: Int = 2,
   drainTimeout: Duration = 30.seconds
@@ -137,7 +138,7 @@ final case class NatsConfig(
     if (discardMessagesWhenOutgoingQueueFull) builder = builder.discardMessagesWhenOutgoingQueueFull()
     if (writeQueuePushTimeout > Duration.Zero) builder = builder.writeQueuePushTimeout(writeQueuePushTimeout.asJava)
     if (socketWriteTimeout > Duration.Zero) builder = builder.socketWriteTimeout(socketWriteTimeout.asJava)
-    if (socketReadTimeout > 0) builder = builder.socketReadTimeoutMillis(socketReadTimeout)
+    if (socketReadTimeout > Duration.Zero) builder = builder.socketReadTimeoutMillis(socketReadTimeout.toMillis.toInt)
     if (maxControlLine > 0) builder = builder.maxControlLine(maxControlLine)
     builder = builder.maxPingsOut(maxPingsOut)
     builder
@@ -171,7 +172,7 @@ object NatsConfig {
   private final case class TunGroup(
     reconnectJitter: Duration, reconnectJitterTls: Duration, reconnectBufferSize: Long,
     maxMessagesInOutgoingQueue: Int, discardMessagesWhenOutgoingQueueFull: Boolean,
-    writeQueuePushTimeout: Duration, socketWriteTimeout: Duration, socketReadTimeout: Int,
+    writeQueuePushTimeout: Duration, socketWriteTimeout: Duration, socketReadTimeout: Duration,
     maxControlLine: Int, maxPingsOut: Int, drainTimeout: Duration
   )
 
@@ -283,7 +284,7 @@ object NatsConfig {
        Config.boolean("discard-messages-when-outgoing-queue-full").withDefault(false) zip
        Config.duration("write-queue-push-timeout").withDefault(Duration.Zero) zip
        Config.duration("socket-write-timeout").withDefault(Duration.Zero) zip
-       Config.duration("socket-read-timeout").withDefault(Duration.Zero).map(_.toMillis.toInt) zip
+       Config.duration("socket-read-timeout").withDefault(Duration.Zero) zip
        Config.int("max-control-line").withDefault(0) zip
        Config.int("max-pings-out").withDefault(2) zip
        Config.duration("drain-timeout").withDefault(30.seconds)

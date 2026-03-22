@@ -69,7 +69,7 @@ object NatsConfigSpec extends ZIOSpecDefault {
       },
       test("socket-read-timeout uses ISO-8601 duration") {
         loadConfig(Map("nats.socket-read-timeout" -> "PT0.5S")).map { cfg =>
-          assertTrue(cfg.socketReadTimeout == 500)
+          assertTrue(cfg.socketReadTimeout == 500.millis)
         }
       }
     ),
