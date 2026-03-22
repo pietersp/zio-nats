@@ -6,9 +6,8 @@ target/
 *.class
 *.log
 
-# Claude Code — ignore personal settings and skills; commit .claude/commands/ if added
+# Claude Code — ignore personal settings; skills are project-specific and committed
 .claude/settings.local.json
-.claude/skills/
 
 # Agent skills (personal, not project-specific)
 .agents/skills/
