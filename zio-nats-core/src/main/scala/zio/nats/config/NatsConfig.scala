@@ -2,6 +2,7 @@ package zio.nats.config
 
 import io.nats.client.Options
 import zio.*
+import java.net.URI
 import java.nio.file.Paths
 
 /**
@@ -138,6 +139,9 @@ final case class NatsConfig(
     if (discardMessagesWhenOutgoingQueueFull) builder = builder.discardMessagesWhenOutgoingQueueFull()
     if (writeQueuePushTimeout > Duration.Zero) builder = builder.writeQueuePushTimeout(writeQueuePushTimeout.asJava)
     if (socketWriteTimeout > Duration.Zero) builder = builder.socketWriteTimeout(socketWriteTimeout.asJava)
+    // jnats exposes socketReadTimeout only via an int-millis overload (no Duration variant),
+    // unlike socketWriteTimeout / writeQueuePushTimeout which have java.time.Duration overloads.
+    // The Long→Int cast is safe for any realistic timeout value (Int.MaxValue ≈ 24.8 days).
     if (socketReadTimeout > Duration.Zero) builder = builder.socketReadTimeoutMillis(socketReadTimeout.toMillis.toInt)
     if (maxControlLine > 0) builder = builder.maxControlLine(maxControlLine)
     builder = builder.maxPingsOut(maxPingsOut)
@@ -167,14 +171,30 @@ object NatsConfig {
     servers: List[String], connectionName: Option[String], connectionTimeout: Duration,
     reconnectWait: Duration, maxReconnects: Int, pingInterval: Duration,
     requestCleanupInterval: Duration, bufferSize: Int, noEcho: Boolean,
-    utf8Support: Boolean, inboxPrefix: String
+    utf8Support: Boolean, inboxPrefix: String, drainTimeout: Duration
   )
   private final case class TunGroup(
     reconnectJitter: Duration, reconnectJitterTls: Duration, reconnectBufferSize: Long,
     maxMessagesInOutgoingQueue: Int, discardMessagesWhenOutgoingQueueFull: Boolean,
     writeQueuePushTimeout: Duration, socketWriteTimeout: Duration, socketReadTimeout: Duration,
-    maxControlLine: Int, maxPingsOut: Int, drainTimeout: Duration
+    maxControlLine: Int, maxPingsOut: Int
   )
+
+  // Validates that a server URL is a parseable URI with a non-empty host.
+  // Called per-element from Config.listOf so each bad URL is reported individually.
+  private def validateNatsUrl(url: String): Either[Config.Error, String] =
+    try {
+      val uri = new URI(url)
+      if (uri.getScheme == null || uri.getHost == null || uri.getHost.isEmpty)
+        Left(Config.Error.InvalidData(Chunk.empty,
+          s"'$url' is not a valid NATS server URL — expected e.g. nats://host:4222 or tls://host:4222"))
+      else
+        Right(url)
+    } catch {
+      case _: java.net.URISyntaxException =>
+        Left(Config.Error.InvalidData(Chunk.empty,
+          s"'$url' is not a valid NATS server URL — expected e.g. nats://host:4222 or tls://host:4222"))
+    }
 
   // Auth: all sub-fields are read as optional strings so that mapOrFail can dispatch
   // on the type value and surface a single, targeted error message — one error for an
@@ -248,21 +268,28 @@ object NatsConfig {
    * ISO-8601 format (e.g. `PT5S` for 5 seconds, `PT2M` for 2 minutes,
    * `PT0.5S` for 500 ms). The `servers` list uses the config provider's sequence
    * delimiter (comma by default for env vars, native list syntax for HOCON).
+   * Each server URL is validated at load time (must be a parseable URI with a
+   * non-empty host); invalid URLs produce a [[Config.Error.InvalidData]] before
+   * any connection is attempted.
    *
    * `NatsAuth.Custom` and `NatsTls.Custom` are not reachable via text config —
    * construct [[NatsConfig]] programmatically when you need those variants.
    *
-   * This descriptor is flat (no nesting). Use [[fromConfig]] for the conventional
-   * `nats`-nested layer, or apply your own nesting:
+   * This descriptor reads keys at the root level — there is no `nats.` prefix.
+   * Use [[fromConfig]] for the conventional `nats`-prefixed layer.
+   * For a different prefix, apply your own nesting — note that `nested` calls
+   * stack from inner to outer (last call = outermost namespace):
    * {{{
-   *   ZIO.config(NatsConfig.config.nested("myapp").nested("nats"))
+   *   // Config lives at myapp.nats.* (e.g. HOCON: myapp { nats { servers = [...] } })
+   *   ZIO.config(NatsConfig.config.nested("nats").nested("myapp"))
    * }}}
    */
   val config: Config[NatsConfig] = {
     // Each group is mapped to a private case class so Zippable never tries to
     // flatten the fields across groups.  The final zip is a clean 4-element tuple.
     val connGroupConfig: Config[ConnGroup] =
-      (Config.listOf("servers", Config.string).withDefault(List("nats://localhost:4222")) zip
+      (Config.listOf("servers", Config.string.mapOrFail(validateNatsUrl))
+         .withDefault(List("nats://localhost:4222")) zip
        Config.string("connection-name").optional zip
        Config.duration("connection-timeout").withDefault(2.seconds) zip
        Config.duration("reconnect-wait").withDefault(2.seconds) zip
@@ -272,12 +299,14 @@ object NatsConfig {
        Config.int("buffer-size").withDefault(64 * 1024) zip
        Config.boolean("no-echo").withDefault(false) zip
        Config.boolean("utf8-support").withDefault(false) zip
-       Config.string("inbox-prefix").withDefault("_INBOX.")
+       Config.string("inbox-prefix").withDefault("_INBOX.") zip
+       Config.duration("drain-timeout").withDefault(30.seconds)
       ).map { case (servers, connectionName, connectionTimeout, reconnectWait, maxReconnects,
                     pingInterval, requestCleanupInterval, bufferSize, noEcho, utf8Support,
-                    inboxPrefix) =>
+                    inboxPrefix, drainTimeout) =>
         ConnGroup(servers, connectionName, connectionTimeout, reconnectWait, maxReconnects,
-                  pingInterval, requestCleanupInterval, bufferSize, noEcho, utf8Support, inboxPrefix)
+                  pingInterval, requestCleanupInterval, bufferSize, noEcho, utf8Support,
+                  inboxPrefix, drainTimeout)
       }
 
     val tunGroupConfig: Config[TunGroup] =
@@ -290,16 +319,15 @@ object NatsConfig {
        Config.duration("socket-write-timeout").withDefault(Duration.Zero) zip
        Config.duration("socket-read-timeout").withDefault(Duration.Zero) zip
        Config.int("max-control-line").withDefault(0) zip
-       Config.int("max-pings-out").withDefault(2) zip
-       Config.duration("drain-timeout").withDefault(30.seconds)
+       Config.int("max-pings-out").withDefault(2)
       ).map { case (reconnectJitter, reconnectJitterTls, reconnectBufferSize,
                     maxMessagesInOutgoingQueue, discardMessagesWhenOutgoingQueueFull,
                     writeQueuePushTimeout, socketWriteTimeout, socketReadTimeout,
-                    maxControlLine, maxPingsOut, drainTimeout) =>
+                    maxControlLine, maxPingsOut) =>
         TunGroup(reconnectJitter, reconnectJitterTls, reconnectBufferSize,
                  maxMessagesInOutgoingQueue, discardMessagesWhenOutgoingQueueFull,
                  writeQueuePushTimeout, socketWriteTimeout, socketReadTimeout,
-                 maxControlLine, maxPingsOut, drainTimeout)
+                 maxControlLine, maxPingsOut)
       }
 
     (connGroupConfig zip tunGroupConfig zip authConfig zip tlsConfig).map {
@@ -328,7 +356,7 @@ object NatsConfig {
           socketReadTimeout                    = tun.socketReadTimeout,
           maxControlLine                       = tun.maxControlLine,
           maxPingsOut                          = tun.maxPingsOut,
-          drainTimeout                         = tun.drainTimeout
+          drainTimeout                         = conn.drainTimeout
         )
     }
   }
@@ -353,9 +381,11 @@ object NatsConfig {
    * For HOCON loading, add `dev.zio::zio-config-typesafe` and provide
    * `Runtime.setConfigProvider(TypesafeConfigProvider.fromResourcePath())`.
    *
-   * For custom nesting use [[config]] directly:
+   * For custom nesting use [[config]] directly — `nested` calls stack from inner
+   * to outer, so the last call becomes the outermost namespace:
    * {{{
-   *   ZIO.config(NatsConfig.config.nested("myapp").nested("nats"))
+   *   // Config lives at myapp.nats.* (e.g. HOCON: myapp { nats { servers = [...] } })
+   *   ZIO.config(NatsConfig.config.nested("nats").nested("myapp"))
    * }}}
    */
   val fromConfig: ZLayer[Any, Config.Error, NatsConfig] =

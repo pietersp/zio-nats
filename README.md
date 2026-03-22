@@ -222,10 +222,11 @@ nats {
 
 ### Custom nesting
 
-The descriptor is flat — apply your own nesting if your config lives elsewhere:
+The descriptor reads keys at the root level (no `nats.` prefix). Apply your own nesting if your config lives elsewhere. `nested` calls stack from inner to outer — the last call becomes the outermost namespace:
 
 ```scala
-ZIO.config(NatsConfig.config.nested("myapp").nested("messaging"))
+// Config lives at myapp.nats.* (e.g. HOCON: myapp { nats { servers = [...] } })
+ZIO.config(NatsConfig.config.nested("nats").nested("myapp"))
 ```
 
 ### Programmatic config

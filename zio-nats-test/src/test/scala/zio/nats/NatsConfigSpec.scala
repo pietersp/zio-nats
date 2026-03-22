@@ -37,6 +37,12 @@ object NatsConfigSpec extends ZIOSpecDefault {
         loadConfig(Map("nats.servers" -> "nats://a:4222|nats://b:4222")).map { cfg =>
           assertTrue(cfg.servers == List("nats://a:4222", "nats://b:4222"))
         }
+      },
+      test("invalid server URL fails at load time with a helpful error") {
+        loadConfig(Map("nats.servers" -> "not-a-url")).exit.map { result =>
+          assertTrue(result.isFailure) &&
+          assertTrue(result.causeOption.exists(_.squash.getMessage.contains("not-a-url")))
+        }
       }
     ),
 
