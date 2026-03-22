@@ -175,20 +175,22 @@ app.provide(
 )
 ```
 
-With the default `ConfigProvider` (environment variables + system properties), keys are normalised to `UPPER_SNAKE_CASE` under the `NATS_` prefix:
+With the default `ConfigProvider` (environment variables + system properties), keys are normalised to `UPPER_SNAKE_CASE` under the `NATS_` prefix. Multiple servers are comma-separated:
 
 | Setting | Env var |
 |---------|---------|
-| `servers` (first) | `NATS_SERVERS_0=nats://broker:4222` |
+| `servers` (single) | `NATS_SERVERS=nats://broker:4222` |
+| `servers` (multiple) | `NATS_SERVERS=nats://a:4222,nats://b:4222` |
 | `auth.type` | `NATS_AUTH_TYPE=token` |
 | `auth.value` (token) | `NATS_AUTH_VALUE=s3cr3t` |
 | `connection-timeout` | `NATS_CONNECTION_TIMEOUT=PT5S` |
 | `max-reconnects` | `NATS_MAX_RECONNECTS=60` |
 | `tls.type` | `NATS_TLS_TYPE=system-default` |
+| `socket-read-timeout` | `NATS_SOCKET_READ_TIMEOUT=PT0.5S` (500 ms) |
 
 All fields have defaults; only values you want to override need to be set.
 
-**Duration format** — ISO-8601: `PT5S` = 5 seconds, `PT2M` = 2 minutes, `PT0.1S` = 100 ms.
+**Duration format** — ISO-8601: `PT5S` = 5 seconds, `PT2M` = 2 minutes, `PT0.1S` = 100 ms. All timeout fields, including `socket-read-timeout`, use this format.
 
 **Auth type values**: `no-auth`, `token`, `user-password`, `credential-file`.
 

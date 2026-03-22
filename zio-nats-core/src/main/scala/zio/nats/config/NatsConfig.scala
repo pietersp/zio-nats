@@ -175,87 +175,74 @@ object NatsConfig {
     maxControlLine: Int, maxPingsOut: Int, drainTimeout: Duration
   )
 
-  // Auth: each variant validates the type field and reads its required sub-fields.
-  // Variants are chained with orElse; .withDefault provides the fallback when the
-  // auth section is absent entirely (MissingData).  An unrecognised type value
-  // produces a Config.Error.InvalidData which .withDefault does NOT swallow.
-  private val authConfig: Config[NatsAuth] = {
-    val noAuth: Config[NatsAuth] =
-      Config.string("type").nested("auth")
-        .validate("auth.type must be 'no-auth'")(_.trim == "no-auth")
-        .map(_ => NatsAuth.NoAuth)
-
-    val token: Config[NatsAuth] =
-      Config.string("type").nested("auth")
-        .validate("auth.type must be 'token'")(_.trim == "token")
-        .zip(Config.string("value").nested("auth"))
-        .map { case (_, v) => NatsAuth.Token(v) }
-
-    val userPassword: Config[NatsAuth] =
-      Config.string("type").nested("auth")
-        .validate("auth.type must be 'user-password'")(_.trim == "user-password")
-        .zip(Config.string("username").nested("auth") zip Config.string("password").nested("auth"))
-        .map { case (_, (u, p)) => NatsAuth.UserPassword(u, p) }
-
-    val credentialFile: Config[NatsAuth] =
-      Config.string("type").nested("auth")
-        .validate("auth.type must be 'credential-file'")(_.trim == "credential-file")
-        .zip(Config.string("path").nested("auth"))
-        .map { case (_, p) => NatsAuth.CredentialFile(Paths.get(p)) }
-
-    // withDefault only recovers from MissingData (absent section), not from InvalidData
-    // (present but unrecognised type).  This means a typo like auth.type=tokne propagates
-    // as a Config.Error rather than silently falling back to NoAuth.
-    noAuth
-      .orElse(token)
-      .orElse(userPassword)
-      .orElse(credentialFile)
-      .withDefault(NatsAuth.NoAuth)
-  }
-
-  // TLS: same orElse + validate + withDefault pattern as authConfig.
-  private val tlsConfig: Config[NatsTls] = {
-    val disabled: Config[NatsTls] =
-      Config.string("type").nested("tls")
-        .validate("tls.type must be 'disabled'")(_.trim == "disabled")
-        .map(_ => NatsTls.Disabled)
-
-    val systemDefault: Config[NatsTls] =
-      Config.string("type").nested("tls")
-        .validate("tls.type must be 'system-default'")(_.trim == "system-default")
-        .map(_ => NatsTls.SystemDefault)
-
-    val keyStore: Config[NatsTls] = {
-      // Config.zip uses Zippable which produces flat tuples, not nested pairs.
-      type KsFields = (String, String, Option[String], Option[String], Option[String], Boolean)
-      val ksConfig: Config[KsFields] =
-        Config.string("key-store-path").nested("tls") zip
-        Config.string("key-store-password").nested("tls") zip
-        Config.string("trust-store-path").optional.nested("tls") zip
-        Config.string("trust-store-password").optional.nested("tls") zip
-        Config.string("algorithm").optional.nested("tls") zip
-        Config.boolean("tls-first").withDefault(false).nested("tls")
-      Config.string("type").nested("tls")
-        .validate("tls.type must be 'key-store'")(_.trim == "key-store")
-        .zip(ksConfig)
-        .map { case (_, (ksp, kspw, tsp, tspw, alg, first)) =>
-          NatsTls.KeyStore(Paths.get(ksp), kspw, tsp.map(Paths.get(_)), tspw, alg, first)
-        }
+  // Auth: all sub-fields are read as optional strings so that mapOrFail can dispatch
+  // on the type value and surface a single, targeted error message — one error for an
+  // unknown type, one for a missing required sub-field.  The previous orElse+validate
+  // approach accumulated N separate validation errors (one per variant), which was
+  // confusing when a type was simply mistyped.
+  private val authConfig: Config[NatsAuth] =
+    (Config.string("type").optional.nested("auth") zip
+     Config.string("value").optional.nested("auth") zip
+     Config.string("username").optional.nested("auth") zip
+     Config.string("password").optional.nested("auth") zip
+     Config.string("path").optional.nested("auth")
+    ).mapOrFail {
+      case (None,                    _,       _,       _,       _      ) => Right(NatsAuth.NoAuth)
+      case (Some("no-auth"),         _,       _,       _,       _      ) => Right(NatsAuth.NoAuth)
+      case (Some("token"),           Some(v), _,       _,       _      ) => Right(NatsAuth.Token(v))
+      case (Some("token"),           None,    _,       _,       _      ) =>
+        Left(Config.Error.MissingData(Chunk.empty,
+          "auth.value is required when auth.type = token"))
+      case (Some("user-password"),   _,       Some(u), Some(p), _      ) => Right(NatsAuth.UserPassword(u, p))
+      case (Some("user-password"),   _,       _,       _,       _      ) =>
+        Left(Config.Error.MissingData(Chunk.empty,
+          "auth.username and auth.password are required when auth.type = user-password"))
+      case (Some("credential-file"), _,       _,       _,       Some(p)) => Right(NatsAuth.CredentialFile(Paths.get(p)))
+      case (Some("credential-file"), _,       _,       _,       None   ) =>
+        Left(Config.Error.MissingData(Chunk.empty,
+          "auth.path is required when auth.type = credential-file"))
+      case (Some(t),                 _,       _,       _,       _      ) =>
+        Left(Config.Error.InvalidData(Chunk.empty,
+          s"Unknown auth.type '$t'. Valid values: no-auth, token, user-password, credential-file. " +
+          "NatsAuth.Custom requires programmatic NatsConfig construction."))
     }
 
-    disabled
-      .orElse(systemDefault)
-      .orElse(keyStore)
-      .withDefault(NatsTls.Disabled)
-  }
+  // TLS: same mapOrFail approach as authConfig.
+  private val tlsConfig: Config[NatsTls] =
+    (Config.string("type").optional.nested("tls") zip
+     Config.string("key-store-path").optional.nested("tls") zip
+     Config.string("key-store-password").optional.nested("tls") zip
+     Config.string("trust-store-path").optional.nested("tls") zip
+     Config.string("trust-store-password").optional.nested("tls") zip
+     Config.string("algorithm").optional.nested("tls") zip
+     Config.boolean("tls-first").withDefault(false).nested("tls")
+    ).mapOrFail {
+      case (None,                   _, _, _, _, _, _) => Right(NatsTls.Disabled)
+      case (Some("disabled"),       _, _, _, _, _, _) => Right(NatsTls.Disabled)
+      case (Some("system-default"), _, _, _, _, _, _) => Right(NatsTls.SystemDefault)
+      case (Some("key-store"), Some(ksp), Some(kspw), tsp, tspw, alg, first) =>
+        Right(NatsTls.KeyStore(Paths.get(ksp), kspw, tsp.map(Paths.get(_)), tspw, alg, first))
+      case (Some("key-store"), ksp, kspw, _, _, _, _) =>
+        val missing = List(
+          Option.when(ksp.isEmpty)("tls.key-store-path"),
+          Option.when(kspw.isEmpty)("tls.key-store-password")
+        ).flatten
+        Left(Config.Error.MissingData(Chunk.empty,
+          s"${missing.mkString(" and ")} ${if (missing.size > 1) "are" else "is"} required when tls.type = key-store"))
+      case (Some(t), _, _, _, _, _, _) =>
+        Left(Config.Error.InvalidData(Chunk.empty,
+          s"Unknown tls.type '$t'. Valid values: disabled, system-default, key-store. " +
+          "NatsTls.Custom requires programmatic NatsConfig construction."))
+    }
 
   /**
    * ZIO [[Config]] descriptor for [[NatsConfig]].
    *
    * All fields default to their [[NatsConfig]] case class defaults — only values
-   * you want to override need to be present. Duration fields use ISO-8601 format
-   * (e.g. `PT5S` for 5 seconds, `PT2M` for 2 minutes). The `servers` field uses
-   * indexed keys (`servers.0`, `servers.1`, ...).
+   * you want to override need to be present. All duration and timeout fields use
+   * ISO-8601 format (e.g. `PT5S` for 5 seconds, `PT2M` for 2 minutes,
+   * `PT0.5S` for 500 ms). The `servers` list uses the config provider's sequence
+   * delimiter (comma by default for env vars, native list syntax for HOCON).
    *
    * `NatsAuth.Custom` and `NatsTls.Custom` are not reachable via text config —
    * construct [[NatsConfig]] programmatically when you need those variants.
@@ -296,7 +283,7 @@ object NatsConfig {
        Config.boolean("discard-messages-when-outgoing-queue-full").withDefault(false) zip
        Config.duration("write-queue-push-timeout").withDefault(Duration.Zero) zip
        Config.duration("socket-write-timeout").withDefault(Duration.Zero) zip
-       Config.int("socket-read-timeout").withDefault(0) zip // milliseconds
+       Config.duration("socket-read-timeout").withDefault(Duration.Zero).map(_.toMillis.toInt) zip
        Config.int("max-control-line").withDefault(0) zip
        Config.int("max-pings-out").withDefault(2) zip
        Config.duration("drain-timeout").withDefault(30.seconds)
@@ -346,12 +333,14 @@ object NatsConfig {
    * reading from the `nats` key namespace.
    *
    * With the default [[zio.ConfigProvider]] (env vars + system properties),
-   * keys are normalised to `UPPER_SNAKE_CASE` under the `NATS_` prefix:
+   * keys are normalised to `UPPER_SNAKE_CASE` under the `NATS_` prefix.
+   * List values use comma as the sequence delimiter:
    * {{{
-   *   NATS_SERVERS_0=nats://broker:4222
+   *   NATS_SERVERS=nats://broker:4222
    *   NATS_AUTH_TYPE=token
    *   NATS_AUTH_VALUE=s3cr3t
    *   NATS_CONNECTION_TIMEOUT=PT5S
+   *   NATS_SOCKET_READ_TIMEOUT=PT0.5S
    * }}}
    *
    * All fields have defaults; only values you want to override need to be set.

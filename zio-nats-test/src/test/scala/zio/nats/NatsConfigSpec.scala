@@ -67,8 +67,8 @@ object NatsConfigSpec extends ZIOSpecDefault {
           assertTrue(cfg.reconnectBufferSize == 0L)
         }
       },
-      test("socket-read-timeout is in milliseconds (Int)") {
-        loadConfig(Map("nats.socket-read-timeout" -> "500")).map { cfg =>
+      test("socket-read-timeout uses ISO-8601 duration") {
+        loadConfig(Map("nats.socket-read-timeout" -> "PT0.5S")).map { cfg =>
           assertTrue(cfg.socketReadTimeout == 500)
         }
       }
@@ -112,7 +112,14 @@ object NatsConfigSpec extends ZIOSpecDefault {
       },
       test("unrecognised auth.type fails with a helpful error") {
         loadConfig(Map("nats.auth.type" -> "tokne")).exit.map { result =>
-          assertTrue(result.isFailure)
+          assertTrue(result.isFailure) &&
+          assertTrue(result.causeOption.exists(_.squash.getMessage.contains("tokne")))
+        }
+      },
+      test("missing required sub-field fails with a helpful error") {
+        loadConfig(Map("nats.auth.type" -> "token" /* auth.value missing */)).exit.map { result =>
+          assertTrue(result.isFailure) &&
+          assertTrue(result.causeOption.exists(_.squash.getMessage.contains("auth.value")))
         }
       }
     ),
@@ -167,7 +174,14 @@ object NatsConfigSpec extends ZIOSpecDefault {
       },
       test("unrecognised tls.type fails with a helpful error") {
         loadConfig(Map("nats.tls.type" -> "system_default")).exit.map { result =>
-          assertTrue(result.isFailure)
+          assertTrue(result.isFailure) &&
+          assertTrue(result.causeOption.exists(_.squash.getMessage.contains("system_default")))
+        }
+      },
+      test("missing required key-store fields fails with a helpful error") {
+        loadConfig(Map("nats.tls.type" -> "key-store" /* both paths missing */)).exit.map { result =>
+          assertTrue(result.isFailure) &&
+          assertTrue(result.causeOption.exists(_.squash.getMessage.contains("key-store-path")))
         }
       }
     )
