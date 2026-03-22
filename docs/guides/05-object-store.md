@@ -13,7 +13,7 @@ metadata, soft deletes, and a watch stream for changes.
 
 ## Prerequisites
 
-- [Quick start](../quickstart) completed
+- [Quick start](../quickstart.md) completed
 - JetStream-enabled NATS server:
 
 ```bash
@@ -207,6 +207,6 @@ The watch stream never completes on its own. Fork it alongside your program.
 
 ## Next steps
 
-- [Key-Value guide](./04-key-value) — KV store for smaller, structured data
-- [JetStream guide](./03-jetstream) — Object Store is built on JetStream streams
-- [Serialization guide](./02-serialization) — decode objects directly into domain types
+- [Key-Value guide](./04-key-value.md) — KV store for smaller, structured data
+- [JetStream guide](./03-jetstream.md) — Object Store is built on JetStream streams
+- [Serialization guide](./02-serialization.md) — decode objects directly into domain types

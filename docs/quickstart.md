@@ -28,7 +28,7 @@ libraryDependencies += "io.github.pietersp" %% "zio-nats" % "@VERSION@"
 ```
 
 This is the batteries-included artifact. It includes pub/sub, JetStream, Key-Value, Object Store,
-and zio-blocks type-safe serialization. See [Modules](./reference/03-modules) for the full list
+and zio-blocks type-safe serialization. See [Modules](./reference/03-modules.md) for the full list
 of available artifacts.
 
 ## Connect
@@ -112,6 +112,6 @@ Received: Hello #3
 
 ## Next steps
 
-- [Pub/Sub guide](./guides/01-pubsub) — queue groups, request-reply, headers, raw bytes
-- [Serialization guide](./guides/02-serialization) — type-safe publish/subscribe with domain types
-- [Architecture](./concepts/01-architecture) — understand the full `ZLayer` service graph
+- [Pub/Sub guide](./guides/01-pubsub.md) — queue groups, request-reply, headers, raw bytes
+- [Serialization guide](./guides/02-serialization.md) — type-safe publish/subscribe with domain types
+- [Architecture](./concepts/01-architecture.md) — understand the full `ZLayer` service graph

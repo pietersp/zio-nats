@@ -13,7 +13,7 @@ position. This gives you at-least-once delivery, message replay, and backpressur
 
 ## Prerequisites
 
-- [Quick start](../quickstart) completed
+- [Quick start](../quickstart.md) completed
 - JetStream-enabled NATS server:
 
 ```bash
@@ -217,6 +217,6 @@ a `Chunk[Byte]` envelope and want to decode lazily.
 
 ## Next steps
 
-- [Key-Value guide](./04-key-value) — KV store is built on JetStream streams
-- [Serialization guide](./02-serialization) — publish and consume typed domain types
-- [JetStreamManagement API](../reference/01-nats-config) — stream and consumer config fields
+- [Key-Value guide](./04-key-value.md) — KV store is built on JetStream streams
+- [Serialization guide](./02-serialization.md) — publish and consume typed domain types
+- [JetStreamManagement API](../reference/01-nats-config.md) — stream and consumer config fields

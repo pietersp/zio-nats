@@ -13,7 +13,7 @@ current value, read by revision, or watch a stream of changes in real time.
 
 ## Prerequisites
 
-- [Quick start](../quickstart) completed
+- [Quick start](../quickstart.md) completed
 - JetStream-enabled NATS server:
 
 ```bash
@@ -89,7 +89,7 @@ val kvOps: ZIO[Nats, NatsError, Unit] =
 **What's happening:**
 
 1. `KeyValue.bucket("config")` — obtains a `KeyValue` handle for the named bucket. This is a `ZIO[Nats, NatsError, KeyValue]` effect, so it needs `Nats` in scope.
-2. `kv.put(key, value)` — encodes the value with `NatsCodec[A]` and writes it. `String` and `Chunk[Byte]` work out of the box. For domain types, put a `NatsCodec[A]` in scope (see [Serialization](./02-serialization)).
+2. `kv.put(key, value)` — encodes the value with `NatsCodec[A]` and writes it. `String` and `Chunk[Byte]` work out of the box. For domain types, put a `NatsCodec[A]` in scope (see [Serialization](./02-serialization.md)).
 3. `kv.create` fails if the key already exists. Use it to implement distributed locks or idempotent initialisation.
 4. `kv.update` fails if the current revision does not match — this is optimistic concurrency control.
 5. `kv.delete` adds a tombstone marker but keeps the history. `kv.purge` removes all history, including the marker.
@@ -192,6 +192,6 @@ val watchExample: ZIO[Nats, NatsError, Unit] =
 
 ## Next steps
 
-- [Object Store guide](./05-object-store) — bucket storage for binary blobs
-- [JetStream guide](./03-jetstream) — KV is built on JetStream; understanding streams helps with advanced config
-- [Serialization guide](./02-serialization) — store and retrieve typed domain objects
+- [Object Store guide](./05-object-store.md) — bucket storage for binary blobs
+- [JetStream guide](./03-jetstream.md) — KV is built on JetStream; understanding streams helps with advanced config
+- [Serialization guide](./02-serialization.md) — store and retrieve typed domain objects

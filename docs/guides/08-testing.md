@@ -104,6 +104,6 @@ container reaper that testcontainers uses by default.
 
 ## Next steps
 
-- [Pub/Sub guide](./01-pubsub) — what to test
-- [Error handling reference](../reference/02-error-handling) — assert on specific `NatsError` variants
-- [Modules reference](../reference/03-modules) — all available artifacts and their scopes
+- [Pub/Sub guide](./01-pubsub.md) — what to test
+- [Error handling reference](../reference/02-error-handling.md) — assert on specific `NatsError` variants
+- [Modules reference](../reference/03-modules.md) — all available artifacts and their scopes

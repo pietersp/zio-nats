@@ -12,7 +12,7 @@ variables, or load it from a HOCON file — the `Nats.live` layer accepts any of
 
 ## Prerequisites
 
-- [Quick start](../quickstart) completed
+- [Quick start](../quickstart.md) completed
 
 ## Default config
 
@@ -209,6 +209,6 @@ def buildLayer(sslCtx: SSLContext, authHandler: AuthHandler) =
 
 ## Next steps
 
-- [NatsConfig reference](../reference/01-nats-config) — full field table with types and defaults
-- [Architecture](../concepts/01-architecture) — how `NatsConfig` feeds into the service graph
-- [Connection Events guide](./07-connection-events) — observe reconnection and disconnect events
+- [NatsConfig reference](../reference/01-nats-config.md) — full field table with types and defaults
+- [Architecture](../concepts/01-architecture.md) — how `NatsConfig` feeds into the service graph
+- [Connection Events guide](./07-connection-events.md) — observe reconnection and disconnect events

@@ -12,7 +12,7 @@ is resolved at compile time, so there is no casting or runtime lookup.
 
 ## Prerequisites
 
-- [Quick start](../quickstart) completed
+- [Quick start](../quickstart.md) completed
 
 ## Built-in codecs
 
@@ -229,6 +229,6 @@ object HighFreqEvent:
 
 ## Next steps
 
-- [Pub/Sub guide](./01-pubsub) — the underlying publish/subscribe mechanics
-- [JetStream guide](./03-jetstream) — persistent messaging with typed payloads
-- [Modules reference](../reference/03-modules) — which artifact to add for each integration
+- [Pub/Sub guide](./01-pubsub.md) — the underlying publish/subscribe mechanics
+- [JetStream guide](./03-jetstream.md) — persistent messaging with typed payloads
+- [Modules reference](../reference/03-modules.md) — which artifact to add for each integration

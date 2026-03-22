@@ -9,7 +9,7 @@ title: Pub/Sub
 
 ## Prerequisites
 
-- [Quick start](../quickstart) completed — you have a working `Nats` layer
+- [Quick start](../quickstart.md) completed — you have a working `Nats` layer
 
 ## Publish
 
@@ -151,6 +151,6 @@ val rpcExample: ZIO[Nats, NatsError, Unit] =
 
 ## Next steps
 
-- [Serialization guide](./02-serialization) — publish and subscribe with domain types (not just `String`/`Chunk[Byte]`)
-- [JetStream guide](./03-jetstream) — persistent, replay-able messaging with delivery guarantees
-- [Configuration guide](./06-configuration) — connecting to authenticated or TLS-secured servers
+- [Serialization guide](./02-serialization.md) — publish and subscribe with domain types (not just `String`/`Chunk[Byte]`)
+- [JetStream guide](./03-jetstream.md) — persistent, replay-able messaging with delivery guarantees
+- [Configuration guide](./06-configuration.md) — connecting to authenticated or TLS-secured servers

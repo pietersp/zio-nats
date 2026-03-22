@@ -43,4 +43,4 @@ val program: ZIO[Nats, NatsError, Unit] =
 
 ---
 
-[Quick start →](./quickstart) · [Browse guides →](./guides/01-pubsub)
+[Quick start →](./quickstart.md) · [Browse guides →](./guides/01-pubsub.md)

@@ -13,7 +13,7 @@ connectivity changes.
 
 ## Prerequisites
 
-- [Quick start](../quickstart) completed
+- [Quick start](../quickstart.md) completed
 
 ## Listening to lifecycle events
 
@@ -119,5 +119,5 @@ Use it before shutting down to avoid losing in-flight publishes.
 
 ## Next steps
 
-- [Configuration guide](./06-configuration) — tune reconnect behaviour, timeouts, and buffer sizes
-- [NatsConfig reference](../reference/01-nats-config) — `maxReconnects`, `reconnectWait`, `drainTimeout`
+- [Configuration guide](./06-configuration.md) — tune reconnect behaviour, timeouts, and buffer sizes
+- [NatsConfig reference](../reference/01-nats-config.md) — `maxReconnects`, `reconnectWait`, `drainTimeout`
