@@ -6,18 +6,21 @@ import zio.Chunk
 /**
  * Automatically bridge any `Format[A]` in implicit scope to [[NatsCodec]][A].
  *
- * This is a top-level given in `package zio.nats`, so it is brought into scope
- * by `import zio.nats.*` when `zio-nats-play-json` is on the classpath — no
- * additional import or builder step required.
+ * This is a top-level given in `package zio.nats`. In Scala 3, package-level
+ * given instances are not imported by a plain wildcard `import zio.nats.*`.
+ * Use `import zio.nats.{given, *}` (or `import zio.nats.given`) to bring this
+ * given into scope.
  *
  * The `NotGiven[NatsCodec[A]]` guard ensures this given does not shadow
  * built-in codecs (e.g. `NatsCodec[String]`, `NatsCodec[Chunk[Byte]]`) or any
  * explicit `given NatsCodec[A]` already in scope.
  *
  * {{{
+ * import zio.nats.{given, *}
+ *
  * given Format[Person] = Json.format[Person]
  *
- * // NatsCodec[Person] resolved automatically via import zio.nats.*:
+ * // NatsCodec[Person] resolved automatically via fromPlayJsonFormat:
  * nats.publish(Subject("persons"), Person("Alice", 30))
  * }}}
  */
@@ -29,8 +32,8 @@ given fromPlayJsonFormat[A](using fmt: Format[A], ev: scala.util.NotGiven[NatsCo
  *
  * Bridges `Format[A]` (play-json's combined read/write codec) to the library's
  * [[NatsCodec]] typeclass. The bridge `given fromPlayJsonFormat` is the primary
- * integration point: after `import zio.nats.*`, any `Format[A]` that is in
- * implicit scope is automatically promoted to a `NatsCodec[A]`.
+ * integration point: after `import zio.nats.{given, *}`, any `Format[A]` that
+ * is in implicit scope is automatically promoted to a `NatsCodec[A]`.
  *
  * JSON is serialised as UTF-8 bytes.
  *
@@ -89,8 +92,8 @@ object NatsCodecPlayJson {
    * Wrap a play-json `Format[A]` as a [[NatsCodec]][A].
    *
    * Use this for an explicit one-off codec. For automatic bridging via implicit
-   * resolution, ensure a `given Format[A]` is in scope and `import zio.nats.*`
-   * — the `fromPlayJsonFormat` given handles the rest.
+   * resolution, ensure a `given Format[A]` is in scope and use
+   * `import zio.nats.{given, *}` — the `fromPlayJsonFormat` given handles the rest.
    *
    * @param format
    *   A play-json `Format[A]` (typically obtained via `Json.format[Person]` or

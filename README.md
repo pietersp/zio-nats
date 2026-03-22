@@ -453,15 +453,18 @@ libraryDependencies += "io.github.pietersp" %% "zio-nats-jsoniter" % "<version>"
 
 ### Automatic bridging (recommended)
 
-Place a `given JsonValueCodec[A]` in scope and `import zio.nats.*`. The top-level
+Place a `given JsonValueCodec[A]` in scope and use `import zio.nats.{given, *}`. The top-level
 `given fromJsonValueCodec` bridges it to `NatsCodec[A]` automatically — no builder step required.
 A `NotGiven[NatsCodec[A]]` guard ensures it never shadows built-in codecs (`String`,
 `Chunk[Byte]`) or any explicit `given NatsCodec[A]` you provide:
 
+> **Note:** In Scala 3, package-level `given` instances are not imported by a plain `import zio.nats.*`.
+> Use `import zio.nats.{given, *}` to bring the bridging given into scope.
+
 ```scala
 import com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec
 import com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker
-import zio.nats.*
+import zio.nats.{given, *}
 
 case class Person(name: String, age: Int)
 object Person {
@@ -488,6 +491,8 @@ val codec: NatsCodec[Person] = NatsCodecJsoniter.fromJsoniter(JsonCodecMaker.mak
 Both integrations can be used in the same project. Per-type overrides are plain `given val`s:
 
 ```scala
+import zio.nats.{given, *}   // required to activate the fromJsonValueCodec bridge
+
 // Most types use zio-blocks:
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
@@ -516,13 +521,13 @@ libraryDependencies += "io.github.pietersp" %% "zio-nats-play-json" % "<version>
 
 ### Automatic bridging (recommended)
 
-Place a `given Format[A]` in scope and `import zio.nats.*`. The top-level
+Place a `given Format[A]` in scope and use `import zio.nats.{given, *}`. The top-level
 `given fromPlayJsonFormat` bridges it to `NatsCodec[A]` automatically — no builder step required.
 Same `NotGiven[NatsCodec[A]]` guard applies — built-in and explicit codecs always win:
 
 ```scala
 import play.api.libs.json.{Format, Json}
-import zio.nats.*
+import zio.nats.{given, *}
 
 case class Person(name: String, age: Int)
 object Person {
