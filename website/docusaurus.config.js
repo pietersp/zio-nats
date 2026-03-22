@@ -10,7 +10,11 @@ const config = {
   organizationName: 'pietersp',
   projectName: 'zio-nats',
   onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
+  },
   i18n: { defaultLocale: 'en', locales: ['en'] },
   presets: [
     [
