@@ -5,7 +5,6 @@ const { themes: prismThemes } = require('prism-react-renderer');
 const config = {
   title: 'zio-nats',
   tagline: 'A purely functional NATS client for ZIO',
-  favicon: 'img/favicon.ico',
   url: 'https://pietersp.github.io',
   baseUrl: '/zio-nats/',
   organizationName: 'pietersp',
