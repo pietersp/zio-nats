@@ -121,7 +121,127 @@ Removed. README examples that used `order.toNatsData` (which was already incorre
 
 `NatsConfig` is a plain case class. Official ZIO libraries use `zio-config` for automatic derivation from HOCON, environment variables, and system properties. Users should be able to write `NatsConfig.fromConfig` or derive a `ConfigDescriptor[NatsConfig]`.
 
-**Precondition met:** `NatsConfig` has been refactored so all fields are purely text-configurable (`NatsAuth` and `NatsTls` Scala 3 enums replace the old Java-object fields). The implementation approach is fully documented in `C:\Users\pieter\.claude\plans\clever-snuggling-flask.md` (Future: zio-config integration section) and requires no new dependency.
+**Precondition met:** `NatsConfig` has been refactored so all fields are purely text-configurable (`NatsAuth` and `NatsTls` Scala 3 enums replace the old Java-object fields). Ready to implement.
+
+##### Implementation approach
+
+No new dependency required — ZIO 2 core already ships `zio.Config` and `ZIO.config(...)`.
+
+Add the following to `object NatsConfig` in `config/NatsConfig.scala`:
+
+```scala
+/** ZIO 2 [[zio.Config]] descriptor for [[NatsConfig]].
+ *  All fields have defaults; only values to override need to be set.
+ *
+ *  Auth type selected via `NATS_AUTH_TYPE` (no-auth | token | user-password | credential-file).
+ *  TLS type selected via `NATS_TLS_TYPE` (disabled | system-default | key-store).
+ *
+ *  Programmatic-only additions (AuthHandler, SSLContext) are not expressible as text —
+ *  use Nats.customized for those. */
+val config: Config[NatsConfig] = ...
+
+/** ZLayer that loads NatsConfig from the environment via ZIO Config. */
+val fromConfig: ZLayer[Any, Config.Error, NatsConfig] =
+  ZLayer.fromZIO(ZIO.config(config))
+```
+
+**`Config[NatsAuth]` descriptor** — discriminated on a `type` key:
+```scala
+private val authConfig: Config[NatsAuth] =
+  Config.string("type").flatMap {
+    case "no-auth"         => Config.succeed(NatsAuth.NoAuth)
+    case "token"           => Config.string("value").map(NatsAuth.Token(_))
+    case "user-password"   => (Config.string("username") zip Config.string("password"))
+                               .map(NatsAuth.UserPassword(_, _))
+    case "credential-file" => Config.string("path").map(s => NatsAuth.CredentialFile(Paths.get(s)))
+    case other             => Config.fail(s"Unknown auth type '$other'.")
+  }.nested("auth").withDefault(NatsAuth.NoAuth)
+```
+
+**`Config[NatsTls]` descriptor** — discriminated on a `type` key:
+```scala
+private val tlsConfig: Config[NatsTls] =
+  Config.string("type").flatMap {
+    case "disabled"       => Config.succeed(NatsTls.Disabled)
+    case "system-default" => Config.succeed(NatsTls.SystemDefault)
+    case "key-store"      =>
+      (Config.string("key-store-path") zip Config.string("key-store-password") zip
+       Config.string("trust-store-path").optional zip Config.string("trust-store-password").optional zip
+       Config.string("algorithm").optional zip Config.boolean("tls-first").withDefault(false))
+      .map { case (((((ksp, kspw), tsp), tspw), alg), first) =>
+        NatsTls.KeyStore(Paths.get(ksp), kspw, tsp.map(Paths.get(_)), tspw, alg, first)
+      }
+    case other => Config.fail(s"Unknown tls type '$other'.")
+  }.nested("tls").withDefault(NatsTls.Disabled)
+```
+
+**`Config[NatsConfig]`** — all fields via for-comprehension, nested under `"nats"`:
+```scala
+val config: Config[NatsConfig] =
+  (for {
+    servers                              <- Config.listOf("servers", Config.string)
+                                             .withDefault(List("nats://localhost:4222"))
+    connectionName                       <- Config.string("connection-name").optional
+    connectionTimeout                    <- Config.duration("connection-timeout").withDefault(2.seconds)
+    reconnectWait                        <- Config.duration("reconnect-wait").withDefault(2.seconds)
+    maxReconnects                        <- Config.int("max-reconnects").withDefault(60)
+    pingInterval                         <- Config.duration("ping-interval").withDefault(2.minutes)
+    requestCleanupInterval               <- Config.duration("request-cleanup-interval").withDefault(5.seconds)
+    bufferSize                           <- Config.int("buffer-size").withDefault(64 * 1024)
+    noEcho                               <- Config.boolean("no-echo").withDefault(false)
+    utf8Support                          <- Config.boolean("utf8-support").withDefault(false)
+    inboxPrefix                          <- Config.string("inbox-prefix").withDefault("_INBOX.")
+    reconnectJitter                      <- Config.duration("reconnect-jitter").withDefault(100.millis)
+    reconnectJitterTls                   <- Config.duration("reconnect-jitter-tls").withDefault(1.second)
+    reconnectBufferSize                  <- Config.long("reconnect-buffer-size").withDefault(8L * 1024 * 1024)
+    maxMessagesInOutgoingQueue           <- Config.int("max-messages-in-outgoing-queue").withDefault(0)
+    discardMessagesWhenOutgoingQueueFull <- Config.boolean("discard-messages-when-outgoing-queue-full")
+                                             .withDefault(false)
+    writeQueuePushTimeout                <- Config.duration("write-queue-push-timeout").withDefault(Duration.Zero)
+    socketWriteTimeout                   <- Config.duration("socket-write-timeout").withDefault(Duration.Zero)
+    socketReadTimeout                    <- Config.int("socket-read-timeout").withDefault(0)
+    maxControlLine                       <- Config.int("max-control-line").withDefault(0)
+    maxPingsOut                          <- Config.int("max-pings-out").withDefault(2)
+    drainTimeout                         <- Config.duration("drain-timeout").withDefault(30.seconds)
+    auth                                 <- authConfig
+    tls                                  <- tlsConfig
+  } yield NatsConfig(
+    servers = servers, connectionName = connectionName, connectionTimeout = connectionTimeout,
+    reconnectWait = reconnectWait, maxReconnects = maxReconnects, pingInterval = pingInterval,
+    requestCleanupInterval = requestCleanupInterval, bufferSize = bufferSize, noEcho = noEcho,
+    utf8Support = utf8Support, inboxPrefix = inboxPrefix, reconnectJitter = reconnectJitter,
+    reconnectJitterTls = reconnectJitterTls, reconnectBufferSize = reconnectBufferSize,
+    maxMessagesInOutgoingQueue = maxMessagesInOutgoingQueue,
+    discardMessagesWhenOutgoingQueueFull = discardMessagesWhenOutgoingQueueFull,
+    writeQueuePushTimeout = writeQueuePushTimeout, socketWriteTimeout = socketWriteTimeout,
+    socketReadTimeout = socketReadTimeout, maxControlLine = maxControlLine,
+    maxPingsOut = maxPingsOut, drainTimeout = drainTimeout, auth = auth, tls = tls
+  )).nested("nats")
+```
+
+**Example env var names** (ZIO normalises kebab-case + nested path to `UPPER_SNAKE_CASE`):
+```
+NATS_SERVERS_0=nats://broker1:4222    # indexed list
+NATS_AUTH_TYPE=token
+NATS_AUTH_VALUE=s3cr3t
+NATS_TLS_TYPE=key-store
+NATS_TLS_KEY_STORE_PATH=/certs/client.jks
+NATS_TLS_KEY_STORE_PASSWORD=changeit
+NATS_CONNECTION_TIMEOUT=PT5S          # ISO-8601 duration
+```
+
+**Test** (no Docker needed — pure config loading):
+```scala
+object NatsConfigSpec extends ZIOSpecDefault:
+  def spec = suite("NatsConfig.config")(
+    test("defaults when nothing set") {
+      ZIO.config(NatsConfig.config).map { cfg =>
+        assertTrue(cfg.servers == List("nats://localhost:4222"),
+                   cfg.auth == NatsAuth.NoAuth, cfg.tls == NatsTls.Disabled)
+      }
+    }
+  )
+```
 
 #### P1-5: No metrics integration
 
