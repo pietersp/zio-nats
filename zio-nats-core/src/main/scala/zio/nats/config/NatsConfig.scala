@@ -176,9 +176,9 @@ object NatsConfig {
   )
 
   // Auth: each variant validates the type field and reads its required sub-fields.
-  // Variants are chained with orElse; a final Config.succeed provides the default
-  // when the auth section is absent entirely.
-  // Note: an unrecognised type value (e.g. "custom") also falls back to NoAuth.
+  // Variants are chained with orElse; .withDefault provides the fallback when the
+  // auth section is absent entirely (MissingData).  An unrecognised type value
+  // produces a Config.Error.InvalidData which .withDefault does NOT swallow.
   private val authConfig: Config[NatsAuth] = {
     val noAuth: Config[NatsAuth] =
       Config.string("type").nested("auth")
@@ -203,14 +203,17 @@ object NatsConfig {
         .zip(Config.string("path").nested("auth"))
         .map { case (_, p) => NatsAuth.CredentialFile(Paths.get(p)) }
 
+    // withDefault only recovers from MissingData (absent section), not from InvalidData
+    // (present but unrecognised type).  This means a typo like auth.type=tokne propagates
+    // as a Config.Error rather than silently falling back to NoAuth.
     noAuth
       .orElse(token)
       .orElse(userPassword)
       .orElse(credentialFile)
-      .orElse(Config.succeed(NatsAuth.NoAuth))
+      .withDefault(NatsAuth.NoAuth)
   }
 
-  // TLS: same orElse + validate pattern as authConfig.
+  // TLS: same orElse + validate + withDefault pattern as authConfig.
   private val tlsConfig: Config[NatsTls] = {
     val disabled: Config[NatsTls] =
       Config.string("type").nested("tls")
@@ -243,7 +246,7 @@ object NatsConfig {
     disabled
       .orElse(systemDefault)
       .orElse(keyStore)
-      .orElse(Config.succeed(NatsTls.Disabled))
+      .withDefault(NatsTls.Disabled)
   }
 
   /**

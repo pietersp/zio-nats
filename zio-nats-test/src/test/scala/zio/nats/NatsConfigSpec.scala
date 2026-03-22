@@ -109,6 +109,11 @@ object NatsConfigSpec extends ZIOSpecDefault {
         loadConfig(Map.empty).map { cfg =>
           assertTrue(cfg.auth == NatsAuth.NoAuth)
         }
+      },
+      test("unrecognised auth.type fails with a helpful error") {
+        loadConfig(Map("nats.auth.type" -> "tokne")).exit.map { result =>
+          assertTrue(result.isFailure)
+        }
       }
     ),
 
@@ -158,6 +163,11 @@ object NatsConfigSpec extends ZIOSpecDefault {
       test("absent tls section defaults to Disabled") {
         loadConfig(Map.empty).map { cfg =>
           assertTrue(cfg.tls == NatsTls.Disabled)
+        }
+      },
+      test("unrecognised tls.type fails with a helpful error") {
+        loadConfig(Map("nats.tls.type" -> "system_default")).exit.map { result =>
+          assertTrue(result.isFailure)
         }
       }
     )
