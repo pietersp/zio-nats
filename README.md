@@ -805,32 +805,50 @@ The testcontainer is started with `--js` so JetStream, KV, and Object Store APIs
 
 ```scala
 NatsConfig(
-  servers              = List("nats://localhost:4222"),
-  connectionName       = None,
-  connectionTimeout    = 2.seconds,
-  reconnectWait        = 2.seconds,
-  maxReconnects        = 60,
-  pingInterval         = 2.minutes,
-  requestCleanupInterval = 5.seconds,
-  bufferSize           = 64 * 1024,   // bytes
-  noEcho               = false,
-  utf8Support          = false,
-  inboxPrefix          = "_INBOX.",
-  // Authentication (pick one):
-  token                = None,
-  username             = None,
-  password             = None,
-  credentialPath       = None,
-  authHandler          = None,
-  // Escape hatch for any Options.Builder field not covered above:
-  optionsCustomizer    = identity
+  // Connection
+  servers                              = List("nats://localhost:4222"),
+  connectionName                       = None,
+  connectionTimeout                    = 2.seconds,
+  reconnectWait                        = 2.seconds,
+  maxReconnects                        = 60,        // -1 = unlimited
+  pingInterval                         = 2.minutes,
+  requestCleanupInterval               = 5.seconds,
+  bufferSize                           = 64 * 1024, // bytes
+  noEcho                               = false,
+  utf8Support                          = false,
+  inboxPrefix                          = "_INBOX.",
+  // Authentication — pick one variant (mutually exclusive by construction):
+  auth                                 = NatsAuth.NoAuth,
+  // auth                              = NatsAuth.Token("s3cr3t"),
+  // auth                              = NatsAuth.UserPassword("alice", "p4ss"),
+  // auth                              = NatsAuth.CredentialFile(Paths.get("/app/nats.creds")),
+  // TLS — pick one variant:
+  tls                                  = NatsTls.Disabled,
+  // tls                               = NatsTls.SystemDefault,
+  // tls                               = NatsTls.KeyStore(keyStorePath = ..., keyStorePassword = "..."),
+  // Reconnect tuning
+  reconnectJitter                      = 100.millis,
+  reconnectJitterTls                   = 1.second,
+  reconnectBufferSize                  = 8 * 1024 * 1024, // bytes; 0 = disable
+  // Outbound queue
+  maxMessagesInOutgoingQueue           = 0,         // 0 = unlimited
+  discardMessagesWhenOutgoingQueueFull = false,
+  writeQueuePushTimeout                = Duration.Zero, // Zero = block indefinitely
+  // Socket tuning
+  socketWriteTimeout                   = Duration.Zero,
+  socketReadTimeout                    = 0,         // milliseconds; 0 = no timeout
+  // Protocol
+  maxControlLine                       = 0,         // 0 = jnats default
+  maxPingsOut                          = 2,
+  // Lifecycle
+  drainTimeout                         = 30.seconds
 )
 ```
 
 Convenience constructors:
 
 ```scala
-NatsConfig.default        // localhost:4222
+NatsConfig.default          // localhost:4222, no auth, no TLS
 NatsConfig("nats://host:4222")
 ```
 
@@ -839,6 +857,30 @@ NatsConfig("nats://host:4222")
 ```scala
 program.provide(Nats.default)
 ```
+
+For programmatic auth or TLS (e.g. credentials loaded from a secrets manager at runtime),
+use `Nats.customized`:
+
+```scala
+program.provide(
+  Nats.customized(tlsContext = Some(myCtx)),
+  NatsConfig.live
+)
+```
+
+### Migration from previous versions
+
+| Before | After |
+|--------|-------|
+| `NatsConfig(token = Some("x"))` | `NatsConfig(auth = NatsAuth.Token("x"))` |
+| `NatsConfig(username = Some("u"), password = Some("p"))` | `NatsConfig(auth = NatsAuth.UserPassword("u", "p"))` |
+| `NatsConfig(credentialPath = Some(p))` | `NatsConfig(auth = NatsAuth.CredentialFile(p))` |
+| `NatsConfig(authHandler = Some(h))` | `Nats.customized(authHandler = Some(h))` |
+| `NatsConfig(tlsFirst = true)` | `NatsConfig(tls = NatsTls.KeyStore(..., tlsFirst = true))` |
+| `NatsConfig(tlsContext = Some(ctx))` | `Nats.customized(tlsContext = Some(ctx))` |
+| `NatsConfig(optionsCustomizer = f)` | Not supported — use named fields or `Nats.customized` |
+| `StreamConfig(maxMsgSize = n: Long)` | `StreamConfig(maxMsgSize = n: Int)` |
+| `KeyValueConfig(maxValueSize = n: Long)` | `KeyValueConfig(maxValueSize = n: Int)` |
 
 ## Examples
 

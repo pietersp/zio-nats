@@ -121,6 +121,8 @@ Removed. README examples that used `order.toNatsData` (which was already incorre
 
 `NatsConfig` is a plain case class. Official ZIO libraries use `zio-config` for automatic derivation from HOCON, environment variables, and system properties. Users should be able to write `NatsConfig.fromConfig` or derive a `ConfigDescriptor[NatsConfig]`.
 
+**Precondition met:** `NatsConfig` has been refactored so all fields are purely text-configurable (`NatsAuth` and `NatsTls` Scala 3 enums replace the old Java-object fields). The implementation approach is fully documented in `C:\Users\pieter\.claude\plans\clever-snuggling-flask.md` (Future: zio-config integration section) and requires no new dependency.
+
 #### P1-5: No metrics integration
 
 No ZIO-native metrics for message counts, publish/subscribe latency, connection status, or reconnection counts. Official ZIO libraries integrate with `zio-metrics-connectors`.

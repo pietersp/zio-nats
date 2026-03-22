@@ -188,7 +188,7 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 
 | File | Contents |
 |------|----------|
-| `zio-nats-core/src/main/scala/zio/nats/Nats.scala` | Core pub/sub service + `NatsLive`; `lifecycleEvents` stream |
+| `zio-nats-core/src/main/scala/zio/nats/Nats.scala` | Core pub/sub service + `NatsLive`; `live` and `customized` ZLayer constructors; `lifecycleEvents` stream |
 | `zio-nats-core/src/main/scala/zio/nats/NatsCodec.scala` | Serialization typeclass; built-in `bytesCodec` and `stringCodec` only (no zio-blocks) |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocks.scala` | `NatsCodecZioBlocks.Builder` — derives `NatsCodec[A]` from a zio-blocks `Format` + `Schema`; caches in `ConcurrentHashMap` |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocksExtensions.scala` | Extension methods `NatsCodec.fromFormat` and `NatsCodec.derived` (available via `import zio.nats.*`) |
@@ -214,7 +214,9 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | `zio-nats-core/src/main/scala/zio/nats/objectstore/ObjectStore.scala` | ObjectStore service + management; `ObjectStore.bucket` (ZIO) and `ObjectStore.live` (ZLayer) constructors |
 | `zio-nats-core/src/main/scala/zio/nats/objectstore/ObjectStoreModels.scala` | `ObjectMeta`, `ObjectData`, `ObjectSummary`, watch options, bucket status |
 | `zio-nats-core/src/main/scala/zio/nats/objectstore/ObjectStoreConfig.scala` | `ObjectStoreConfig` |
-| `zio-nats-core/src/main/scala/zio/nats/config/NatsConfig.scala` | Connection config (host, port, TLS, reconnect) |
+| `zio-nats-core/src/main/scala/zio/nats/config/NatsConfig.scala` | Connection config — all text-configurable fields; `live` and `fromConfig` ZLayer constructors |
+| `zio-nats-core/src/main/scala/zio/nats/config/NatsAuth.scala` | `NatsAuth` enum: `NoAuth`, `Token`, `UserPassword`, `CredentialFile` — mutually exclusive auth methods |
+| `zio-nats-core/src/main/scala/zio/nats/config/NatsTls.scala` | `NatsTls` enum: `Disabled`, `SystemDefault`, `KeyStore` — file-based TLS/mTLS config |
 | `zio-nats-core/src/main/scala/zio/nats/package.scala` | Type aliases (`NatsIO[A]`), all sub-package re-exports |
 | `zio-nats-core/src/main/scala/zio/nats/service/ServiceEndpoint.scala` | `ServiceEndpoint[In, Out]`, `BoundEndpoint`, `BoundEndpointLive` |
 | `zio-nats-core/src/main/scala/zio/nats/service/ServiceConfig.scala` | `ServiceConfig`, `ServiceGroup`, `QueueGroupPolicy`, `ServiceErrorMapper` |

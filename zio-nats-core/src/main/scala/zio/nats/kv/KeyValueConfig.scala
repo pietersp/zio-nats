@@ -40,7 +40,7 @@ case class RepublishConfig(
  * @param description
  *   Optional human-readable description.
  * @param maxValueSize
- *   Maximum size of a single value in bytes (-1 = unlimited).
+ *   Maximum size of a single value in bytes (-1 = unlimited). Must fit in a 32-bit signed integer.
  * @param maxBucketSize
  *   Maximum total bytes for the bucket (-1 = unlimited).
  * @param maxHistoryPerKey
@@ -65,7 +65,7 @@ case class RepublishConfig(
 case class KeyValueConfig(
   name: String,
   description: Option[String] = None,
-  maxValueSize: Long = -1,
+  maxValueSize: Int = -1,
   maxBucketSize: Long = -1,
   maxHistoryPerKey: Int = -1,
   storageType: StorageType = StorageType.File,
@@ -92,7 +92,7 @@ object KeyValueConfig {
       .replicas(config.numberOfReplicas)
 
     config.description.foreach(d => builder.description(d))
-    if (config.maxValueSize > 0) builder.maxValueSize(config.maxValueSize)
+    if (config.maxValueSize > 0) builder.maximumValueSize(config.maxValueSize)
     if (config.maxBucketSize > 0) builder.maxBucketSize(config.maxBucketSize)
     if (config.maxHistoryPerKey > 0) builder.maxHistoryPerKey(config.maxHistoryPerKey)
     config.ttl.foreach(d => builder.ttl(java.time.Duration.ofMillis(d.toMillis)))

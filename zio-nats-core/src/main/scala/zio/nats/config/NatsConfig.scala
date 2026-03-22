@@ -1,17 +1,27 @@
 package zio.nats.config
 
-import io.nats.client.{AuthHandler, Options}
+import io.nats.client.Options
 import zio.*
-
-import java.nio.file.Path
-import javax.net.ssl.SSLContext
 
 /**
  * Configuration for a NATS connection.
  *
- * Provides a Scala-friendly API over `io.nats.client.Options.Builder`. For
- * advanced configuration not covered by this case class, use
- * `advancedOptionsCustomizer` to access the raw builder directly.
+ * Provides a Scala-friendly API over `io.nats.client.Options.Builder`.
+ *
+ * === Authentication ===
+ *
+ * Set the `auth` field to one of the [[NatsAuth]] variants. Only one
+ * authentication method can be active at a time; impossible combinations
+ * (e.g. token and user/password simultaneously) cannot be constructed.
+ *
+ * For dynamic credential rotation via a custom `io.nats.client.AuthHandler`,
+ * use [[zio.nats.Nats.customized]].
+ *
+ * === TLS ===
+ *
+ * Set the `tls` field to one of the [[NatsTls]] variants. For exotic setups
+ * requiring a pre-built `javax.net.ssl.SSLContext`, use
+ * [[zio.nats.Nats.customized]].
  *
  * @param servers
  *   List of NATS server URLs (default: `nats://localhost:4222`).
@@ -20,7 +30,7 @@ import javax.net.ssl.SSLContext
  * @param connectionTimeout
  *   Maximum time to wait for the initial connection (default: 2s).
  * @param reconnectWait
- *   Delay between reconnect attempts (default: 2s).
+ *   Base delay between reconnect attempts (default: 2s).
  * @param maxReconnects
  *   Maximum reconnect attempts before giving up (default: 60; -1 = unlimited).
  * @param pingInterval
@@ -36,32 +46,43 @@ import javax.net.ssl.SSLContext
  *   Enable UTF-8 subject support (default: false).
  * @param inboxPrefix
  *   Prefix for auto-generated reply-to inboxes (default: `_INBOX.`).
- * @param authHandler
- *   Custom authentication handler (NKey, JWT, etc.).
- * @param token
- *   Authentication token.
- * @param username
- *   Username for user/password authentication.
- * @param password
- *   Password for user/password authentication.
- * @param credentialPath
- *   Path to a `.creds` file for NKey/JWT authentication. Validated at
- *   construction (file must exist on the filesystem).
- * @param tlsContext
- *   Custom [[javax.net.ssl.SSLContext]] for TLS/mTLS connections. When set, the
- *   connection will use TLS using the provided context. Use the standard
- *   `javax.net.ssl.SSLContext` API to configure certificates, trust stores, and
- *   client keys without any jnats imports.
- * @param tlsFirst
- *   If true, initiate TLS immediately on connect rather than waiting for a
- *   server upgrade (`tls_required` servers). Equivalent to jnats
- *   `Options.Builder.tlsFirst()` (default: false).
+ * @param auth
+ *   Authentication method (default: [[NatsAuth.NoAuth]]). Use [[NatsAuth.Token]],
+ *   [[NatsAuth.UserPassword]], or [[NatsAuth.CredentialFile]] for authenticated
+ *   connections.
+ * @param tls
+ *   TLS configuration (default: [[NatsTls.Disabled]]). Use [[NatsTls.SystemDefault]]
+ *   for public-CA-signed servers, or [[NatsTls.KeyStore]] for mTLS.
+ * @param reconnectJitter
+ *   Random jitter added to [[reconnectWait]] to avoid thundering herd on reconnect
+ *   (default: 100ms).
+ * @param reconnectJitterTls
+ *   Jitter for TLS connections, which are more expensive to establish (default: 1s).
+ * @param reconnectBufferSize
+ *   Maximum bytes to buffer for in-flight publishes during a reconnect window
+ *   (default: 8 MiB). Set to 0 to disable buffering.
+ * @param maxMessagesInOutgoingQueue
+ *   Maximum number of messages in the outbound queue (default: 0 = unlimited).
+ * @param discardMessagesWhenOutgoingQueueFull
+ *   If true, new messages are discarded when the outbound queue is full instead
+ *   of blocking (default: false).
+ * @param writeQueuePushTimeout
+ *   How long to wait when the outbound queue is full before giving up
+ *   (default: [[Duration.Zero]] = block indefinitely).
+ * @param socketWriteTimeout
+ *   Socket-level write timeout to prevent hanging on a dead connection
+ *   (default: [[Duration.Zero]] = no timeout).
+ * @param socketReadTimeout
+ *   Socket-level read timeout in milliseconds (default: 0 = no timeout).
+ * @param maxControlLine
+ *   Maximum length of a NATS protocol control line in bytes; must match the
+ *   server's `max_control_line` setting (default: 0 = jnats default).
+ * @param maxPingsOut
+ *   Maximum number of client PINGs in-flight before the connection is considered
+ *   stale and closed (default: 2).
  * @param drainTimeout
- *   Maximum time to wait for subscriptions to drain when the connection's
- *   ZLayer scope ends (default: 30 seconds).
- * @param optionsCustomizer
- *   Escape hatch: apply any additional `Options.Builder` settings not covered
- *   by the fields above.
+ *   Maximum time to wait for subscriptions to drain when the connection's ZLayer
+ *   scope ends (default: 30s).
  */
 final case class NatsConfig(
   servers: List[String] = List("nats://localhost:4222"),
@@ -75,23 +96,27 @@ final case class NatsConfig(
   noEcho: Boolean = false,
   utf8Support: Boolean = false,
   inboxPrefix: String = "_INBOX.",
-  authHandler: Option[AuthHandler] = None,
-  token: Option[String] = None,
-  username: Option[String] = None,
-  password: Option[String] = None,
-  credentialPath: Option[Path] = None,
-  tlsContext: Option[SSLContext] = None,
-  tlsFirst: Boolean = false,
-  drainTimeout: Duration = 30.seconds,
-  optionsCustomizer: Options.Builder => Options.Builder = identity
+  auth: NatsAuth = NatsAuth.NoAuth,
+  tls: NatsTls = NatsTls.Disabled,
+  reconnectJitter: Duration = 100.millis,
+  reconnectJitterTls: Duration = 1.second,
+  reconnectBufferSize: Long = 8L * 1024 * 1024,
+  maxMessagesInOutgoingQueue: Int = 0,
+  discardMessagesWhenOutgoingQueueFull: Boolean = false,
+  writeQueuePushTimeout: Duration = Duration.Zero,
+  socketWriteTimeout: Duration = Duration.Zero,
+  socketReadTimeout: Int = 0,
+  maxControlLine: Int = 0,
+  maxPingsOut: Int = 2,
+  drainTimeout: Duration = 30.seconds
 ) {
 
   /** Build jnats Options from this config. */
   private[nats] def toOptions: Options = toOptionsBuilder.build()
 
   /**
-   * Build jnats Options.Builder from this config (allows further
-   * customization).
+   * Build a jnats `Options.Builder` from this config (allows further
+   * customization in [[zio.nats.Nats.customized]]).
    */
   private[nats] def toOptionsBuilder: Options.Builder = {
     var builder = new Options.Builder()
@@ -106,27 +131,30 @@ final case class NatsConfig(
     if (noEcho) builder = builder.noEcho()
     if (utf8Support) builder = builder.supportUTF8Subjects()
     builder = builder.inboxPrefix(inboxPrefix)
-    authHandler.foreach(h => builder = builder.authHandler(h))
-    token.foreach(t => builder = builder.token(t.toCharArray))
-    for {
-      u <- username
-      p <- password
-    } builder = builder.userInfo(u.toCharArray, p.toCharArray)
-    credentialPath.foreach(p => builder = builder.credentialPath(p.toString))
-    tlsContext.foreach(ctx => builder = builder.sslContext(ctx))
-    if (tlsFirst) builder = builder.tlsFirst()
-    optionsCustomizer(builder)
+    builder = auth.applyTo(builder)
+    builder = tls.applyTo(builder)
+    builder = builder.reconnectJitter(reconnectJitter.asJava)
+    builder = builder.reconnectJitterTls(reconnectJitterTls.asJava)
+    builder = builder.reconnectBufferSize(reconnectBufferSize)
+    if (maxMessagesInOutgoingQueue > 0) builder = builder.maxMessagesInOutgoingQueue(maxMessagesInOutgoingQueue)
+    if (discardMessagesWhenOutgoingQueueFull) builder = builder.discardMessagesWhenOutgoingQueueFull()
+    if (writeQueuePushTimeout > Duration.Zero) builder = builder.writeQueuePushTimeout(writeQueuePushTimeout.asJava)
+    if (socketWriteTimeout > Duration.Zero) builder = builder.socketWriteTimeout(socketWriteTimeout.asJava)
+    if (socketReadTimeout > 0) builder = builder.socketReadTimeoutMillis(socketReadTimeout)
+    if (maxControlLine > 0) builder = builder.maxControlLine(maxControlLine)
+    builder = builder.maxPingsOut(maxPingsOut)
+    builder
   }
 }
 
 object NatsConfig {
 
-  /** Default config connecting to localhost:4222. */
+  /** Default config connecting to `nats://localhost:4222` with no auth and no TLS. */
   val default: NatsConfig = NatsConfig()
 
-  /** Config from a single server URL. */
+  /** Config for a single server URL with all other settings at their defaults. */
   def apply(server: String): NatsConfig = NatsConfig(servers = List(server))
 
-  /** ZLayer providing a default config. */
+  /** ZLayer providing a default [[NatsConfig]] connecting to `nats://localhost:4222`. */
   val live: ULayer[NatsConfig] = ZLayer.succeed(default)
 }
