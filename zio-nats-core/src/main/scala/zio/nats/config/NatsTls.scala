@@ -94,3 +94,25 @@ enum NatsTls:
         if first then b = b.tlsFirst()
         b
       case Custom(ctx) => builder.sslContext(ctx)
+
+  /**
+   * Returns the config type key for this variant, or [[None]] for variants that
+   * are not reachable from text config ([[Custom]]).
+   *
+   * Exhaustive match — compile-time guard for [[NatsConfig.tlsConfig]].
+   * See [[NatsAuth.configTypeKey]] for the rationale.
+   */
+  private[config] def configTypeKey: Option[String] = this match
+    case Disabled                   => Some(NatsTls.Keys.disabled)
+    case SystemDefault              => Some(NatsTls.Keys.systemDefault)
+    case KeyStore(_, _, _, _, _, _) => Some(NatsTls.Keys.keyStore)
+    case Custom(_)                  => None
+
+object NatsTls:
+  /** Config type key constants for all text-configurable [[NatsTls]] variants.
+   *  Referenced in [[NatsConfig.tlsConfig]] — single source of truth.
+   */
+  private[config] object Keys:
+    val disabled      = "disabled"
+    val systemDefault = "system-default"
+    val keyStore      = "key-store"

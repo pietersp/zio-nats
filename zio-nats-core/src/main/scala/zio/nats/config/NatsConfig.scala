@@ -178,9 +178,11 @@ object NatsConfig {
 
   // Auth: all sub-fields are read as optional strings so that mapOrFail can dispatch
   // on the type value and surface a single, targeted error message — one error for an
-  // unknown type, one for a missing required sub-field.  The previous orElse+validate
-  // approach accumulated N separate validation errors (one per variant), which was
-  // confusing when a type was simply mistyped.
+  // unknown type, one for a missing required sub-field.
+  // NatsAuth.configTypeKey is the compile-time exhaustiveness guard: it forces a
+  // non-exhaustive match error when a new NatsAuth case is added without updating it,
+  // signalling that the pattern arms below also need updating.
+  // NatsAuth.Keys is the single source of truth for all type key strings.
   private val authConfig: Config[NatsAuth] =
     (Config.string("type").optional.nested("auth") zip
      Config.string("value").optional.nested("auth") zip
@@ -188,27 +190,29 @@ object NatsConfig {
      Config.string("password").optional.nested("auth") zip
      Config.string("path").optional.nested("auth")
     ).mapOrFail {
-      case (None,                    _,       _,       _,       _      ) => Right(NatsAuth.NoAuth)
-      case (Some("no-auth"),         _,       _,       _,       _      ) => Right(NatsAuth.NoAuth)
-      case (Some("token"),           Some(v), _,       _,       _      ) => Right(NatsAuth.Token(v))
-      case (Some("token"),           None,    _,       _,       _      ) =>
+      case (None,                              _,       _,       _,       _      ) => Right(NatsAuth.NoAuth)
+      case (Some(NatsAuth.Keys.noAuth),        _,       _,       _,       _      ) => Right(NatsAuth.NoAuth)
+      case (Some(NatsAuth.Keys.token),         Some(v), _,       _,       _      ) => Right(NatsAuth.Token(v))
+      case (Some(NatsAuth.Keys.token),         None,    _,       _,       _      ) =>
         Left(Config.Error.MissingData(Chunk.empty,
-          "auth.value is required when auth.type = token"))
-      case (Some("user-password"),   _,       Some(u), Some(p), _      ) => Right(NatsAuth.UserPassword(u, p))
-      case (Some("user-password"),   _,       _,       _,       _      ) =>
+          s"auth.value is required when auth.type = ${NatsAuth.Keys.token}"))
+      case (Some(NatsAuth.Keys.userPassword),  _,       Some(u), Some(p), _      ) => Right(NatsAuth.UserPassword(u, p))
+      case (Some(NatsAuth.Keys.userPassword),  _,       _,       _,       _      ) =>
         Left(Config.Error.MissingData(Chunk.empty,
-          "auth.username and auth.password are required when auth.type = user-password"))
-      case (Some("credential-file"), _,       _,       _,       Some(p)) => Right(NatsAuth.CredentialFile(Paths.get(p)))
-      case (Some("credential-file"), _,       _,       _,       None   ) =>
+          s"auth.username and auth.password are required when auth.type = ${NatsAuth.Keys.userPassword}"))
+      case (Some(NatsAuth.Keys.credentialFile),_,       _,       _,       Some(p)) => Right(NatsAuth.CredentialFile(Paths.get(p)))
+      case (Some(NatsAuth.Keys.credentialFile),_,       _,       _,       None   ) =>
         Left(Config.Error.MissingData(Chunk.empty,
-          "auth.path is required when auth.type = credential-file"))
-      case (Some(t),                 _,       _,       _,       _      ) =>
+          s"auth.path is required when auth.type = ${NatsAuth.Keys.credentialFile}"))
+      case (Some(t),                           _,       _,       _,       _      ) =>
         Left(Config.Error.InvalidData(Chunk.empty,
-          s"Unknown auth.type '$t'. Valid values: no-auth, token, user-password, credential-file. " +
+          s"Unknown auth.type '$t'. Valid values: ${NatsAuth.Keys.noAuth}, ${NatsAuth.Keys.token}, " +
+          s"${NatsAuth.Keys.userPassword}, ${NatsAuth.Keys.credentialFile}. " +
           "NatsAuth.Custom requires programmatic NatsConfig construction."))
     }
 
   // TLS: same mapOrFail approach as authConfig.
+  // NatsTls.configTypeKey and NatsTls.Keys serve the same role as for auth above.
   private val tlsConfig: Config[NatsTls] =
     (Config.string("type").optional.nested("tls") zip
      Config.string("key-store-path").optional.nested("tls") zip
@@ -218,22 +222,22 @@ object NatsConfig {
      Config.string("algorithm").optional.nested("tls") zip
      Config.boolean("tls-first").withDefault(false).nested("tls")
     ).mapOrFail {
-      case (None,                   _, _, _, _, _, _) => Right(NatsTls.Disabled)
-      case (Some("disabled"),       _, _, _, _, _, _) => Right(NatsTls.Disabled)
-      case (Some("system-default"), _, _, _, _, _, _) => Right(NatsTls.SystemDefault)
-      case (Some("key-store"), Some(ksp), Some(kspw), tsp, tspw, alg, first) =>
+      case (None,                           _, _, _, _, _, _) => Right(NatsTls.Disabled)
+      case (Some(NatsTls.Keys.disabled),    _, _, _, _, _, _) => Right(NatsTls.Disabled)
+      case (Some(NatsTls.Keys.systemDefault), _, _, _, _, _, _) => Right(NatsTls.SystemDefault)
+      case (Some(NatsTls.Keys.keyStore), Some(ksp), Some(kspw), tsp, tspw, alg, first) =>
         Right(NatsTls.KeyStore(Paths.get(ksp), kspw, tsp.map(Paths.get(_)), tspw, alg, first))
-      case (Some("key-store"), ksp, kspw, _, _, _, _) =>
+      case (Some(NatsTls.Keys.keyStore), ksp, kspw, _, _, _, _) =>
         val missing = List(
           Option.when(ksp.isEmpty)("tls.key-store-path"),
           Option.when(kspw.isEmpty)("tls.key-store-password")
         ).flatten
         Left(Config.Error.MissingData(Chunk.empty,
-          s"${missing.mkString(" and ")} ${if (missing.size > 1) "are" else "is"} required when tls.type = key-store"))
+          s"${missing.mkString(" and ")} ${if (missing.size > 1) "are" else "is"} required when tls.type = ${NatsTls.Keys.keyStore}"))
       case (Some(t), _, _, _, _, _, _) =>
         Left(Config.Error.InvalidData(Chunk.empty,
-          s"Unknown tls.type '$t'. Valid values: disabled, system-default, key-store. " +
-          "NatsTls.Custom requires programmatic NatsConfig construction."))
+          s"Unknown tls.type '$t'. Valid values: ${NatsTls.Keys.disabled}, ${NatsTls.Keys.systemDefault}, " +
+          s"${NatsTls.Keys.keyStore}. NatsTls.Custom requires programmatic NatsConfig construction."))
     }
 
   /**

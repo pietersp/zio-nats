@@ -82,3 +82,29 @@ enum NatsAuth:
       case UserPassword(u, p) => builder.userInfo(u.toCharArray, p.toCharArray)
       case CredentialFile(p)  => builder.credentialPath(p.toString)
       case Custom(h)          => builder.authHandler(h)
+
+  /**
+   * Returns the config type key for this variant, or [[None]] for variants that
+   * are not reachable from text config ([[Custom]]).
+   *
+   * This exhaustive match is the compile-time guard for [[NatsConfig.authConfig]]:
+   * adding a new [[NatsAuth]] case without updating it produces a non-exhaustive
+   * match error, signalling that [[NatsConfig.authConfig]] also needs updating.
+   */
+  private[config] def configTypeKey: Option[String] = this match
+    case NoAuth             => Some(NatsAuth.Keys.noAuth)
+    case Token(_)           => Some(NatsAuth.Keys.token)
+    case UserPassword(_, _) => Some(NatsAuth.Keys.userPassword)
+    case CredentialFile(_)  => Some(NatsAuth.Keys.credentialFile)
+    case Custom(_)          => None
+
+object NatsAuth:
+  /** Config type key constants for all text-configurable [[NatsAuth]] variants.
+   *  Referenced in [[NatsConfig.authConfig]] — kept here so they are co-located
+   *  with the type they describe and form a single source of truth.
+   */
+  private[config] object Keys:
+    val noAuth         = "no-auth"
+    val token          = "token"
+    val userPassword   = "user-password"
+    val credentialFile = "credential-file"
