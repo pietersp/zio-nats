@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # sbt-dynver needs full history to compute version from tag
 
       - uses: actions/setup-java@v4
         with:
