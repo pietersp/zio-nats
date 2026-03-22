@@ -121,16 +121,20 @@ Removed. README examples that used `order.toNatsData` (which was already incorre
 
 `NatsConfig.config` — a `zio.Config[NatsConfig]` descriptor — and `NatsConfig.fromConfig` — a `ZLayer[Any, Config.Error, NatsConfig]` — are implemented in `config/NatsConfig.scala`. No new dependency: `zio.Config` is in `zio-core`.
 
-- All 24 fields covered with defaults matching the case class defaults.
-- Auth discriminated via `auth.type` (`no-auth` | `token` | `user-password` | `credential-file`).
-- TLS discriminated via `tls.type` (`disabled` | `system-default` | `key-store`).
+- All fields covered with defaults matching the case class defaults.
+- Auth discriminated via `auth.type` (`no-auth` | `token` | `user-password` | `credential-file`); unknown type or missing required sub-field produces a single targeted `Config.Error` with the key name in the message.
+- TLS discriminated via `tls.type` (`disabled` | `system-default` | `key-store`); same error quality.
 - `NatsAuth.Custom` and `NatsTls.Custom` are intentionally excluded (they hold runtime Java objects).
-- 19 offline unit tests added in `NatsConfigSpec.scala` (no Docker required).
-- `Config.zip` in ZIO 2 produces flat tuples via `Zippable`; the implementation uses private case classes (`ConnGroup`, `TunGroup`) to group fields before the final combine, avoiding `Zippable` flatten/nesting ambiguity.
+- `NatsAuth.Keys` / `NatsTls.Keys` companion objects hold all type-key strings as a single source of truth. `configTypeKey` exhaustive methods on each enum provide a compile-time guard: adding a new variant without updating the config layer produces a non-exhaustive match error.
+- Server URLs validated at load time via `mapOrFail` — invalid URLs produce `Config.Error.InvalidData` before any connection attempt.
+- All duration / timeout fields use ISO-8601 format (`PT5S`, `PT2M`, `PT0.5S`); `socketReadTimeout` maps to jnats's int-millis overload internally (documented at call site).
+- `Config.zip` in ZIO 2 produces flat tuples via `Zippable`; the implementation uses private case classes (`ConnGroup`, `TunGroup`) to group fields before the final combine, avoiding `Zippable` flatten/nesting ambiguity. `drainTimeout` is in `ConnGroup` (connection lifecycle, not tuning).
+- `nested` call order documented: last call = outermost namespace, so `.nested("nats").nested("myapp")` reads `myapp.nats.*`.
+- 24 offline unit tests in `NatsConfigSpec.scala` (no Docker required).
 
 **Key env var examples:**
 ```
-NATS_SERVERS_0=nats://broker:4222
+NATS_SERVERS=nats://broker:4222
 NATS_AUTH_TYPE=token
 NATS_AUTH_VALUE=s3cr3t
 NATS_CONNECTION_TIMEOUT=PT5S
