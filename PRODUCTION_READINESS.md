@@ -202,9 +202,9 @@ In `KeyValue.scala` (lines 411–424). Initial concern was that the `LinkedBlock
 
 The library uses Scala 3 features (opaque types, enums, extension methods, `given`/`using`) extensively throughout the codebase. Cross-compilation would require a near-complete rewrite with no clear benefit — the ZIO 2 ecosystem has largely moved to Scala 3.
 
-#### P2-2: Documentation site
+#### ~~P2-2: Documentation site~~ **DONE**
 
-No mdoc, Laika, or microsite setup. Official ZIO libraries have generated documentation sites hosted on GitHub Pages.
+mdoc + Docusaurus 3.x scaffolded. GitHub Actions workflow builds and deploys to GitHub Pages on every push to `master`. Site live at `https://pietersp.github.io/zio-nats/`. Unified Scaladoc generated via sbt-unidoc and linked from the navbar. Content is placeholder — to be filled in.
 
 #### P2-3: Scalafix rules — WON'T DO
 
@@ -250,7 +250,7 @@ Suggested order:
 
 ### Phase 3 — P2 (1.x maintenance)
 
-Address as capacity allows. P2-2 (docs site) has the highest impact in this tier.
+~~P2-2 (docs site)~~ **DONE**. Remaining P2 items are low priority.
 
 ---
 
