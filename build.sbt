@@ -33,7 +33,7 @@ inThisBuild(
 )
 
 lazy val root = (project in file("."))
-  .aggregate(zioNatsCore, zioNatsZioBlocks, zioNats, zioNatsJsoniter, zioNatsPlayJson, zioNatsTestkit, zioNatsTest, zioNatsExamples)
+  .aggregate(zioNatsCore, zioNatsZioBlocks, zioNats, zioNatsJsoniter, zioNatsPlayJson, zioNatsTestkit, zioNatsTest, zioNatsExamples, docs)
   .settings(
     name               := "zio-nats-root",
     publish / skip     := true,
@@ -136,6 +136,27 @@ lazy val zioNatsTest = (project in file("zio-nats-test"))
         "TESTCONTAINERS_HOST_OVERRIDE" -> "localhost"
       )
     }
+  )
+
+lazy val docs = project
+  .in(file("zio-nats-docs"))
+  .dependsOn(zioNatsCore, zioNatsZioBlocks, zioNatsJsoniter, zioNatsPlayJson)
+  .enablePlugins(MdocPlugin, DocusaurusPlugin, ScalaUnidocPlugin)
+  .settings(
+    name           := "zio-nats-docs",
+    publish / skip := true,
+    mimaPreviousArtifacts := Set.empty,
+    mdocIn  := (LocalRootProject / baseDirectory).value / "docs",
+    mdocOut := (LocalRootProject / baseDirectory).value / "website" / "docs",
+    mdocVariables := Map("VERSION" -> version.value),
+    ScalaUnidoc / unidoc / target :=
+      (LocalRootProject / baseDirectory).value / "website" / "static" / "api",
+    ScalaUnidoc / unidoc / unidocProjectFilter :=
+      inProjects(zioNatsCore, zioNatsZioBlocks, zioNatsJsoniter, zioNatsPlayJson),
+    docusaurusCreateSite :=
+      docusaurusCreateSite.dependsOn(Compile / unidoc).value,
+    docusaurusPublishGhpages :=
+      docusaurusPublishGhpages.dependsOn(Compile / unidoc).value
   )
 
 lazy val zioNatsExamples = (project in file("examples"))
