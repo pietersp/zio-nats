@@ -45,6 +45,8 @@ object ImageMetadata { given Schema[ImageMetadata] = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
+val imageBytes: Chunk[Byte] = Chunk.fill(1024)(0.toByte)
+
 val store: ZIO[Nats, NatsError, Unit] =
   for {
     os <- ObjectStore.bucket("assets")
@@ -52,7 +54,7 @@ val store: ZIO[Nats, NatsError, Unit] =
     // Raw bytes - image loaded from disk or another source
     _ <- os.put(
            ObjectMeta("logo.png", description = Some("Brand logo")),
-           Chunk.fromArray(Array[Byte](0x89.toByte, 0x50, 0x4e, 0x47)) // PNG header bytes
+           imageBytes
          )
 
     // Plain string - a README or licence file
