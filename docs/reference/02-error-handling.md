@@ -38,6 +38,7 @@ All variants except `KeyNotFound`, `ObjectNotFound`, `ObjectAlreadyExists`, and 
 Group errors by domain for broader pattern matches. Use these when you want to handle an entire feature area uniformly rather than listing each variant:
 
 ```scala
+import zio.*
 import zio.nats.NatsError
 
 // Catch any JetStream error
