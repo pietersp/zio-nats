@@ -5,7 +5,7 @@ NATS is one of the fastest messaging systems available — lightweight, cloud-na
 ![ZIO 2](https://img.shields.io/badge/ZIO-2-red)
 ![Scala 3](https://img.shields.io/badge/scala-3-blue)
 [![Development](https://img.shields.io/badge/Project%20Stage-Development-green.svg)](https://github.com/zio/zio/wiki/Project-Stages)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/pietersp/zio-nats)
+![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/pietersp/zio-nats)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.pietersp/zio-nats_3)](https://central.sonatype.com/artifact/io.github.pietersp/zio-nats_3)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green)
 
