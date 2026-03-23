@@ -72,7 +72,7 @@ effect.catchAll(e => ZIO.logError(s"NATS error: ${e.message}"))
 
 **Retry on connection loss:**
 
-```scala
+```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 
@@ -86,7 +86,7 @@ def withRetry[A](effect: IO[NatsError, A]): IO[NatsError, A] =
 
 **Map to a simpler error type:**
 
-```scala
+```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 
