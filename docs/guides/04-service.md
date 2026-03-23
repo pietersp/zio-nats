@@ -206,11 +206,11 @@ We now have a running service with two typed, discoverable endpoints.
 
 ## Calling a service
 
-We have three ways to call a service endpoint: a typed call with `Nats#requestService` that decodes the reply as `Either[Err, Out]`, a raw call with `Nats#request` using `ServiceEndpoint#effectiveSubject` for infallible endpoints, and an untyped `Nats#request` for when the endpoint descriptor is not available.
+We have three ways to call a service endpoint: a typed call with `Nats#requestService` that surfaces both domain and infrastructure errors in the ZIO error channel, a raw call with `Nats#request` using `ServiceEndpoint#effectiveSubject` for infallible endpoints, and an untyped `Nats#request` for when the endpoint descriptor is not available.
 
 ### Typed calls with `requestService`
 
-`Nats#requestService` is the preferred way to call a fallible service endpoint. It uses the `ServiceEndpoint` descriptor as the complete contract - the subject, input and output codecs, and error codec are all captured there - and returns `Either[Err, Out]` to cleanly separate domain errors from transport failures:
+`Nats#requestService` is the preferred way to call a fallible service endpoint. It uses the `ServiceEndpoint` descriptor as the complete contract - the subject, input and output codecs, and error codec are all captured there. Both domain errors (`Err`) and transport failures (`NatsError`) surface directly in the ZIO error channel as `IO[NatsError | Err, Out]`:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -229,30 +229,60 @@ object StockError   { given Schema[StockError]   = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
-given ServiceErrorMapper[StockError] with {
-  def toErrorResponse(e: StockError): (String, Int) = (e.reason, 500)
-}
-
 // Shared endpoint descriptor - the complete typed contract
 val stockEndpoint = ServiceEndpoint[StockRequest, StockReply]("stock-check")
   .withError[StockError]
 
-val checkStock: ZIO[Nats, NatsError, Option[StockReply]] =
+val checkStock: ZIO[Nats, NatsError | StockError, Int] =
   ZIO.serviceWithZIO[Nats] { nats =>
-    nats.requestService(stockEndpoint, StockRequest("item-456"), 5.seconds).map {
-      case Right(reply) => Some(reply)
-      case Left(err)    => None  // typed domain error: StockError
-    }
+    nats.requestService(stockEndpoint, StockRequest("item-456"), 5.seconds)
+      .map(_.available)
   }
 ```
 
-`Nats#requestService` returns:
-- `Right(out)` - the handler succeeded; reply body decoded as `Out`
-- `Left(err)` - the handler failed with a domain `Err`; reply body decoded as `Err`
+`Nats#requestService` produces:
+- `out: Out` when the handler succeeds
+- Fails with `err: Err` when the handler returns a domain error
 - Fails with `NatsError.ServiceCallFailed` for infrastructure errors (codec crash, connection issues)
 - Fails with `NatsError.Timeout` if no reply arrives in time
 
-For this to work, `Err` must have a `NatsCodec[Err]` in scope - the same codec is used on both sides to encode the error body on the server and decode it on the client. This is why `ServiceEndpoint#withError` now requires both `NatsCodec[E]` and `ServiceErrorMapper[E]`.
+Because the error type is `NatsError | Err`, Scala 3 union types compose naturally across multiple calls - no manual error merging needed:
+
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.blocks.schema.Schema
+import zio.blocks.schema.json.JsonFormat
+
+case class StockRequest(itemId: String)
+case class StockReply(available: Int, reserved: Int)
+case class PriceRequest(itemId: String)
+case class PriceReply(cents: Long)
+case class StockError(reason: String)
+case class PriceError(reason: String)
+
+object StockRequest { given Schema[StockRequest] = Schema.derived }
+object StockReply   { given Schema[StockReply]   = Schema.derived }
+object PriceRequest { given Schema[PriceRequest] = Schema.derived }
+object PriceReply   { given Schema[PriceReply]   = Schema.derived }
+object StockError   { given Schema[StockError]   = Schema.derived }
+object PriceError   { given Schema[PriceError]   = Schema.derived }
+
+val codecs = NatsCodec.fromFormat(JsonFormat)
+import codecs.derived
+
+val stockEp = ServiceEndpoint[StockRequest, StockReply]("stock").withError[StockError]
+val priceEp = ServiceEndpoint[PriceRequest, PriceReply]("price").withError[PriceError]
+
+// Error type widens to NatsError | StockError | PriceError automatically
+val checkBoth: ZIO[Nats, NatsError | StockError | PriceError, (StockReply, PriceReply)] =
+  ZIO.serviceWithZIO[Nats] { nats =>
+    nats.requestService(stockEp, StockRequest("item-1"), 5.seconds)
+      .zipPar(nats.requestService(priceEp, PriceRequest("item-1"), 5.seconds))
+  }
+```
+
+`ServiceEndpoint#withError` only requires a `NatsCodec[E]` in scope - the same codec encodes the error on the server and decodes it on the client. `NatsCodec[E]` is derived automatically from the `Schema[E]` when using `NatsCodec.fromFormat`. A `ServiceErrorMapper[E]` is resolved automatically via the universal fallback; provide a specific instance to customise the `Nats-Service-Error` header value or status code.
 
 ### Calling infallible endpoints
 

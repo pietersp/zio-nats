@@ -76,6 +76,10 @@ NatsConfig ──► Nats.live ──► JetStream.live
 
 `Nats` holds the raw jnats `Connection`. All other services derive from it via `nats.underlying`. No jnats types are exposed in the public API — every method parameter and return type is a Scala type from this library.
 
+`Nats.requestService` is the typed client-side entry point for service endpoints: it accepts a `ServiceEndpoint[In, Err, Out]` as the complete contract and returns `IO[NatsError | Err, Out]`. Domain errors go directly into the ZIO error channel — call sites use Scala 3 union types which widen automatically across multiple calls with no manual merging. Domain errors (`Err`) are encoded into the reply body by the server (using `NatsCodec[Err]`) and decoded by the client. The `Nats-Service-Error` header is still set for NATS Micro compatibility. An empty body with the error header means an infrastructure error (`NatsError.ServiceCallFailed`); a non-empty body means a typed domain error (`Err`). `ServiceErrorMapper[E]` has a universal fallback given (`e.toString`, code 500) so `withError[E]` requires only a `NatsCodec[E]` in scope.
+
+`Nats.request` is the untyped fallback: it detects `Nats-Service-Error` / `Nats-Service-Error-Code` headers and fails with `NatsError.ServiceCallFailed(message, code)` regardless of body content. Use it when the endpoint descriptor is not available or for infallible endpoints (via `endpoint.effectiveSubject`).
+
 Connection lifecycle events are exposed via `Nats.lifecycleEvents: ZStream[Nats, Nothing, NatsEvent]`. The event infrastructure (queue, hub, listeners) is set up internally in `Nats.make` before `connect()` is called.
 
 ### Typed Serialization
@@ -150,7 +154,7 @@ All publish/put/get/create/update methods are generic `[A: NatsCodec]`. Passing 
 - `JetStreamError` → `JetStreamApiError`, `JetStreamPublishFailed`, `JetStreamConsumeFailed`
 - `KeyValueError` → `KeyNotFound`
 - `ObjectStoreError`
-- `ServiceError` → `ServiceOperationFailed`, `ServiceStartFailed`
+- `ServiceError` → `ServiceOperationFailed`, `ServiceStartFailed`, `ServiceCallFailed` (infrastructure errors; domain errors go directly into the ZIO error channel as `Err` via `requestService`)
 
 ### Package Structure
 
@@ -189,7 +193,7 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | File | Contents |
 |------|----------|
 | `zio-nats-core/src/main/scala/zio/nats/Nats.scala` | Core pub/sub service + `NatsLive`; `live` and `customized` ZLayer constructors; `lifecycleEvents` stream |
-| `zio-nats-core/src/main/scala/zio/nats/NatsCodec.scala` | Serialization typeclass; built-in `bytesCodec` and `stringCodec` only (no zio-blocks) |
+| `zio-nats-core/src/main/scala/zio/nats/NatsCodec.scala` | Serialization typeclass; built-in `bytesCodec` and `stringCodec` only (no zio-blocks); `ErrorCodecOrNothing[E]` for service domain-error encoding |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocks.scala` | `NatsCodecZioBlocks.Builder` — derives `NatsCodec[A]` from a zio-blocks `Format` + `Schema`; caches in `ConcurrentHashMap` |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocksExtensions.scala` | Extension methods `NatsCodec.fromFormat` and `NatsCodec.derived` (available via `import zio.nats.*`) |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/serialization/NatsSerializer.scala` | `CompiledCodec[A]` sealed trait, `makeFor[A](format)` factory (eager, can throw), `BinaryCompiledCodec` / `TextCompiledCodec` impls |

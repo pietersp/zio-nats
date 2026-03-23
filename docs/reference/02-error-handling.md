@@ -109,7 +109,7 @@ val updated: IO[NatsError, Long] =
   kv.update("my-key", "new-value", expectedRevision = 5L)
 ```
 
-**Handle service call errors (typed)** - use `Nats#requestService` with a shared `ServiceEndpoint` descriptor to receive typed domain errors as `Left(err)` rather than a stringly-typed `ServiceCallFailed`. `NatsCodec[Err]` must be in scope:
+**Handle service call errors (typed)** - use `Nats#requestService` with a shared `ServiceEndpoint` descriptor. Domain errors (`Err`) and transport failures (`NatsError`) both go into the ZIO error channel as `IO[NatsError | Err, Out]`. `NatsCodec[Err]` must be in scope:
 
 ```scala
 import zio.*
@@ -118,11 +118,11 @@ import zio.nats.*
 // Endpoint shared between server and client
 val ep = ServiceEndpoint[String, String]("do-thing").withError[String]
 
+// IO[String | NatsError, String] - catchSome by type
 val result: IO[NatsError, Option[String]] =
-  nats.requestService(ep, "input", 5.seconds).map {
-    case Right(out) => Some(out)
-    case Left(err)  => None  // typed String error from the handler
-  }
+  nats.requestService(ep, "input", 5.seconds)
+    .map(Some(_))
+    .catchSome { case _: String => ZIO.succeed(None) }
 ```
 
 **Handle service call errors (untyped)** - when the endpoint descriptor is not available, `Nats#request` still detects the `Nats-Service-Error` header and fails with `ServiceCallFailed`. This covers infrastructure errors from `Nats#requestService` too:
