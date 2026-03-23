@@ -109,6 +109,40 @@ kv.watchAll[FeatureConfig](KeyValueWatchOptions())
   .fork
 ```
 
+### Object Store - large binary objects, no S3 required
+
+Store and stream arbitrarily large objects across your NATS cluster. Chunking and reassembly are handled transparently - a 10-byte config file and a 2 GB model use the same API:
+
+```scala
+val os = ObjectStore.bucket("models")
+
+// Store
+os.put("gpt-small.bin", modelBytes)
+
+// Stream a large object without buffering it in JVM heap
+os.getStream("gpt-small.bin")
+  .grouped(4096)
+  .tap(chunk => ZIO.debug(s"${chunk.length} bytes"))
+  .runDrain
+```
+
+### Service Framework - typed microservices over NATS
+
+Define typed request-reply endpoints and let NATS handle routing, load balancing, and service discovery - no service mesh, no sidecar:
+
+```scala
+val prices = ServiceEndpoint[String, Nothing, Double]("prices")
+
+val bound = prices.implement[Nothing](itemId =>
+  ZIO.succeed(pricingEngine.lookup(itemId))
+)
+
+nats.service(ServiceConfig(name = "pricing", version = "1.0.0"), bound)
+
+// On the client side - call any instance by name, NATS picks one
+nats.request[String, Double](Subject("prices"), "item-42", 5.seconds)
+```
+
 ### Integration tests with a real server
 
 ```scala
