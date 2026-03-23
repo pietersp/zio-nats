@@ -1,6 +1,6 @@
 # zio-nats
 
-NATS is one of the fastest messaging systems available — lightweight, cloud-native, and built for scale. zio-nats brings the full NATS ecosystem into ZIO 2: subscriptions become `ZStream`s, services become `ZLayer`s, errors are typed, and not a single callback touches your code.
+NATS is one of the fastest messaging systems available - lightweight, cloud-native, and built for scale. zio-nats brings the full NATS ecosystem into ZIO 2: subscriptions become `ZStream`s, services become `ZLayer`s, errors are typed, and not a single callback touches your code.
 
 ![ZIO 2](https://img.shields.io/badge/ZIO-2-red)
 ![Scala 3](https://img.shields.io/badge/scala-3-blue)
@@ -15,9 +15,9 @@ NATS is one of the fastest messaging systems available — lightweight, cloud-na
 
 **Everything is a stream.** `Nats#subscribe`, `Consumer#consume`, `KeyValue#watch`, and `ObjectStore#watch` all return `ZStream`. Backpressure, interruption, and resource cleanup are handled automatically.
 
-**Full NATS coverage.** Core pub/sub, JetStream persistent messaging, Key-Value store, Object Store, and the Service Framework — the complete NATS API in one library.
+**Full NATS coverage.** Core pub/sub, JetStream persistent messaging, Key-Value store, Object Store, and the Service Framework - the complete NATS API in one library.
 
-**Type-safe from publish to subscribe.** One `Schema` derivation covers every format — JSON, Avro, MsgPack. Prefer jsoniter-scala or play-json? Bring your own codec and it bridges automatically.
+**Type-safe from publish to subscribe.** One `Schema` derivation covers every format - JSON, Avro, MsgPack. Prefer jsoniter-scala or play-json? Bring your own codec and it bridges automatically.
 
 **Testing without mocks.** `NatsTestLayers.nats` starts a real NATS server in Docker. One line, no infrastructure to manage, no mocks to drift from the real protocol.
 
@@ -57,7 +57,7 @@ object HelloNats extends ZIOAppDefault {
 }
 ```
 
-`Nats.default` connects to `localhost:4222`. Every other service — JetStream, KV, Object Store — is a `ZLayer` derived from it.
+`Nats.default` connects to `localhost:4222`. Every other service - JetStream, KV, Object Store - is a `ZLayer` derived from it.
 
 ---
 
@@ -81,17 +81,17 @@ nats.publish(Subject("orders.new"), OrderPlaced("ord-1", 59.99))
 nats.subscribe[OrderPlaced](Subject("orders.>")).map(_.value).runDrain
 ```
 
-Switch `JsonFormat` to `AvroFormat` or `MsgPackFormat` and the wire format changes — your domain code does not.
+Switch `JsonFormat` to `AvroFormat` or `MsgPackFormat` and the wire format changes - your domain code does not.
 
-### JetStream — persistent, at-least-once delivery
+### JetStream - persistent streams with up to exactly-once delivery
 
 Messages survive server restarts. Consumer positions are tracked server-side and resume exactly where they left off after a crash or reconnect:
 
 ```scala
-// Publish with a delivery guarantee — blocks until the server confirms storage
+// Publish with a delivery guarantee - blocks until the server confirms storage
 val ack: PublishAck = js.publish(Subject("orders.new"), order)
 
-// Consume durably — ack each message to advance the server-side cursor
+// Consume durably - ack each message to advance the server-side cursor
 consumer.consume[OrderPlaced]()
   .mapZIO(env => fulfill(env.value) *> env.message.ack)
   .runDrain
@@ -124,7 +124,7 @@ object OrderSpec extends ZIOSpecDefault {
 }
 ```
 
-`NatsTestLayers.nats` starts a NATS container via [testcontainers](https://testcontainers.com), waits for it to be ready, and provides a fully wired `Nats` service. `.provideShared` starts the container once for the whole suite — fast and cheap.
+`NatsTestLayers.nats` starts a NATS container via [testcontainers](https://testcontainers.com), waits for it to be ready, and provides a fully wired `Nats` service. `.provideShared` starts the container once for the whole suite - fast and cheap.
 
 ---
 
