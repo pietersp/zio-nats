@@ -87,20 +87,32 @@ val storeStream: ZIO[Nats, NatsError, Unit] =
 
 ## Retrieving objects
 
-`ObjectStore#get[A]` reassembles the chunks and decodes them into `ObjectData[A]`. `ObjectData[A]` bundles `data.value` (the decoded payload) and `data.summary` (an `ObjectSummary` with size, chunk count, and delete status). Use `.payload` to drop the wrapper and get just the decoded value:
+`ObjectStore#get[A]` reassembles the chunks and decodes them into `ObjectData[A]`. The type parameter selects the `NatsCodec[A]` - pass `Chunk[Byte]` for raw bytes, `String` for text, or a domain type like `ImageMetadata` for structured objects stored with a derived codec. `ObjectData[A]` bundles `data.value` (the decoded payload) and `data.summary` (an `ObjectSummary` with size, chunk count, and delete status). Use `.payload` to drop the wrapper and get just the decoded value.
+
+Retrieving each of the three objects stored earlier, each with its own type:
 
 ```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 import zio.nats.objectstore.*
+import zio.blocks.schema.Schema
+import zio.blocks.schema.json.JsonFormat
+
+case class ImageMetadata(width: Int, height: Int, format: String)
+object ImageMetadata { given Schema[ImageMetadata] = Schema.derived }
+
+val codecs = NatsCodec.fromFormat(JsonFormat)
+import codecs.derived
 
 val retrieve: ZIO[Nats, NatsError, Unit] =
   for {
-    os   <- ObjectStore.bucket("assets")
-    data <- os.get[Chunk[Byte]]("config.json")
-    _    <- ZIO.debug(s"${data.value.length} bytes, deleted=${data.summary.isDeleted}")
-    raw  <- os.get[Chunk[Byte]]("config.json").payload
-    _    <- ZIO.debug(s"Unwrapped: ${raw.length} bytes")
+    os       <- ObjectStore.bucket("assets")
+    readme   <- os.get[String]("README.md").payload
+    _        <- ZIO.debug(s"README: $readme")
+    meta     <- os.get[ImageMetadata]("logo.meta.json").payload
+    _        <- ZIO.debug(s"Image: ${meta.width}x${meta.height} ${meta.format}")
+    imgData  <- os.get[Chunk[Byte]]("logo.png")
+    _        <- ZIO.debug(s"Logo: ${imgData.value.length} bytes, chunks=${imgData.summary.chunks}")
   } yield ()
 ```
 
@@ -123,7 +135,9 @@ val retrieveStream: ZIO[Nats, NatsError, Unit] =
 
 ## Metadata, listing, and links
 
-`ObjectStore#getInfo` returns the `ObjectSummary` for an object without downloading its content - useful for checking size or existence before committing to a download. `ObjectStore#updateMeta` replaces name, description, and headers without re-uploading the bytes. `ObjectStore#list` returns a snapshot of all current objects in the bucket.
+Every object in the bucket has an `ObjectSummary` - a lightweight record holding its name, size, chunk count, description, and delete status. This metadata is stored separately from the object bytes and can be read, updated, and listed without touching the content itself.
+
+`ObjectStore#getInfo` fetches the `ObjectSummary` for a single object - useful for checking size or existence before committing to a download. `ObjectStore#updateMeta` replaces the name, description, and headers without re-uploading the bytes. `ObjectStore#list` returns a snapshot of summaries for all current objects in the bucket.
 
 `ObjectStore#addLink` creates an alias within the same bucket - reading the alias fetches the bytes of its target. `ObjectStore#addBucketLink` creates a cross-bucket reference so you can resolve objects from another bucket through a single name. To inspect, update, list, and alias objects in one flow:
 
