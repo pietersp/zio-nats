@@ -155,9 +155,7 @@ val startService: ZIO[Nats & Scope, NatsError, NatsService] =
 
 The `Scope` in the return type ties the service lifetime to the enclosing scope - when the scope closes, the service shuts down and stops accepting requests. In a long-running application, provide the scope via `ZIO.scoped` and keep it open with `ZIO.never` or another blocking effect. Requests arrive on the subject `<service-name>.<endpoint-name>` by default - in this case `inventory.stock-check`. Multiple instances started with the same config share a queue group automatically, so NATS distributes requests across them with no additional configuration.
 
-### Grouping endpoints
-
-`ServiceGroup` adds a subject prefix that organises related endpoints under a common namespace. Nest groups to mirror a deeper subject hierarchy:
+**Grouping endpoints.** `ServiceGroup` adds a subject prefix that organises related endpoints under a common namespace. Nest groups to mirror a deeper subject hierarchy:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -203,6 +201,8 @@ val startGrouped: ZIO[Nats & Scope, NatsError, NatsService] =
 ```
 
 Both endpoints are now reachable under the `catalog` prefix: `catalog.stock` and `catalog.price`.
+
+We now have a running service with two typed, discoverable endpoints.
 
 ## Calling a service
 
