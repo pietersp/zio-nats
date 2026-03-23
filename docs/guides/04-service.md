@@ -84,7 +84,7 @@ val boundWithMeta = stockEndpoint.implementWithRequest { req =>
 
 ### Handling errors
 
-When your handler can fail, use `ServiceEndpoint#withError` to declare the error type and provide a `ServiceErrorMapper[E]`. The mapper converts your error into a `(message, code)` pair that NATS sends back as a typed service error response. Built-in mappers are provided for `NatsError` and `String`:
+When your handler can fail, call `ServiceEndpoint#withError[E]` to declare the error type. A universal fallback `ServiceErrorMapper[E]` is always in scope — it sends `e.toString` with HTTP status code 500 — so no extra setup is required. Built-in mappers for `String` and `NatsError` are also provided, so plain string errors just work:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -111,6 +111,76 @@ val fallibleEndpoint = stockEndpoint.withError[String].implement { req =>
     ZIO.succeed(StockReply(available = 42, reserved = 3))
 }
 ```
+
+#### Custom `ServiceErrorMapper`
+
+To control the HTTP-style status code or error message format, provide a `given ServiceErrorMapper[E]` in the same scope as the endpoint. The full form uses `with`:
+
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.blocks.schema.Schema
+import zio.blocks.schema.json.JsonFormat
+
+enum StockError:
+  case NotFound(id: String)
+  case InvalidRequest(msg: String)
+
+object StockError { given Schema[StockError] = Schema.derived }
+
+val codecs = NatsCodec.fromFormat(JsonFormat)
+import codecs.derived
+
+given ServiceErrorMapper[StockError] with {
+  def toErrorResponse(e: StockError): (String, Int) = e match {
+    case StockError.NotFound(id)        => (s"Item $id not found", 404)
+    case StockError.InvalidRequest(msg) => (msg, 400)
+  }
+}
+
+case class StockRequest(itemId: String)
+case class StockReply(available: Int, reserved: Int)
+
+object StockRequest { given Schema[StockRequest] = Schema.derived }
+object StockReply   { given Schema[StockReply]   = Schema.derived }
+
+val ep = ServiceEndpoint[StockRequest, StockReply]("stock-check").withError[StockError]
+```
+
+Because `ServiceErrorMapper[E]` has a single abstract method, Scala 3 also accepts a lambda (SAM syntax), which is more concise:
+
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.blocks.schema.Schema
+import zio.blocks.schema.json.JsonFormat
+
+enum StockError:
+  case NotFound(id: String)
+  case InvalidRequest(msg: String)
+
+object StockError { given Schema[StockError] = Schema.derived }
+
+val codecs = NatsCodec.fromFormat(JsonFormat)
+import codecs.derived
+
+given ServiceErrorMapper[StockError] = { e =>
+  e match {
+    case StockError.NotFound(id)        => (s"Item $id not found", 404)
+    case StockError.InvalidRequest(msg) => (msg, 400)
+  }
+}
+
+case class StockRequest(itemId: String)
+case class StockReply(available: Int, reserved: Int)
+
+object StockRequest { given Schema[StockRequest] = Schema.derived }
+object StockReply   { given Schema[StockReply]   = Schema.derived }
+
+val ep = ServiceEndpoint[StockRequest, StockReply]("stock-check").withError[StockError]
+```
+
+Both forms produce identical behaviour. The `(message, code)` pair is sent to callers via the `Nats-Service-Error` and `Nats-Service-Error-Code` headers, following the NATS Micro protocol convention.
 
 :::tip
 For infallible handlers (`IO[Nothing, Out]`), Scala 3's given resolution requires an explicit `[Nothing]` type parameter: `ep.implement[Nothing](handler)`. Handlers with a concrete error type work without annotation.
