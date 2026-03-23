@@ -211,4 +211,4 @@ def buildLayer(sslCtx: SSLContext, authHandler: AuthHandler) =
 
 - [NatsConfig reference](../reference/01-nats-config.md) — full field table with types and defaults
 - [Architecture](../concepts/01-architecture.md) — how `NatsConfig` feeds into the service graph
-- [Connection Events guide](./08-connection-events.md) — observe reconnection and disconnect events
+- [Connection Events guide](./07-connection-events.md) — observe reconnection and disconnect events

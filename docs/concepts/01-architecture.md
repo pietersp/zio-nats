@@ -81,7 +81,7 @@ val layer1 = ZLayer.succeed(NatsConfig.default) >>> Nats.live
 val layer2 = Nats.default
 ```
 
-See [Configuration](../guides/07-configuration.md) for auth, TLS, environment variable loading,
+See [Configuration](../guides/08-configuration.md) for auth, TLS, environment variable loading,
 and HOCON integration.
 
 ## Service descriptions
@@ -100,4 +100,4 @@ and HOCON integration.
 
 - [Quick start](../quickstart.md) — wire `Nats` into a working app in 5 minutes
 - [Pub/Sub guide](../guides/01-pubsub.md) — the core messaging operations
-- [Configuration guide](../guides/07-configuration.md) — auth, TLS, environment variables
+- [Configuration guide](../guides/08-configuration.md) — auth, TLS, environment variables

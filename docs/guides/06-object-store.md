@@ -218,5 +218,5 @@ val watching: ZIO[Nats, NatsError, Unit] =
 
 ## Next steps
 
-- [Configuration guide](./07-configuration.md) - connecting to authenticated or TLS-secured servers with JetStream enabled
+- [Configuration guide](./08-configuration.md) - connecting to authenticated or TLS-secured servers with JetStream enabled
 - [JetStream guide](./03-jetstream.md) - Object Store is built on JetStream streams; understanding storage types and retention policies helps with advanced bucket configuration
