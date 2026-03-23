@@ -175,4 +175,4 @@ Set these directly on `NatsConfig` when constructing it in code, or via the corr
 ## Next steps
 
 - [NatsConfig reference](../reference/01-nats-config.md) - full field table with types and defaults
-- [Architecture](../concepts/01-architecture.md) - how `NatsConfig` feeds into the service layer
+- [Layer Construction](../concepts/01-construction.md) - how `NatsConfig` feeds into the service layer
