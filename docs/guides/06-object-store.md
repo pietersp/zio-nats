@@ -28,9 +28,11 @@ val createBucket: ZIO[ObjectStoreManagement, NatsError, Unit] =
 
 ## Storing objects
 
-`ObjectStore#put` encodes the value with `NatsCodec[A]`, chunks it server-side, and stores it under a name. `Chunk[Byte]` and `String` work out of the box; for domain types bring a `NatsCodec` in scope (see [Serialization](./02-serialization.md)). `put` returns an `ObjectSummary` with `name`, `size`, `chunks`, and `isDeleted`. Attach a description or custom headers by passing an `ObjectMeta` instead of a plain name.
+`ObjectStore#put` encodes the value with `NatsCodec[A]`, chunks it server-side, and stores it under a name. `Chunk[Byte]` and `String` work out of the box; for domain types bring a `NatsCodec` in scope (see [Serialization](./02-serialization.md)). `put` returns an `ObjectSummary` with `name`, `size`, `chunks`, and `isDeleted`.
 
-Three puts - raw image bytes, a plain string, and a typed case class - to show the range of what the same API accepts:
+By default, the object name is the only identifier. `ObjectMeta` lets you attach additional context to an object at write time: a human-readable `description` and custom `Headers` that travel with the object and are accessible via `getInfo` without downloading the content.
+
+Three puts - a plain string, a typed case class, and raw image bytes with metadata - to show the range of what the same API accepts:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -51,17 +53,17 @@ val store: ZIO[Nats, NatsError, Unit] =
   for {
     os <- ObjectStore.bucket("assets")
 
-    // Raw bytes - image loaded from disk or another source
+    // Plain string - a README or licence file
+    _ <- os.put("README.md", "# Assets\nBrand assets for the shop service.")
+
+    // Typed case class - sidecar metadata stored alongside the image
+    _ <- os.put("logo.meta.json", ImageMetadata(512, 512, "PNG"))
+
+    // Raw bytes with ObjectMeta - description is stored server-side with the object
     _ <- os.put(
            ObjectMeta("logo.png", description = Some("Brand logo")),
            imageBytes
          )
-
-    // Plain string - a README or licence file
-    _          <- os.put("README.md", "# Assets\nBrand assets for the shop service.")
-
-    // Typed case class - sidecar metadata stored alongside the image
-    _          <- os.put("logo.meta.json", ImageMetadata(512, 512, "PNG"))
   } yield ()
 ```
 
