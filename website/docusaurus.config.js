@@ -38,7 +38,7 @@ const config = {
         title: 'zio-nats',
         items: [
           {
-            href: 'pathname:///api/index.html',
+            href: 'https://javadoc.io/doc/io.github.pietersp/zio-nats-core_3/latest/',
             label: 'API',
             position: 'left',
           },

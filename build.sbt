@@ -141,22 +141,14 @@ lazy val zioNatsTest = (project in file("zio-nats-test"))
 lazy val docs = project
   .in(file("zio-nats-docs"))
   .dependsOn(zioNatsCore, zioNatsZioBlocks, zioNatsJsoniter, zioNatsPlayJson)
-  .enablePlugins(MdocPlugin, DocusaurusPlugin, ScalaUnidocPlugin)
+  .enablePlugins(MdocPlugin, DocusaurusPlugin)
   .settings(
     name           := "zio-nats-docs",
     publish / skip := true,
     mimaPreviousArtifacts := Set.empty,
     mdocIn  := (LocalRootProject / baseDirectory).value / "docs",
     mdocOut := (LocalRootProject / baseDirectory).value / "website" / "docs",
-    mdocVariables := Map("VERSION" -> version.value),
-    ScalaUnidoc / unidoc / target :=
-      (LocalRootProject / baseDirectory).value / "website" / "static" / "api",
-    ScalaUnidoc / unidoc / unidocProjectFilter :=
-      inProjects(zioNatsCore, zioNatsZioBlocks, zioNatsJsoniter, zioNatsPlayJson),
-    docusaurusCreateSite :=
-      docusaurusCreateSite.dependsOn(Compile / unidoc).value,
-    docusaurusPublishGhpages :=
-      docusaurusPublishGhpages.dependsOn(Compile / unidoc).value
+    mdocVariables := Map("VERSION" -> version.value)
   )
 
 lazy val zioNatsExamples = (project in file("examples"))
