@@ -12,8 +12,8 @@
 </div>
 <div class="cover">
  <div class="doc">
-  <p>jsoniter-scala integration for <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+37-b22a2d57-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>.</p>
-  <p>Bridges <code>JsonValueCodec[A]</code> (jsoniter-scala's codec type) to the library's <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+37-b22a2d57-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> typeclass. The bridge <code>given fromJsonValueCodec</code> is the primary integration point: after <code>import zio.nats.{given, *}</code>, any <code>JsonValueCodec[A]</code> that is in implicit scope is automatically promoted to a <code>NatsCodec[A]</code>.</p>
+  <p>jsoniter-scala integration for <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>.</p>
+  <p>Bridges <code>JsonValueCodec[A]</code> (jsoniter-scala's codec type) to the library's <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> typeclass. The bridge <code>given fromJsonValueCodec</code> is the primary integration point: after <code>import zio.nats.{given, *}</code>, any <code>JsonValueCodec[A]</code> that is in implicit scope is automatically promoted to a <code>NatsCodec[A]</code>.</p>
   <p>==Typical usage==</p>
   <div class="snippet mono-small-block">
    <pre><code class="language-"><span line-number="1" class=""><span class="tooltip-container"></span>import com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec
@@ -116,7 +116,7 @@ node3 -> node2;
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">def </span></span><a href="NatsCodecJsoniter$.html#fromJsoniter-390" t="n" class="documentableName ">fromJsoniter</a>[<span t="k"></span><span data-unresolved-link="" t="t">A</span>](<span t="k"></span><span t="k"></span><span data-unresolved-link="" t="n">codec</span>: <a href="https://javadoc.io/page/com.github.plokhotnyuk.jsoniter-scala/jsoniter-scala-core_3/2.38.9/com/github/plokhotnyuk/jsoniter_scala/core/JsonValueCodec.html" t="t">JsonValueCodec</a>[<span t="t">A</span>]): <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+37-b22a2d57-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<span data-unresolved-link="" t="t">A</span>]
+            <span class="modifiers"></span><span class="kind"><span t="k">def </span></span><a href="NatsCodecJsoniter$.html#fromJsoniter-390" t="n" class="documentableName ">fromJsoniter</a>[<span t="k"></span><span data-unresolved-link="" t="t">A</span>](<span t="k"></span><span t="k"></span><span data-unresolved-link="" t="n">codec</span>: <a href="https://javadoc.io/page/com.github.plokhotnyuk.jsoniter-scala/jsoniter-scala-core_3/2.38.9/com/github/plokhotnyuk/jsoniter_scala/core/JsonValueCodec.html" t="t">JsonValueCodec</a>[<span t="t">A</span>]): <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<span data-unresolved-link="" t="t">A</span>]
            </div>
           </div>
          </div>
@@ -126,11 +126,11 @@ node3 -> node2;
            <div class="originInfo"></div>
            <div class="memberDocumentation">
             <div class="documentableBrief doc">
-             <p>Wrap a jsoniter-scala <code>JsonValueCodec[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+37-b22a2d57-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
+             <p>Wrap a jsoniter-scala <code>JsonValueCodec[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
             </div>
             <div class="cover">
              <div class="doc">
-              <p>Wrap a jsoniter-scala <code>JsonValueCodec[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+37-b22a2d57-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
+              <p>Wrap a jsoniter-scala <code>JsonValueCodec[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
               <p>Use this for an explicit one-off codec. For automatic bridging via implicit resolution, ensure a <code>given JsonValueCodec[A]</code> is in scope and use <code>import zio.nats.{given, *}</code> — the <code>fromJsonValueCodec</code> given handles the rest.</p>
              </div>
              <h2 class="h200">Value parameters</h2>
@@ -154,7 +154,7 @@ node3 -> node2;
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">def </span></span><a href="NatsCodecJsoniter$.html#wrap-390" t="n" class="documentableName ">wrap</a>[<span t="k"></span><span data-unresolved-link="" t="t">A</span>](<span t="k"></span><span t="k"></span><span data-unresolved-link="" t="n">codec</span>: <a href="https://javadoc.io/page/com.github.plokhotnyuk.jsoniter-scala/jsoniter-scala-core_3/2.38.9/com/github/plokhotnyuk/jsoniter_scala/core/JsonValueCodec.html" t="t">JsonValueCodec</a>[<span t="t">A</span>]): <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+37-b22a2d57-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<span data-unresolved-link="" t="t">A</span>]
+            <span class="modifiers"></span><span class="kind"><span t="k">def </span></span><a href="NatsCodecJsoniter$.html#wrap-390" t="n" class="documentableName ">wrap</a>[<span t="k"></span><span data-unresolved-link="" t="t">A</span>](<span t="k"></span><span t="k"></span><span data-unresolved-link="" t="n">codec</span>: <a href="https://javadoc.io/page/com.github.plokhotnyuk.jsoniter-scala/jsoniter-scala-core_3/2.38.9/com/github/plokhotnyuk/jsoniter_scala/core/JsonValueCodec.html" t="t">JsonValueCodec</a>[<span t="t">A</span>]): <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<span data-unresolved-link="" t="t">A</span>]
            </div>
           </div>
          </div>
@@ -164,12 +164,12 @@ node3 -> node2;
            <div class="originInfo"></div>
            <div class="memberDocumentation">
             <div class="documentableBrief doc">
-             <p>Wrap a <code>JsonValueCodec[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+37-b22a2d57-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
+             <p>Wrap a <code>JsonValueCodec[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
             </div>
             <div class="cover">
              <div class="doc">
-              <p>Wrap a <code>JsonValueCodec[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+37-b22a2d57-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
-              <p>Encoding delegates to <code>writeToArray</code>; decoding delegates to <code>readFromArray</code> and maps any thrown exception (typically a <code>JsonReaderException</code>) to <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+37-b22a2d57-SNAPSHOT/zio/nats/NatsDecodeError.html">NatsDecodeError</a>.</p>
+              <p>Wrap a <code>JsonValueCodec[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
+              <p>Encoding delegates to <code>writeToArray</code>; decoding delegates to <code>readFromArray</code> and maps any thrown exception (typically a <code>JsonReaderException</code>) to <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsDecodeError.html">NatsDecodeError</a>.</p>
              </div>
              <h2 class="h200">Value parameters</h2>
              <dl class="attributes attributes-small">
