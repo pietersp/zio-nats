@@ -229,6 +229,10 @@ object StockError   { given Schema[StockError]   = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
+given ServiceErrorMapper[StockError] with {
+  def toErrorResponse(e: StockError): (String, Int) = (e.reason, 500)
+}
+
 // Shared endpoint descriptor - the complete typed contract
 val stockEndpoint = ServiceEndpoint[StockRequest, StockReply]("stock-check")
   .withError[StockError]
