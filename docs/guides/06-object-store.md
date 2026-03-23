@@ -28,22 +28,39 @@ val createBucket: ZIO[ObjectStoreManagement, NatsError, Unit] =
 
 ## Storing objects
 
-`ObjectStore#put` encodes the value with `NatsCodec[A]`, chunks it server-side, and stores it under a name. `Chunk[Byte]` and `String` work out of the box; for domain types bring a `NatsCodec` in scope (see [Serialization](./02-serialization.md)). `put` returns an `ObjectSummary` with `name`, `size`, `chunks`, and `isDeleted`. Attach a description or custom headers by passing an `ObjectMeta` instead of a plain name:
+`ObjectStore#put` encodes the value with `NatsCodec[A]`, chunks it server-side, and stores it under a name. `Chunk[Byte]` and `String` work out of the box; for domain types bring a `NatsCodec` in scope (see [Serialization](./02-serialization.md)). `put` returns an `ObjectSummary` with `name`, `size`, `chunks`, and `isDeleted`. Attach a description or custom headers by passing an `ObjectMeta` instead of a plain name.
+
+Three puts - raw image bytes, a plain string, and a typed case class - to show the range of what the same API accepts:
 
 ```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 import zio.nats.objectstore.*
+import zio.blocks.schema.Schema
+import zio.blocks.schema.json.JsonFormat
+
+case class ImageMetadata(width: Int, height: Int, format: String)
+object ImageMetadata { given Schema[ImageMetadata] = Schema.derived }
+
+val codecs = NatsCodec.fromFormat(JsonFormat)
+import codecs.derived
 
 val store: ZIO[Nats, NatsError, Unit] =
   for {
-    os      <- ObjectStore.bucket("assets")
-    summary <- os.put("config.json", Chunk.fromArray("""{"env":"prod"}""".getBytes))
-    _       <- ZIO.debug(s"${summary.name}: ${summary.size} bytes in ${summary.chunks} chunks")
-    _       <- os.put(
-                 ObjectMeta("logo.png", description = Some("Brand logo")),
-                 Chunk.fromArray("(binary)".getBytes)
-               )
+    os <- ObjectStore.bucket("assets")
+
+    // Raw bytes - image loaded from disk or another source
+    imgSummary <- os.put(
+                    ObjectMeta("logo.png", description = Some("Brand logo")),
+                    Chunk.fromArray(Array[Byte](0x89.toByte, 0x50, 0x4e, 0x47)) // PNG header bytes
+                  )
+    _          <- ZIO.debug(s"Image: ${imgSummary.size} bytes in ${imgSummary.chunks} chunks")
+
+    // Plain string - a README or licence file
+    _          <- os.put("README.md", "# Assets\nBrand assets for the shop service.")
+
+    // Typed case class - sidecar metadata stored alongside the image
+    _          <- os.put("logo.meta.json", ImageMetadata(512, 512, "PNG"))
   } yield ()
 ```
 
