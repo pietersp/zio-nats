@@ -340,13 +340,13 @@ val discoverAll: ZIO[ServiceDiscovery, NatsError, Unit] =
 
 The three discovery operations each have three overloads:
 
-| Call | Returns |
-|------|---------|
-| `ping()` | `List[PingResponse]` - all services in the cluster |
-| `ping(name)` | `List[PingResponse]` - all instances of the named service |
-| `ping(name, id)` | `Option[PingResponse]` - a specific instance by ID |
-| `info(...)` | Same shapes, returns `InfoResponse` with endpoint list |
-| `stats(...)` | Same shapes, returns `StatsResponse` with per-endpoint counters |
+| Call              | Returns                                                          |
+|-------------------|------------------------------------------------------------------|
+| `ping()`          | `List[PingResponse]` - all services in the cluster              |
+| `ping(name)`      | `List[PingResponse]` - all instances of the named service       |
+| `ping(name, id)`  | `Option[PingResponse]` - a specific instance by ID             |
+| `info(...)`       | Same shapes, returns `InfoResponse` with endpoint list          |
+| `stats(...)`      | Same shapes, returns `StatsResponse` with per-endpoint counters |
 
 `NatsService#stats` returns the same `StatsResponse` from the server side - useful for exposing metrics from within the service process itself.
 
