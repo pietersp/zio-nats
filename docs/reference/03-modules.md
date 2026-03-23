@@ -79,3 +79,5 @@ libraryDependencies += "dev.zio" %% "zio-blocks-schema-thrift"  % "<zio-blocks-v
 libraryDependencies += "dev.zio" %% "zio-blocks-schema-bson"    % "<zio-blocks-version>"
 libraryDependencies += "dev.zio" %% "zio-blocks-schema-toon"    % "<zio-blocks-version>"
 ```
+
+More formats are likely to be added as zio-blocks grows. See the [zio-blocks documentation](https://zio.dev/zio-blocks/) for the current list of supported formats.

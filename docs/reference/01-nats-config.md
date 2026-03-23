@@ -5,6 +5,8 @@ title: NatsConfig Reference
 
 Full field reference for `NatsConfig`. For usage examples - auth, TLS, environment variables, HOCON - see the [Configuration guide](../guides/08-configuration.md).
 
+zio-nats is built on [jnats](https://github.com/nats-io/nats.java), the official Java NATS client. `NatsConfig` maps directly onto jnats connection options - if you need a setting that is not exposed here, the [jnats documentation](https://github.com/nats-io/nats.java) is the authoritative source for what the underlying options do.
+
 ## Constructor
 
 All fields have defaults. Pass only what you want to override:
