@@ -12,7 +12,7 @@
 </div>
 <div class="cover">
  <div class="doc">
-  <p>Derives <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> instances from a zio-blocks <a href="https://javadoc.io/page/dev.zio/zio-blocks-schema_3/0.0.29/zio/blocks/schema/codec/Format.html">zio.blocks.schema.codec.Format</a>.</p>
+  <p>Derives <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> instances from a zio-blocks <a href="https://javadoc.io/page/dev.zio/zio-blocks-schema_3/0.0.29/zio/blocks/schema/codec/Format.html">zio.blocks.schema.codec.Format</a>.</p>
   <p>Import <code>builder.derived</code> to bring a default codec for all Schema-annotated types into scope.</p>
   <div class="snippet mono-small-block">
    <pre><code class="language-"><span line-number="1" class=""><span class="tooltip-container"></span>val codecs = NatsCodec.fromFormat(JsonFormat)
@@ -124,7 +124,7 @@ node3 -> node2;
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">given </span></span><a href="NatsCodecZioBlocks$$Builder.html#derived-fffff0fb" t="n" class="documentableName ">derived</a>[<span t="k"></span><span data-unresolved-link="" t="t">A</span> : <a href="https://javadoc.io/page/dev.zio/zio-blocks-schema_3/0.0.29/zio/blocks/schema/Schema.html" t="t">Schema</a>]: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<span data-unresolved-link="" t="t">A</span>]
+            <span class="modifiers"></span><span class="kind"><span t="k">given </span></span><a href="NatsCodecZioBlocks$$Builder.html#derived-fffff0fb" t="n" class="documentableName ">derived</a>[<span t="k"></span><span data-unresolved-link="" t="t">A</span> : <a href="https://javadoc.io/page/dev.zio/zio-blocks-schema_3/0.0.29/zio/blocks/schema/Schema.html" t="t">Schema</a>]: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<span data-unresolved-link="" t="t">A</span>]
            </div>
           </div>
          </div>
@@ -134,14 +134,14 @@ node3 -> node2;
            <div class="originInfo"></div>
            <div class="memberDocumentation">
             <div class="documentableBrief doc">
-             <p>Derive a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> for type <code>A</code> using this builder's format.</p>
+             <p>Derive a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> for type <code>A</code> using this builder's format.</p>
             </div>
             <div class="cover">
              <div class="doc">
-              <p>Derive a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> for type <code>A</code> using this builder's format.</p>
+              <p>Derive a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> for type <code>A</code> using this builder's format.</p>
               <p>The underlying format codec is built the first time this <code>given</code> is resolved for a particular type <code>A</code>, then cached in this <a href="NatsCodecZioBlocks$$Builder.html">Builder</a> instance. Subsequent resolutions for the same <code>A</code> return the cached codec without re-deriving.</p>
               <p>If the format cannot derive a codec for <code>A</code> — for example because no implicit <code>Deriver</code> is available — an exception is thrown on the first resolution, failing fast rather than hiding the error inside an <code>encode</code> call.</p>
-              <p>Import this method to make <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> available for all types that have a given <a href="https://javadoc.io/page/dev.zio/zio-blocks-schema_3/0.0.29/zio/blocks/schema/Schema.html">zio.blocks.schema.Schema</a>.</p>
+              <p>Import this method to make <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> available for all types that have a given <a href="https://javadoc.io/page/dev.zio/zio-blocks-schema_3/0.0.29/zio/blocks/schema/Schema.html">zio.blocks.schema.Schema</a>.</p>
               <div class="snippet mono-small-block">
                <pre><code class="language-"><span line-number="1" class=""><span class="tooltip-container"></span>import builder.derived
 </span></code></pre>

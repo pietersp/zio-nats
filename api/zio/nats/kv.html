@@ -34,7 +34,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">trait </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValue.html" t="n" class="documentableName ">KeyValue</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">trait </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValue.html" t="n" class="documentableName ">KeyValue</a>
            </div>
           </div>
          </div>
@@ -50,8 +50,8 @@
              <div class="doc">
               <p>Service for key-value operations on a single NATS KV bucket.</p>
               <p>NATS KV is built on JetStream and provides compare-and-swap writes, revisioned history, and change-watch streams.</p>
-              <p>All read operations are generic <code>[A: NatsCodec]</code> and return <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEnvelope.html">KvEnvelope</a>s that bundle the decoded value with server-side metadata (key, revision, operation, and bucket name). Pass <code>Chunk[Byte]</code> as <code>A</code> to skip decoding and receive raw bytes.</p>
-              <p>Obtain an instance via <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValue$.html#bucket(bucketName:String):ZIO[Nats,NatsError,KeyValue]">KeyValue.bucket</a> (requires a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/Nats.html">zio.nats.Nats</a> connection in scope). Use <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueManagement.html">KeyValueManagement</a> to create or delete buckets.</p>
+              <p>All read operations are generic <code>[A: NatsCodec]</code> and return <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEnvelope.html">KvEnvelope</a>s that bundle the decoded value with server-side metadata (key, revision, operation, and bucket name). Pass <code>Chunk[Byte]</code> as <code>A</code> to skip decoding and receive raw bytes.</p>
+              <p>Obtain an instance via <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValue$.html#bucket(bucketName:String):ZIO[Nats,NatsError,KeyValue]">KeyValue.bucket</a> (requires a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/Nats.html">zio.nats.Nats</a> connection in scope). Use <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueManagement.html">KeyValueManagement</a> to create or delete buckets.</p>
               <p>==Example==</p>
               <div class="snippet mono-small-block">
                <pre><code class="language-"><span line-number="1" class=""><span class="tooltip-container"></span>for {
@@ -69,7 +69,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValue$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValue$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -98,7 +98,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValue$.html" t="n" class="documentableName ">KeyValue</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValue$.html" t="n" class="documentableName ">KeyValue</a>
            </div>
           </div>
          </div>
@@ -115,7 +115,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValue.html">trait</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValue.html">trait</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -140,7 +140,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValue$.html" t="n">KeyValue</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValue$.html" t="n">KeyValue</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
@@ -155,7 +155,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html" t="n" class="documentableName ">KeyValueBucketStatus</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#bucketName:String" t="n">bucketName</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#description:Option[String]" t="n">description</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>], <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#entryCount:Long" t="n">entryCount</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#byteCount:Long" t="n">byteCount</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#maxHistoryPerKey:Long" t="n">maxHistoryPerKey</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#maxBucketSize:Long" t="n">maxBucketSize</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#storageType:StorageType" t="n">storageType</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/StorageType.html" t="t">StorageType</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#replicas:Int" t="n">replicas</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Int.html" t="t">Int</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#isCompressed:Boolean" t="n">isCompressed</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#ttl:Option[Duration]" t="n">ttl</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/dev.zio/zio_3/2.1.24/zio/DurationModule.html#Duration" t="t">Duration</a>])
+            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html" t="n" class="documentableName ">KeyValueBucketStatus</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#bucketName:String" t="n">bucketName</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#description:Option[String]" t="n">description</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>], <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#entryCount:Long" t="n">entryCount</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#byteCount:Long" t="n">byteCount</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#maxHistoryPerKey:Long" t="n">maxHistoryPerKey</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#maxBucketSize:Long" t="n">maxBucketSize</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#storageType:StorageType" t="n">storageType</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/StorageType.html" t="t">StorageType</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#replicas:Int" t="n">replicas</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Int.html" t="t">Int</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#isCompressed:Boolean" t="n">isCompressed</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueBucketStatus.html#ttl:Option[Duration]" t="n">ttl</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/dev.zio/zio_3/2.1.24/zio/DurationModule.html#Duration" t="t">Duration</a>])
            </div>
           </div>
          </div>
@@ -272,7 +272,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html" t="n" class="documentableName ">KeyValueConfig</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#description:Option[String]" t="n">description</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#maxValueSize:Int" t="n">maxValueSize</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Int.html" t="t">Int</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#maxBucketSize:Long" t="n">maxBucketSize</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#maxHistoryPerKey:Int" t="n">maxHistoryPerKey</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Int.html" t="t">Int</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#storageType:StorageType" t="n">storageType</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/StorageType.html" t="t">StorageType</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#compression:Boolean" t="n">compression</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#numberOfReplicas:Int" t="n">numberOfReplicas</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Int.html" t="t">Int</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#ttl:Option[Duration]" t="n">ttl</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/dev.zio/zio_3/2.1.24/zio/DurationModule.html#Duration" t="t">Duration</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#limitMarkerTtl:Option[Duration]" t="n">limitMarkerTtl</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/dev.zio/zio_3/2.1.24/zio/DurationModule.html#Duration" t="t">Duration</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#mirror:Option[MirrorConfig]" t="n">mirror</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/MirrorConfig.html" t="t">MirrorConfig</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#sources:List[SourceConfig]" t="n">sources</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/List.html" t="t">List</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/SourceConfig.html" t="t">SourceConfig</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#republish:Option[RepublishConfig]" t="n">republish</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/RepublishConfig.html" t="t">RepublishConfig</a>] = ...)
+            <span class="modifiers"><span t="k">case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html" t="n" class="documentableName ">KeyValueConfig</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#description:Option[String]" t="n">description</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#maxValueSize:Int" t="n">maxValueSize</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Int.html" t="t">Int</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#maxBucketSize:Long" t="n">maxBucketSize</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#maxHistoryPerKey:Int" t="n">maxHistoryPerKey</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Int.html" t="t">Int</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#storageType:StorageType" t="n">storageType</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/StorageType.html" t="t">StorageType</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#compression:Boolean" t="n">compression</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#numberOfReplicas:Int" t="n">numberOfReplicas</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Int.html" t="t">Int</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#ttl:Option[Duration]" t="n">ttl</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/dev.zio/zio_3/2.1.24/zio/DurationModule.html#Duration" t="t">Duration</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#limitMarkerTtl:Option[Duration]" t="n">limitMarkerTtl</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/dev.zio/zio_3/2.1.24/zio/DurationModule.html#Duration" t="t">Duration</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#mirror:Option[MirrorConfig]" t="n">mirror</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/jetstream/MirrorConfig.html" t="t">MirrorConfig</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#sources:List[SourceConfig]" t="n">sources</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/List.html" t="t">List</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/jetstream/SourceConfig.html" t="t">SourceConfig</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html#republish:Option[RepublishConfig]" t="n">republish</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/RepublishConfig.html" t="t">RepublishConfig</a>] = ...)
            </div>
           </div>
          </div>
@@ -375,7 +375,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -413,7 +413,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig$.html" t="n" class="documentableName ">KeyValueConfig</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig$.html" t="n" class="documentableName ">KeyValueConfig</a>
            </div>
           </div>
          </div>
@@ -430,7 +430,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig.html">class</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig.html">class</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -461,7 +461,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueConfig$.html" t="n">KeyValueConfig</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueConfig$.html" t="n">KeyValueConfig</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
@@ -476,7 +476,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueEntry.html" t="n" class="documentableName ">KeyValueEntry</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueEntry.html#key:String" t="n">key</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueEntry.html#value:Chunk[Byte]" t="n">value</a>: <a href="https://javadoc.io/page/dev.zio/zio_3/2.1.24/zio/Chunk.html" t="t">Chunk</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Byte.html" t="t">Byte</a>], <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueEntry.html#revision:Long" t="n">revision</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueEntry.html#operation:KeyValueOperation" t="n">operation</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueOperation.html" t="t">KeyValueOperation</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueEntry.html#bucketName:String" t="n">bucketName</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>)
+            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueEntry.html" t="n" class="documentableName ">KeyValueEntry</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueEntry.html#key:String" t="n">key</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueEntry.html#value:Chunk[Byte]" t="n">value</a>: <a href="https://javadoc.io/page/dev.zio/zio_3/2.1.24/zio/Chunk.html" t="t">Chunk</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Byte.html" t="t">Byte</a>], <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueEntry.html#revision:Long" t="n">revision</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueEntry.html#operation:KeyValueOperation" t="n">operation</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueOperation.html" t="t">KeyValueOperation</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueEntry.html#bucketName:String" t="n">bucketName</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>)
            </div>
           </div>
          </div>
@@ -491,7 +491,7 @@
             <div class="cover">
              <div class="doc">
               <p>Raw metadata for a single entry in a NATS KV bucket.</p>
-              <p>Embedded in <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEnvelope.html">KvEnvelope</a> to give callers access to revision, operation, and other server-side metadata alongside the decoded value.</p>
+              <p>Embedded in <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEnvelope.html">KvEnvelope</a> to give callers access to revision, operation, and other server-side metadata alongside the decoded value.</p>
              </div>
              <h2 class="h200">Value parameters</h2>
              <dl class="attributes attributes-small">
@@ -511,7 +511,7 @@
                operation
               </dt>
               <dd class="body-medium">
-               <p>Whether this entry is a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueOperation$.html#Put:KeyValueOperation">KeyValueOperation.Put</a>, <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueOperation$.html#Delete:KeyValueOperation">KeyValueOperation.Delete</a>, or <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueOperation$.html#Purge:KeyValueOperation">KeyValueOperation.Purge</a> marker.</p>
+               <p>Whether this entry is a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueOperation$.html#Put:KeyValueOperation">KeyValueOperation.Put</a>, <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueOperation$.html#Delete:KeyValueOperation">KeyValueOperation.Delete</a>, or <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueOperation$.html#Purge:KeyValueOperation">KeyValueOperation.Purge</a> marker.</p>
               </dd>
               <dt class="body-small">
                revision
@@ -564,7 +564,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">trait </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueManagement.html" t="n" class="documentableName ">KeyValueManagement</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">trait </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueManagement.html" t="n" class="documentableName ">KeyValueManagement</a>
            </div>
           </div>
          </div>
@@ -579,7 +579,7 @@
             <div class="cover">
              <div class="doc">
               <p>Service for managing Key-Value buckets.</p>
-              <p>Provides administrative operations to create, update, and delete KV buckets. Obtain an instance via <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueManagement$.html#live:ZLayer[Nats,NatsError,KeyValueManagement]">KeyValueManagement.live</a> (requires <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/Nats.html">zio.nats.Nats</a> in scope).</p>
+              <p>Provides administrative operations to create, update, and delete KV buckets. Obtain an instance via <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueManagement$.html#live:ZLayer[Nats,NatsError,KeyValueManagement]">KeyValueManagement.live</a> (requires <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/Nats.html">zio.nats.Nats</a> in scope).</p>
              </div>
              <h2 class="h200">Attributes</h2>
              <dl class="attributes attributes-small">
@@ -587,7 +587,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueManagement$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueManagement$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -616,7 +616,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueManagement$.html" t="n" class="documentableName ">KeyValueManagement</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueManagement$.html" t="n" class="documentableName ">KeyValueManagement</a>
            </div>
           </div>
          </div>
@@ -633,7 +633,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueManagement.html">trait</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueManagement.html">trait</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -658,7 +658,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueManagement$.html" t="n">KeyValueManagement</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueManagement$.html" t="n">KeyValueManagement</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
@@ -673,7 +673,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">enum </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueOperation.html" t="n" class="documentableName ">KeyValueOperation</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">enum </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueOperation.html" t="n" class="documentableName ">KeyValueOperation</a>
            </div>
           </div>
          </div>
@@ -683,11 +683,11 @@
            <div class="originInfo"></div>
            <div class="memberDocumentation">
             <div class="documentableBrief doc">
-             <p>The type of operation that produced a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueEntry.html">KeyValueEntry</a>.</p>
+             <p>The type of operation that produced a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueEntry.html">KeyValueEntry</a>.</p>
             </div>
             <div class="cover">
              <div class="doc">
-              <p>The type of operation that produced a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueEntry.html">KeyValueEntry</a>.</p>
+              <p>The type of operation that produced a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueEntry.html">KeyValueEntry</a>.</p>
               <ul>
                <li><code>Put</code> — a value was written.</li>
                <li><code>Delete</code> — a soft-delete marker was placed (history preserved).</li>
@@ -700,7 +700,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueOperation$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueOperation$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -741,7 +741,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueOperation$.html" t="n" class="documentableName ">KeyValueOperation</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueOperation$.html" t="n" class="documentableName ">KeyValueOperation</a>
            </div>
           </div>
          </div>
@@ -758,7 +758,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueOperation.html">enum</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueOperation.html">enum</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -789,7 +789,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueOperation$.html" t="n">KeyValueOperation</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueOperation$.html" t="n">KeyValueOperation</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
@@ -804,7 +804,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html" t="n" class="documentableName ">KeyValueWatchOptions</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html#ignoreDeletes:Boolean" t="n">ignoreDeletes</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html#metaOnly:Boolean" t="n">metaOnly</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html#includeHistory:Boolean" t="n">includeHistory</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html#updatesOnly:Boolean" t="n">updatesOnly</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html#fromRevision:Option[Long]" t="n">fromRevision</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>] = ...)
+            <span class="modifiers"><span t="k">case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html" t="n" class="documentableName ">KeyValueWatchOptions</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html#ignoreDeletes:Boolean" t="n">ignoreDeletes</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html#metaOnly:Boolean" t="n">metaOnly</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html#includeHistory:Boolean" t="n">includeHistory</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html#updatesOnly:Boolean" t="n">updatesOnly</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a> = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html#fromRevision:Option[Long]" t="n">fromRevision</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>] = ...)
            </div>
           </div>
          </div>
@@ -832,7 +832,7 @@
                ignoreDeletes
               </dt>
               <dd class="body-medium">
-               <p>Suppress <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent$$Delete.html">KvEvent.Delete</a> and <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent$$Purge.html">KvEvent.Purge</a> events. When <code>true</code> the server does not transmit these entries, so the watch stream emits only <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent$$Put.html">KvEvent.Put</a> events.</p>
+               <p>Suppress <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent$$Delete.html">KvEvent.Delete</a> and <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent$$Purge.html">KvEvent.Purge</a> events. When <code>true</code> the server does not transmit these entries, so the watch stream emits only <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent$$Put.html">KvEvent.Put</a> events.</p>
               </dd>
               <dt class="body-small">
                includeHistory
@@ -859,7 +859,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -897,7 +897,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions$.html" t="n" class="documentableName ">KeyValueWatchOptions</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions$.html" t="n" class="documentableName ">KeyValueWatchOptions</a>
            </div>
           </div>
          </div>
@@ -914,7 +914,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html">class</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html">class</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -945,7 +945,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions$.html" t="n">KeyValueWatchOptions</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions$.html" t="n">KeyValueWatchOptions</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
@@ -960,7 +960,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEnvelope.html" t="n" class="documentableName ">KvEnvelope</a>[<span t="k">+</span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEnvelope.html#A" t="t">A</a>](<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEnvelope.html#value:A" t="n">value</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEnvelope.html#A" t="t">A</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEnvelope.html#entry:KeyValueEntry" t="n">entry</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueEntry.html" t="t">KeyValueEntry</a>)
+            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEnvelope.html" t="n" class="documentableName ">KvEnvelope</a>[<span t="k">+</span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEnvelope.html#A" t="t">A</a>](<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEnvelope.html#value:A" t="n">value</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEnvelope.html#A" t="t">A</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEnvelope.html#entry:KeyValueEntry" t="n">entry</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueEntry.html" t="t">KeyValueEntry</a>)
            </div>
           </div>
          </div>
@@ -970,12 +970,12 @@
            <div class="originInfo"></div>
            <div class="memberDocumentation">
             <div class="documentableBrief doc">
-             <p>A decoded Key-Value entry paired with its server-side <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueEntry.html">KeyValueEntry</a> metadata.</p>
+             <p>A decoded Key-Value entry paired with its server-side <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueEntry.html">KeyValueEntry</a> metadata.</p>
             </div>
             <div class="cover">
              <div class="doc">
-              <p>A decoded Key-Value entry paired with its server-side <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueEntry.html">KeyValueEntry</a> metadata.</p>
-              <p>Returned by <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValue.html#get[A<:Any](key:String,revision:Option[Long])(implicitevidence$1:NatsCodec[A]):IO[NatsError,Option[KvEnvelope[A]]]">KeyValue.get</a> and <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValue.html#history[A<:Any](key:String)(implicitevidence$1:NatsCodec[A]):IO[NatsError,List[KvEnvelope[A]]]">KeyValue.history</a>, which only ever yield Put entries. Pass <code>Chunk[Byte]</code> as <code>A</code> to skip decoding and receive raw bytes.</p>
+              <p>A decoded Key-Value entry paired with its server-side <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueEntry.html">KeyValueEntry</a> metadata.</p>
+              <p>Returned by <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValue.html#get[A<:Any](key:String,revision:Option[Long])(implicitevidence$1:NatsCodec[A]):IO[NatsError,Option[KvEnvelope[A]]]">KeyValue.get</a> and <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValue.html#history[A<:Any](key:String)(implicitevidence$1:NatsCodec[A]):IO[NatsError,List[KvEnvelope[A]]]">KeyValue.history</a>, which only ever yield Put entries. Pass <code>Chunk[Byte]</code> as <code>A</code> to skip decoding and receive raw bytes.</p>
              </div>
              <h2 class="h200">Value parameters</h2>
              <dl class="attributes attributes-small">
@@ -983,7 +983,7 @@
                entry
               </dt>
               <dd class="body-medium">
-               <p>The raw <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueEntry.html">KeyValueEntry</a> containing metadata and raw bytes.</p>
+               <p>The raw <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueEntry.html">KeyValueEntry</a> containing metadata and raw bytes.</p>
               </dd>
               <dt class="body-small">
                value
@@ -1030,7 +1030,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">enum </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent.html" t="n" class="documentableName ">KvEvent</a>[<span t="k">+</span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent.html#A" t="t">A</a>]
+            <span class="modifiers"></span><span class="kind"><span t="k">enum </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent.html" t="n" class="documentableName ">KvEvent</a>[<span t="k">+</span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent.html#A" t="t">A</a>]
            </div>
           </div>
          </div>
@@ -1040,18 +1040,18 @@
            <div class="originInfo"></div>
            <div class="memberDocumentation">
             <div class="documentableBrief doc">
-             <p>An event emitted by a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValue.html#watch[A<:Any](keys:List[String],options:KeyValueWatchOptions)(implicitevidence$1:NatsCodec[A]):ZStream[Any,NatsError,KvEvent[A]]">KeyValue.watch</a> or <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValue.html#watchAll[A<:Any](options:KeyValueWatchOptions)(implicitevidence$1:NatsCodec[A]):ZStream[Any,NatsError,KvEvent[A]]">KeyValue.watchAll</a> stream.</p>
+             <p>An event emitted by a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValue.html#watch[A<:Any](keys:List[String],options:KeyValueWatchOptions)(implicitevidence$1:NatsCodec[A]):ZStream[Any,NatsError,KvEvent[A]]">KeyValue.watch</a> or <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValue.html#watchAll[A<:Any](options:KeyValueWatchOptions)(implicitevidence$1:NatsCodec[A]):ZStream[Any,NatsError,KvEvent[A]]">KeyValue.watchAll</a> stream.</p>
             </div>
             <div class="cover">
              <div class="doc">
-              <p>An event emitted by a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValue.html#watch[A<:Any](keys:List[String],options:KeyValueWatchOptions)(implicitevidence$1:NatsCodec[A]):ZStream[Any,NatsError,KvEvent[A]]">KeyValue.watch</a> or <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValue.html#watchAll[A<:Any](options:KeyValueWatchOptions)(implicitevidence$1:NatsCodec[A]):ZStream[Any,NatsError,KvEvent[A]]">KeyValue.watchAll</a> stream.</p>
+              <p>An event emitted by a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValue.html#watch[A<:Any](keys:List[String],options:KeyValueWatchOptions)(implicitevidence$1:NatsCodec[A]):ZStream[Any,NatsError,KvEvent[A]]">KeyValue.watch</a> or <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValue.html#watchAll[A<:Any](options:KeyValueWatchOptions)(implicitevidence$1:NatsCodec[A]):ZStream[Any,NatsError,KvEvent[A]]">KeyValue.watchAll</a> stream.</p>
               <ul>
-               <li><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent$$Put.html">KvEvent.Put</a> carries a decoded value for each successful write.</li>
-               <li><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent$$Delete.html">KvEvent.Delete</a> signals that the key was soft-deleted (history preserved).</li>
-               <li><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent$$Purge.html">KvEvent.Purge</a> signals that all history for the key was erased.</li>
+               <li><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent$$Put.html">KvEvent.Put</a> carries a decoded value for each successful write.</li>
+               <li><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent$$Delete.html">KvEvent.Delete</a> signals that the key was soft-deleted (history preserved).</li>
+               <li><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent$$Purge.html">KvEvent.Purge</a> signals that all history for the key was erased.</li>
               </ul>
-              <p>All three cases expose <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent.html#key:String">key</a>, <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent.html#revision:Long">revision</a>, and <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent.html#bucketName:String">bucketName</a>.</p>
-              <p>Set <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html#ignoreDeletes:Boolean">KeyValueWatchOptions.ignoreDeletes</a> to suppress <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent$$Delete.html">KvEvent.Delete</a> and <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent$$Purge.html">KvEvent.Purge</a> at the server side when you only care about <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/KvEvent$$Put.html">KvEvent.Put</a>.</p>
+              <p>All three cases expose <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent.html#key:String">key</a>, <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent.html#revision:Long">revision</a>, and <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent.html#bucketName:String">bucketName</a>.</p>
+              <p>Set <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KeyValueWatchOptions.html#ignoreDeletes:Boolean">KeyValueWatchOptions.ignoreDeletes</a> to suppress <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent$$Delete.html">KvEvent.Delete</a> and <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent$$Purge.html">KvEvent.Purge</a> at the server side when you only care about <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/KvEvent$$Put.html">KvEvent.Put</a>.</p>
               <div class="snippet mono-small-block">
                <pre><code class="language-"><span line-number="1" class=""><span class="tooltip-container"></span>kv.watch[UserProfile](List("user.42")).map {
 </span><span line-number="2" class=""><span class="tooltip-container"></span> case KvEvent.Put(env)    =&gt; handleUpdate(env.value)
@@ -1103,7 +1103,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/RepublishConfig.html" t="n" class="documentableName ">RepublishConfig</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/RepublishConfig.html#source:String" t="n">source</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/RepublishConfig.html#destination:String" t="n">destination</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/kv/RepublishConfig.html#headersOnly:Boolean" t="n">headersOnly</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a> = ...)
+            <span class="modifiers"><span t="k">case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/RepublishConfig.html" t="n" class="documentableName ">RepublishConfig</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/RepublishConfig.html#source:String" t="n">source</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/RepublishConfig.html#destination:String" t="n">destination</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/kv/RepublishConfig.html#headersOnly:Boolean" t="n">headersOnly</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Boolean.html" t="t">Boolean</a> = ...)
            </div>
           </div>
          </div>

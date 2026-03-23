@@ -34,7 +34,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">trait </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/BoundEndpoint.html" t="n" class="documentableName ">BoundEndpoint</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">trait </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/BoundEndpoint.html" t="n" class="documentableName ">BoundEndpoint</a>
            </div>
           </div>
          </div>
@@ -44,12 +44,12 @@
            <div class="originInfo"></div>
            <div class="memberDocumentation">
             <div class="documentableBrief doc">
-             <p>An endpoint with its handler bound, ready to be registered on a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/NatsService.html">NatsService</a>.</p>
+             <p>An endpoint with its handler bound, ready to be registered on a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/NatsService.html">NatsService</a>.</p>
             </div>
             <div class="cover">
              <div class="doc">
-              <p>An endpoint with its handler bound, ready to be registered on a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/NatsService.html">NatsService</a>.</p>
-              <p>Created by calling <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#implement(handler:Function1[In,IO[Err,Out]]):BoundEndpoint">ServiceEndpoint.implement</a> or <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#implementWithRequest(handler:Function1[ServiceRequest[In],IO[Err,Out]]):BoundEndpoint">ServiceEndpoint.implementWithRequest</a>. The input/output types are erased at this level — the codec and handler are captured inside. This allows multiple <code>BoundEndpoint</code>s with different type signatures to be passed together to <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/Nats.html#service(config:ServiceConfig,endpoints:<repeated>[BoundEndpoint]):ZIO[Scope,NatsError,NatsService]">zio.nats.Nats.service</a>.</p>
+              <p>An endpoint with its handler bound, ready to be registered on a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/NatsService.html">NatsService</a>.</p>
+              <p>Created by calling <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#implement(handler:Function1[In,IO[Err,Out]]):BoundEndpoint">ServiceEndpoint.implement</a> or <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#implementWithRequest(handler:Function1[ServiceRequest[In],IO[Err,Out]]):BoundEndpoint">ServiceEndpoint.implementWithRequest</a>. The input/output types are erased at this level — the codec and handler are captured inside. This allows multiple <code>BoundEndpoint</code>s with different type signatures to be passed together to <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/Nats.html#service(config:ServiceConfig,endpoints:<repeated>[BoundEndpoint]):ZIO[Scope,NatsError,NatsService]">zio.nats.Nats.service</a>.</p>
               <p>Users never construct this directly.</p>
              </div>
              <h2 class="h200">Attributes</h2>
@@ -81,7 +81,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointInfo.html" t="n" class="documentableName ">EndpointInfo</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointInfo.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointInfo.html#subject:String" t="n">subject</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointInfo.html#queueGroup:String" t="n">queueGroup</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointInfo.html#metadata:Map[String,String]" t="n">metadata</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/Map.html" t="t">Map</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>])
+            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointInfo.html" t="n" class="documentableName ">EndpointInfo</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointInfo.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointInfo.html#subject:String" t="n">subject</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointInfo.html#queueGroup:String" t="n">queueGroup</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointInfo.html#metadata:Map[String,String]" t="n">metadata</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/Map.html" t="t">Map</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>])
            </div>
           </div>
          </div>
@@ -91,11 +91,11 @@
            <div class="originInfo"></div>
            <div class="memberDocumentation">
             <div class="documentableBrief doc">
-             <p>Describes a single registered endpoint as seen in an <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse.html">InfoResponse</a>.</p>
+             <p>Describes a single registered endpoint as seen in an <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse.html">InfoResponse</a>.</p>
             </div>
             <div class="cover">
              <div class="doc">
-              <p>Describes a single registered endpoint as seen in an <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse.html">InfoResponse</a>.</p>
+              <p>Describes a single registered endpoint as seen in an <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse.html">InfoResponse</a>.</p>
              </div>
              <h2 class="h200">Attributes</h2>
              <dl class="attributes attributes-small">
@@ -103,7 +103,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointInfo$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointInfo$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -141,7 +141,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointInfo$.html" t="n" class="documentableName ">EndpointInfo</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointInfo$.html" t="n" class="documentableName ">EndpointInfo</a>
            </div>
           </div>
          </div>
@@ -158,7 +158,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointInfo.html">class</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointInfo.html">class</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -189,7 +189,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointInfo$.html" t="n">EndpointInfo</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointInfo$.html" t="n">EndpointInfo</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
@@ -204,7 +204,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats.html" t="n" class="documentableName ">EndpointStats</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats.html#subject:String" t="n">subject</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats.html#queueGroup:String" t="n">queueGroup</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats.html#numRequests:Long" t="n">numRequests</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats.html#numErrors:Long" t="n">numErrors</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats.html#processingTimeNanos:Long" t="n">processingTimeNanos</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats.html#averageProcessingTimeNanos:Long" t="n">averageProcessingTimeNanos</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats.html#lastError:Option[String]" t="n">lastError</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>], <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats.html#started:ZonedDateTime" t="n">started</a>: <span data-unresolved-link="" t="t">ZonedDateTime</span>)
+            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats.html" t="n" class="documentableName ">EndpointStats</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats.html#subject:String" t="n">subject</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats.html#queueGroup:String" t="n">queueGroup</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats.html#numRequests:Long" t="n">numRequests</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats.html#numErrors:Long" t="n">numErrors</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats.html#processingTimeNanos:Long" t="n">processingTimeNanos</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats.html#averageProcessingTimeNanos:Long" t="n">averageProcessingTimeNanos</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Long.html" t="t">Long</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats.html#lastError:Option[String]" t="n">lastError</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>], <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats.html#started:ZonedDateTime" t="n">started</a>: <span data-unresolved-link="" t="t">ZonedDateTime</span>)
            </div>
           </div>
          </div>
@@ -219,7 +219,7 @@
             <div class="cover">
              <div class="doc">
               <p>Per-endpoint statistics for a running NATS microservice.</p>
-              <p>Included in <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/StatsResponse.html">StatsResponse</a> and returned by <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/NatsService.html#endpointStats(endpointName:String):IO[NatsError,Option[EndpointStats]]">NatsService.endpointStats</a>.</p>
+              <p>Included in <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/StatsResponse.html">StatsResponse</a> and returned by <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/NatsService.html#endpointStats(endpointName:String):IO[NatsError,Option[EndpointStats]]">NatsService.endpointStats</a>.</p>
              </div>
              <h2 class="h200">Attributes</h2>
              <dl class="attributes attributes-small">
@@ -227,7 +227,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -265,7 +265,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats$.html" t="n" class="documentableName ">EndpointStats</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats$.html" t="n" class="documentableName ">EndpointStats</a>
            </div>
           </div>
          </div>
@@ -282,7 +282,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats.html">class</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats.html">class</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -313,7 +313,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats$.html" t="n">EndpointStats</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats$.html" t="n">EndpointStats</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
@@ -328,7 +328,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse.html" t="n" class="documentableName ">InfoResponse</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse.html#id:String" t="n">id</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse.html#version:String" t="n">version</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse.html#description:Option[String]" t="n">description</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>], <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse.html#metadata:Map[String,String]" t="n">metadata</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/Map.html" t="t">Map</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>], <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse.html#endpoints:List[EndpointInfo]" t="n">endpoints</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/List.html" t="t">List</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointInfo.html" t="t">EndpointInfo</a>])
+            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse.html" t="n" class="documentableName ">InfoResponse</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse.html#id:String" t="n">id</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse.html#version:String" t="n">version</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse.html#description:Option[String]" t="n">description</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>], <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse.html#metadata:Map[String,String]" t="n">metadata</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/Map.html" t="t">Map</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>], <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse.html#endpoints:List[EndpointInfo]" t="n">endpoints</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/List.html" t="t">List</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointInfo.html" t="t">EndpointInfo</a>])
            </div>
           </div>
          </div>
@@ -343,7 +343,7 @@
             <div class="cover">
              <div class="doc">
               <p>Info response from a running NATS microservice.</p>
-              <p>Returned by <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceDiscovery.html#info(serviceName:String,serviceId:String):IO[NatsError,Option[InfoResponse]]">ServiceDiscovery.info</a> methods. Extends <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/PingResponse.html">PingResponse</a> with description and a list of registered endpoints.</p>
+              <p>Returned by <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceDiscovery.html#info(serviceName:String,serviceId:String):IO[NatsError,Option[InfoResponse]]">ServiceDiscovery.info</a> methods. Extends <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/PingResponse.html">PingResponse</a> with description and a list of registered endpoints.</p>
              </div>
              <h2 class="h200">Attributes</h2>
              <dl class="attributes attributes-small">
@@ -351,7 +351,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -389,7 +389,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse$.html" t="n" class="documentableName ">InfoResponse</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse$.html" t="n" class="documentableName ">InfoResponse</a>
            </div>
           </div>
          </div>
@@ -406,7 +406,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse.html">class</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse.html">class</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -437,7 +437,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/InfoResponse$.html" t="n">InfoResponse</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/InfoResponse$.html" t="n">InfoResponse</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
@@ -452,7 +452,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">trait </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/NatsService.html" t="n" class="documentableName ">NatsService</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">trait </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/NatsService.html" t="n" class="documentableName ">NatsService</a>
            </div>
           </div>
          </div>
@@ -467,8 +467,8 @@
             <div class="cover">
              <div class="doc">
               <p>A running NATS microservice.</p>
-              <p>Obtained via <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/Nats.html#service(config:ServiceConfig,endpoints:<repeated>[BoundEndpoint]):ZIO[Scope,NatsError,NatsService]">zio.nats.Nats.service</a>. The service is automatically stopped (with drain) when the enclosing <a href="https://javadoc.io/page/dev.zio/zio_3/2.1.24/zio/Scope.html">Scope</a> ends.</p>
-              <p>Provides access to the service's identity, health, and statistics — the same information that remote clients can query via <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceDiscovery.html">ServiceDiscovery</a>.</p>
+              <p>Obtained via <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/Nats.html#service(config:ServiceConfig,endpoints:<repeated>[BoundEndpoint]):ZIO[Scope,NatsError,NatsService]">zio.nats.Nats.service</a>. The service is automatically stopped (with drain) when the enclosing <a href="https://javadoc.io/page/dev.zio/zio_3/2.1.24/zio/Scope.html">Scope</a> ends.</p>
+              <p>Provides access to the service's identity, health, and statistics — the same information that remote clients can query via <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceDiscovery.html">ServiceDiscovery</a>.</p>
               <p>==Example==</p>
               <div class="snippet mono-small-block">
                <pre><code class="language-"><span line-number="1" class=""><span class="tooltip-container"></span>ZIO.scoped {
@@ -511,7 +511,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/PingResponse.html" t="n" class="documentableName ">PingResponse</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/PingResponse.html#id:String" t="n">id</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/PingResponse.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/PingResponse.html#version:String" t="n">version</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/PingResponse.html#metadata:Map[String,String]" t="n">metadata</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/Map.html" t="t">Map</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>])
+            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/PingResponse.html" t="n" class="documentableName ">PingResponse</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/PingResponse.html#id:String" t="n">id</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/PingResponse.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/PingResponse.html#version:String" t="n">version</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/PingResponse.html#metadata:Map[String,String]" t="n">metadata</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/Map.html" t="t">Map</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>])
            </div>
           </div>
          </div>
@@ -526,7 +526,7 @@
             <div class="cover">
              <div class="doc">
               <p>Ping response from a running NATS microservice.</p>
-              <p>Returned by <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceDiscovery.html#ping(serviceName:String,serviceId:String):IO[NatsError,Option[PingResponse]]">ServiceDiscovery.ping</a> methods. Contains the minimal identity information for a service instance.</p>
+              <p>Returned by <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceDiscovery.html#ping(serviceName:String,serviceId:String):IO[NatsError,Option[PingResponse]]">ServiceDiscovery.ping</a> methods. Contains the minimal identity information for a service instance.</p>
              </div>
              <h2 class="h200">Attributes</h2>
              <dl class="attributes attributes-small">
@@ -534,7 +534,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/PingResponse$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/PingResponse$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -572,7 +572,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/PingResponse$.html" t="n" class="documentableName ">PingResponse</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/PingResponse$.html" t="n" class="documentableName ">PingResponse</a>
            </div>
           </div>
          </div>
@@ -589,7 +589,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/PingResponse.html">class</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/PingResponse.html">class</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -620,7 +620,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/PingResponse$.html" t="n">PingResponse</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/PingResponse$.html" t="n">PingResponse</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
@@ -635,7 +635,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">enum </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/QueueGroupPolicy.html" t="n" class="documentableName ">QueueGroupPolicy</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">enum </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/QueueGroupPolicy.html" t="n" class="documentableName ">QueueGroupPolicy</a>
            </div>
           </div>
          </div>
@@ -652,9 +652,9 @@
               <p>Controls queue group behaviour for a service endpoint.</p>
               <p>The NATS service framework uses queue groups for transparent load balancing: when multiple instances of the same service run, each request is delivered to exactly one instance.</p>
               <ul>
-               <li><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/QueueGroupPolicy$.html#Default:QueueGroupPolicy">QueueGroupPolicy.Default</a> — use the standard service queue group <code>"q"</code>.</li>
-               <li><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/QueueGroupPolicy$.html#Disabled:QueueGroupPolicy">QueueGroupPolicy.Disabled</a> — disable queue grouping so every instance receives every request.</li>
-               <li><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/QueueGroupPolicy$$Custom.html">QueueGroupPolicy.Custom</a> — use a caller-supplied queue group name.</li>
+               <li><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/QueueGroupPolicy$.html#Default:QueueGroupPolicy">QueueGroupPolicy.Default</a> — use the standard service queue group <code>"q"</code>.</li>
+               <li><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/QueueGroupPolicy$.html#Disabled:QueueGroupPolicy">QueueGroupPolicy.Disabled</a> — disable queue grouping so every instance receives every request.</li>
+               <li><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/QueueGroupPolicy$$Custom.html">QueueGroupPolicy.Custom</a> — use a caller-supplied queue group name.</li>
               </ul>
              </div>
              <h2 class="h200">Attributes</h2>
@@ -698,7 +698,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceConfig.html" t="n" class="documentableName ">ServiceConfig</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceConfig.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceConfig.html#version:String" t="n">version</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceConfig.html#description:Option[String]" t="n">description</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceConfig.html#metadata:Map[String,String]" t="n">metadata</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/Map.html" t="t">Map</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceConfig.html#drainTimeout:Option[Duration]" t="n">drainTimeout</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/dev.zio/zio_3/2.1.24/zio/DurationModule.html#Duration" t="t">Duration</a>] = ...)
+            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceConfig.html" t="n" class="documentableName ">ServiceConfig</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceConfig.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceConfig.html#version:String" t="n">version</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceConfig.html#description:Option[String]" t="n">description</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceConfig.html#metadata:Map[String,String]" t="n">metadata</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/Map.html" t="t">Map</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>] = ..., <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceConfig.html#drainTimeout:Option[Duration]" t="n">drainTimeout</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/dev.zio/zio_3/2.1.24/zio/DurationModule.html#Duration" t="t">Duration</a>] = ...)
            </div>
           </div>
          </div>
@@ -785,7 +785,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">trait </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceDiscovery.html" t="n" class="documentableName ">ServiceDiscovery</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">trait </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceDiscovery.html" t="n" class="documentableName ">ServiceDiscovery</a>
            </div>
           </div>
          </div>
@@ -819,7 +819,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceDiscovery$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceDiscovery$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -848,7 +848,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceDiscovery$.html" t="n" class="documentableName ">ServiceDiscovery</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceDiscovery$.html" t="n" class="documentableName ">ServiceDiscovery</a>
            </div>
           </div>
          </div>
@@ -865,7 +865,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceDiscovery.html">trait</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceDiscovery.html">trait</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -890,7 +890,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceDiscovery$.html" t="n">ServiceDiscovery</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceDiscovery$.html" t="n">ServiceDiscovery</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
@@ -905,7 +905,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">final </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html" t="n" class="documentableName ">ServiceEndpoint</a>[<span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#In" t="t">In</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#Err" t="t">Err</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#Out" t="t">Out</a>](<span t="k"></span><span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#subject:Option[String]" t="n">subject</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>] = ..., <span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#queueGroup:QueueGroupPolicy" t="n">queueGroup</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/QueueGroupPolicy.html" t="t">QueueGroupPolicy</a> = ..., <span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#group:Option[ServiceGroup]" t="n">group</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceGroup.html" t="t">ServiceGroup</a>] = ..., <span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#metadata:Map[String,String]" t="n">metadata</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/Map.html" t="t">Map</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>] = ...)(<span t="k">using </span><span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#inCodec:NatsCodec[In]" t="n">inCodec</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#In" t="t">In</a>], <span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#outCodec:NatsCodec[Out]" t="n">outCodec</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#Out" t="t">Out</a>], <span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#errorMapper:ServiceErrorMapper[Err]" t="n">errorMapper</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceErrorMapper.html" t="t">ServiceErrorMapper</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#Err" t="t">Err</a>])
+            <span class="modifiers"><span t="k">final </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html" t="n" class="documentableName ">ServiceEndpoint</a>[<span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#In" t="t">In</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#Err" t="t">Err</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#Out" t="t">Out</a>](<span t="k"></span><span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#subject:Option[String]" t="n">subject</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>] = ..., <span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#queueGroup:QueueGroupPolicy" t="n">queueGroup</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/QueueGroupPolicy.html" t="t">QueueGroupPolicy</a> = ..., <span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#group:Option[ServiceGroup]" t="n">group</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceGroup.html" t="t">ServiceGroup</a>] = ..., <span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#metadata:Map[String,String]" t="n">metadata</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/Map.html" t="t">Map</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>] = ...)(<span t="k">using </span><span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#inCodec:NatsCodec[In]" t="n">inCodec</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#In" t="t">In</a>], <span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#outCodec:NatsCodec[Out]" t="n">outCodec</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#Out" t="t">Out</a>], <span t="k">val </span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#errorMapper:ServiceErrorMapper[Err]" t="n">errorMapper</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceErrorMapper.html" t="t">ServiceErrorMapper</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#Err" t="t">Err</a>])
            </div>
           </div>
          </div>
@@ -920,8 +920,8 @@
             <div class="cover">
              <div class="doc">
               <p>A declarative, typed descriptor for a NATS service endpoint.</p>
-              <p>Captures the endpoint's name, optional subject override, queue group policy, optional group prefix, metadata, and — crucially — the input type, error type, and output type with their <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> / <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceErrorMapper.html">ServiceErrorMapper</a> instances. The descriptor is inert: it describes the shape of an endpoint but contains no handler logic.</p>
-              <p>To create a running endpoint, call <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#implement(handler:Function1[In,IO[Err,Out]]):BoundEndpoint">implement</a> or <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#implementWithRequest(handler:Function1[ServiceRequest[In],IO[Err,Out]]):BoundEndpoint">implementWithRequest</a> to bind a handler function:</p>
+              <p>Captures the endpoint's name, optional subject override, queue group policy, optional group prefix, metadata, and — crucially — the input type, error type, and output type with their <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> / <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceErrorMapper.html">ServiceErrorMapper</a> instances. The descriptor is inert: it describes the shape of an endpoint but contains no handler logic.</p>
+              <p>To create a running endpoint, call <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#implement(handler:Function1[In,IO[Err,Out]]):BoundEndpoint">implement</a> or <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#implementWithRequest(handler:Function1[ServiceRequest[In],IO[Err,Out]]):BoundEndpoint">implementWithRequest</a> to bind a handler function:</p>
               <div class="snippet mono-small-block">
                <pre><code class="language-"><span line-number="1" class=""><span class="tooltip-container"></span>// Infallible endpoint (Err = Nothing)
 </span><span line-number="2" class=""><span class="tooltip-container"></span>val echo = ServiceEndpoint[String, String]("echo")
@@ -962,7 +962,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -991,7 +991,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint$.html" t="n" class="documentableName ">ServiceEndpoint</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint$.html" t="n" class="documentableName ">ServiceEndpoint</a>
            </div>
           </div>
          </div>
@@ -1008,7 +1008,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html">class</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html">class</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -1033,7 +1033,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint$.html" t="n">ServiceEndpoint</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint$.html" t="n">ServiceEndpoint</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
@@ -1048,7 +1048,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">trait </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceErrorMapper.html" t="n" class="documentableName ">ServiceErrorMapper</a>[<span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceErrorMapper.html#E" t="t">E</a>]
+            <span class="modifiers"></span><span class="kind"><span t="k">trait </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceErrorMapper.html" t="n" class="documentableName ">ServiceErrorMapper</a>[<span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceErrorMapper.html#E" t="t">E</a>]
            </div>
           </div>
          </div>
@@ -1064,7 +1064,7 @@
              <div class="doc">
               <p>Typeclass for converting handler error types to NATS service error responses.</p>
               <p>NATS service errors are a <code>(message, code)</code> pair surfaced to the caller via the <code>Nats-Service-Error</code> and <code>Nats-Service-Error-Code</code> headers.</p>
-              <p>Built-in instances are provided for <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/NatsError.html">zio.nats.NatsError</a> and <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String">String</a>. Define your own for domain error types:</p>
+              <p>Built-in instances are provided for <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/NatsError.html">zio.nats.NatsError</a> and <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String">String</a>. Define your own for domain error types:</p>
               <div class="snippet mono-small-block">
                <pre><code class="language-"><span line-number="1" class=""><span class="tooltip-container"></span>enum UserError:
 </span><span line-number="2" class=""><span class="tooltip-container"></span> case NotFound(id: Int)
@@ -1084,7 +1084,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceErrorMapper$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceErrorMapper$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -1108,13 +1108,13 @@
               <dd class="body-medium">
                <div class="mono-small-block subtypes">
                 <div>
-                 object <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceErrorMapper$$given_ServiceErrorMapper_NatsError$.html" t="n">given_ServiceErrorMapper_NatsError</a>
+                 object <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceErrorMapper$$given_ServiceErrorMapper_NatsError$.html" t="n">given_ServiceErrorMapper_NatsError</a>
                 </div>
                 <div>
-                 object <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceErrorMapper$$given_ServiceErrorMapper_Nothing$.html" t="n">given_ServiceErrorMapper_Nothing</a>
+                 object <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceErrorMapper$$given_ServiceErrorMapper_Nothing$.html" t="n">given_ServiceErrorMapper_Nothing</a>
                 </div>
                 <div>
-                 object <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceErrorMapper$$given_ServiceErrorMapper_String$.html" t="n">given_ServiceErrorMapper_String</a>
+                 object <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceErrorMapper$$given_ServiceErrorMapper_String$.html" t="n">given_ServiceErrorMapper_String</a>
                 </div><span></span>
                </div>
               </dd>
@@ -1129,7 +1129,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceErrorMapper$.html" t="n" class="documentableName ">ServiceErrorMapper</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceErrorMapper$.html" t="n" class="documentableName ">ServiceErrorMapper</a>
            </div>
           </div>
          </div>
@@ -1146,7 +1146,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceErrorMapper.html">trait</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceErrorMapper.html">trait</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -1171,7 +1171,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceErrorMapper$.html" t="n">ServiceErrorMapper</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceErrorMapper$.html" t="n">ServiceErrorMapper</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
@@ -1186,7 +1186,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceGroup.html" t="n" class="documentableName ">ServiceGroup</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceGroup.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceGroup.html#parent:Option[ServiceGroup]" t="n">parent</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceGroup.html" t="t">ServiceGroup</a>] = ...)
+            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceGroup.html" t="n" class="documentableName ">ServiceGroup</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceGroup.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceGroup.html#parent:Option[ServiceGroup]" t="n">parent</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Option.html" t="t">Option</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceGroup.html" t="t">ServiceGroup</a>] = ...)
            </div>
           </div>
          </div>
@@ -1248,7 +1248,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceRequest.html" t="n" class="documentableName ">ServiceRequest</a>[<span t="k">+</span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceRequest.html#A" t="t">A</a>](<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceRequest.html#value:A" t="n">value</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceRequest.html#A" t="t">A</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceRequest.html#subject:Subject" t="n">subject</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats.html#Subject" t="t">Subject</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceRequest.html#headers:Headers" t="n">headers</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/Headers.html" t="t">Headers</a>)
+            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceRequest.html" t="n" class="documentableName ">ServiceRequest</a>[<span t="k">+</span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceRequest.html#A" t="t">A</a>](<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceRequest.html#value:A" t="n">value</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceRequest.html#A" t="t">A</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceRequest.html#subject:Subject" t="n">subject</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats.html#Subject" t="t">Subject</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceRequest.html#headers:Headers" t="n">headers</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/Headers.html" t="t">Headers</a>)
            </div>
           </div>
          </div>
@@ -1263,8 +1263,8 @@
             <div class="cover">
              <div class="doc">
               <p>An incoming service request with the payload already decoded as <code>A</code>.</p>
-              <p>Provides access to request metadata (subject, headers) alongside the decoded value. Used with <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#implementWithRequest(handler:Function1[ServiceRequest[In],IO[Err,Out]]):BoundEndpoint">ServiceEndpoint.implementWithRequest</a> when the handler needs more than just the payload.</p>
-              <p>For the common case where only the payload is needed, use <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#implement(handler:Function1[In,IO[Err,Out]]):BoundEndpoint">ServiceEndpoint.implement</a> instead — it receives <code>A</code> directly.</p>
+              <p>Provides access to request metadata (subject, headers) alongside the decoded value. Used with <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#implementWithRequest(handler:Function1[ServiceRequest[In],IO[Err,Out]]):BoundEndpoint">ServiceEndpoint.implementWithRequest</a> when the handler needs more than just the payload.</p>
+              <p>For the common case where only the payload is needed, use <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceEndpoint.html#implement(handler:Function1[In,IO[Err,Out]]):BoundEndpoint">ServiceEndpoint.implement</a> instead — it receives <code>A</code> directly.</p>
              </div>
              <h2 class="h200">Type parameters</h2>
              <dl class="attributes attributes-small">
@@ -1313,7 +1313,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/StatsResponse.html" t="n" class="documentableName ">StatsResponse</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/StatsResponse.html#id:String" t="n">id</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/StatsResponse.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/StatsResponse.html#version:String" t="n">version</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/StatsResponse.html#metadata:Map[String,String]" t="n">metadata</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/Map.html" t="t">Map</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>], <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/StatsResponse.html#started:ZonedDateTime" t="n">started</a>: <span data-unresolved-link="" t="t">ZonedDateTime</span>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/StatsResponse.html#endpoints:List[EndpointStats]" t="n">endpoints</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/List.html" t="t">List</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/EndpointStats.html" t="t">EndpointStats</a>])
+            <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/StatsResponse.html" t="n" class="documentableName ">StatsResponse</a>(<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/StatsResponse.html#id:String" t="n">id</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/StatsResponse.html#name:String" t="n">name</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/StatsResponse.html#version:String" t="n">version</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/StatsResponse.html#metadata:Map[String,String]" t="n">metadata</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/Map.html" t="t">Map</a>[<a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>, <a href="https://www.scala-lang.org/api/2.13.16/scala/Predef$.html#String" t="t">String</a>], <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/StatsResponse.html#started:ZonedDateTime" t="n">started</a>: <span data-unresolved-link="" t="t">ZonedDateTime</span>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/StatsResponse.html#endpoints:List[EndpointStats]" t="n">endpoints</a>: <a href="https://www.scala-lang.org/api/2.13.16/scala/collection/immutable/List.html" t="t">List</a>[<a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/EndpointStats.html" t="t">EndpointStats</a>])
            </div>
           </div>
          </div>
@@ -1328,7 +1328,7 @@
             <div class="cover">
              <div class="doc">
               <p>Statistics response from a running NATS microservice.</p>
-              <p>Returned by <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/ServiceDiscovery.html#stats(serviceName:String,serviceId:String):IO[NatsError,Option[StatsResponse]]">ServiceDiscovery.stats</a> methods. Extends <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/PingResponse.html">PingResponse</a> with start time and per-endpoint counters.</p>
+              <p>Returned by <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/ServiceDiscovery.html#stats(serviceName:String,serviceId:String):IO[NatsError,Option[StatsResponse]]">ServiceDiscovery.stats</a> methods. Extends <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/PingResponse.html">PingResponse</a> with start time and per-endpoint counters.</p>
              </div>
              <h2 class="h200">Attributes</h2>
              <dl class="attributes attributes-small">
@@ -1336,7 +1336,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/StatsResponse$.html">object</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/StatsResponse$.html">object</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -1374,7 +1374,7 @@
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/StatsResponse$.html" t="n" class="documentableName ">StatsResponse</a>
+            <span class="modifiers"></span><span class="kind"><span t="k">object </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/StatsResponse$.html" t="n" class="documentableName ">StatsResponse</a>
            </div>
           </div>
          </div>
@@ -1391,7 +1391,7 @@
                Companion
               </dt>
               <dd class="body-medium">
-               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/StatsResponse.html">class</a>
+               <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/StatsResponse.html">class</a>
               </dd>
               <dt class="body-small">
                Supertypes
@@ -1422,7 +1422,7 @@
                <div class="mono-small-block supertypes">
                 <span></span>
                 <div>
-                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/service/StatsResponse$.html" t="n">StatsResponse</a>.<span t="k">type</span>
+                 <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+43-d3f9bf31-SNAPSHOT/zio/nats/service/StatsResponse$.html" t="n">StatsResponse</a>.<span t="k">type</span>
                 </div>
                </div>
               </dd>
