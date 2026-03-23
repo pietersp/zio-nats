@@ -192,6 +192,6 @@ val watchExample: ZIO[Nats, NatsError, Unit] =
 
 ## Next steps
 
-- [Object Store guide](./05-object-store.md) — bucket storage for binary blobs
+- [Object Store guide](./06-object-store.md) — bucket storage for binary blobs
 - [JetStream guide](./03-jetstream.md) — KV is built on JetStream; understanding streams helps with advanced config
 - [Serialization guide](./02-serialization.md) — store and retrieve typed domain objects

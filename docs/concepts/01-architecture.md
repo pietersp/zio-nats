@@ -81,7 +81,7 @@ val layer1 = ZLayer.succeed(NatsConfig.default) >>> Nats.live
 val layer2 = Nats.default
 ```
 
-See [Configuration](../guides/06-configuration.md) for auth, TLS, environment variable loading,
+See [Configuration](../guides/07-configuration.md) for auth, TLS, environment variable loading,
 and HOCON integration.
 
 ## Service descriptions
@@ -91,13 +91,13 @@ and HOCON integration.
 | `Nats` | Core pub/sub, request-reply, connection lifecycle | [Pub/Sub](../guides/01-pubsub.md) |
 | `JetStream` | Persistent publish + access to consumers | [JetStream](../guides/03-jetstream.md) |
 | `JetStreamManagement` | Create/update/delete streams and consumers | [JetStream](../guides/03-jetstream.md) |
-| `KeyValue` | Read/write/watch a named KV bucket | [Key-Value](../guides/04-key-value.md) |
-| `KeyValueManagement` | Create/delete KV buckets | [Key-Value](../guides/04-key-value.md) |
-| `ObjectStore` | Put/get/watch a named object store bucket | [Object Store](../guides/05-object-store.md) |
-| `ObjectStoreManagement` | Create/delete object store buckets | [Object Store](../guides/05-object-store.md) |
+| `KeyValue` | Read/write/watch a named KV bucket | [Key-Value](../guides/05-key-value.md) |
+| `KeyValueManagement` | Create/delete KV buckets | [Key-Value](../guides/05-key-value.md) |
+| `ObjectStore` | Put/get/watch a named object store bucket | [Object Store](../guides/06-object-store.md) |
+| `ObjectStoreManagement` | Create/delete object store buckets | [Object Store](../guides/06-object-store.md) |
 
 ## Next steps
 
 - [Quick start](../quickstart.md) — wire `Nats` into a working app in 5 minutes
 - [Pub/Sub guide](../guides/01-pubsub.md) — the core messaging operations
-- [Configuration guide](../guides/06-configuration.md) — auth, TLS, environment variables
+- [Configuration guide](../guides/07-configuration.md) — auth, TLS, environment variables

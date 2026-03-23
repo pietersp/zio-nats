@@ -222,4 +222,4 @@ val stockLevel: ZIO[Nats, NatsError, StockStatus] =
 
 - [Serialization guide](./02-serialization.md) - publish and subscribe with domain types, not just `String` and `Chunk[Byte]`
 - [JetStream guide](./03-jetstream.md) - durable streams, at-least-once and exactly-once delivery
-- [Configuration guide](./06-configuration.md) - connecting to authenticated or TLS-secured servers
+- [Configuration guide](./07-configuration.md) - connecting to authenticated or TLS-secured servers

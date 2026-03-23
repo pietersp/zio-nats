@@ -49,7 +49,7 @@ What's happening on the NATS side:
 3. `Nats#publish` - sends a message to the subject. Any active subscriber receives it; if there are none, the message is dropped (fire-and-forget semantics). For durability, use JetStream instead.
 
 :::tip
-Need guaranteed delivery, replay, or persistence? The [JetStream guide](./guides/03-jetstream.md) covers durable streams and consumers. For a key-value store or large-object storage, see the [Key-Value](./guides/04-key-value.md) and [Object Store](./guides/05-object-store.md) guides.
+Need guaranteed delivery, replay, or persistence? The [JetStream guide](./guides/03-jetstream.md) covers durable streams and consumers. For a key-value store or large-object storage, see the [Key-Value](./guides/05-key-value.md) and [Object Store](./guides/06-object-store.md) guides.
 :::
 
 ---
