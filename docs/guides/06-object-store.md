@@ -3,210 +3,186 @@ id: object-store
 title: Object Store
 ---
 
-# Object Store
+The NATS Object Store provides named binary storage in a bucket, with automatic chunking for arbitrarily large objects. A 10-byte config file and a 2 GB video use the same API - NATS handles splitting and reassembling the chunks transparently. Like the Key-Value store, Object Store is built on JetStream streams and supports metadata, soft deletes, and a watch stream that notifies you when objects change.
 
-> Blob storage built on JetStream — large objects, streaming put/get, and change watches.
+## Creating a bucket
 
-The **Object Store** stores named binary objects in a bucket. Objects can be arbitrarily large
-because they are automatically chunked and stored across multiple JetStream messages. You get
-metadata, soft deletes, and a watch stream for changes.
+A **bucket** is the top-level namespace for an Object Store. Create one with `ObjectStoreManagement` before storing any objects. `ObjectStoreConfig` requires only a `name`; all other fields default to production-ready values. Set `storageType` to `StorageType.Memory` for ephemeral buckets:
 
-## Prerequisites
-
-- [Quick start](../quickstart.md) completed
-- JetStream-enabled NATS server:
-
-```bash
-docker run --rm -p 4222:4222 nats -js
-```
-
-## Setup
-
-Create a bucket with `ObjectStoreManagement`:
-
-```scala mdoc:silent
+```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 import zio.nats.objectstore.*
 
 val createBucket: ZIO[ObjectStoreManagement, NatsError, Unit] =
   ZIO.serviceWithZIO[ObjectStoreManagement] { osm =>
-    osm.create(ObjectStoreConfig(name = "assets", storageType = StorageType.Memory)).unit
+    osm.create(
+      ObjectStoreConfig(
+        name          = "assets",
+        maxBucketSize = 512L * 1024 * 1024,
+        storageType   = StorageType.File
+      )
+    ).unit
   }
-
-val managementLayer =
-  ZLayer.succeed(NatsConfig.default) >>> Nats.live >+> ObjectStoreManagement.live
 ```
 
-## Basic put and get
+## Storing objects
 
-```scala mdoc:silent
+`ObjectStore#put` encodes the value with `NatsCodec[A]`, chunks it server-side, and stores it under a name. `Chunk[Byte]` and `String` work out of the box; for domain types bring a `NatsCodec` in scope (see [Serialization](./02-serialization.md)). `put` returns an `ObjectSummary` with `name`, `size`, `chunks`, and `isDeleted`. Attach a description or custom headers by passing an `ObjectMeta` instead of a plain name:
+
+```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 import zio.nats.objectstore.*
 
-val basicOps: ZIO[Nats, NatsError, Unit] =
+val store: ZIO[Nats, NatsError, Unit] =
   for {
-    os <- ObjectStore.bucket("assets")
-
-    // Put raw bytes — returns ObjectSummary (metadata about the stored object)
-    summary <- os.put("config.json", Chunk.fromArray("""{"key":"val"}""".getBytes))
-    _       <- ZIO.debug(s"Stored ${summary.size} bytes in ${summary.chunks} chunks")
-
-    // Get with type parameter — returns ObjectData[A] wrapping value + metadata
-    data <- os.get[Chunk[Byte]]("config.json")
-    _    <- ZIO.debug(s"Got ${data.value.length} bytes")
-
-    // .payload strips the ObjectData wrapper — returns just the decoded value
-    raw <- os.get[Chunk[Byte]]("config.json").payload
-    _   <- ZIO.debug(s"Raw bytes: ${raw.length}")
-
-    // Put with custom metadata
-    _ <- os.put(
-           ObjectMeta("logo.png", description = Some("Brand logo")),
-           Chunk.fromArray("(binary image data)".getBytes)
-         )
+    os      <- ObjectStore.bucket("assets")
+    summary <- os.put("config.json", Chunk.fromArray("""{"env":"prod"}""".getBytes))
+    _       <- ZIO.debug(s"${summary.name}: ${summary.size} bytes in ${summary.chunks} chunks")
+    _       <- os.put(
+                 ObjectMeta("logo.png", description = Some("Brand logo")),
+                 Chunk.fromArray("(binary)".getBytes)
+               )
   } yield ()
 ```
 
-**What's happening:**
+For large files, `ObjectStore#putStream` accepts a `ZStream[Any, Nothing, Byte]` and streams bytes directly to the server without buffering the full payload in JVM heap - useful for files, media, or any object large enough to cause memory pressure:
 
-1. `os.put(name, bytes)` — chunks the bytes and stores them. Returns `ObjectSummary` with `.name`, `.size`, `.chunks`, `.description`, and `.isDeleted`.
-2. `os.get[A](name)` — reassembles the chunks and decodes with `NatsCodec[A]`. Returns `ObjectData[A]` with `.value` and `.summary`.
-3. `.payload` is an extension on `IO[NatsError, ObjectData[A]]` that strips the wrapper, returning `IO[NatsError, A]`.
-4. `ObjectMeta` lets you attach a description, custom headers, and other metadata at write time.
-
-## Streaming put and get
-
-For large objects, stream directly without loading everything into memory:
-
-```scala mdoc:silent
+```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 import zio.nats.objectstore.*
 import zio.stream.ZStream
 
-val streamingOps: ZIO[Nats, NatsError, Unit] =
+val storeStream: ZIO[Nats, NatsError, Unit] =
   for {
     os <- ObjectStore.bucket("assets")
-
-    // Stream from a ZStream[Any, Throwable, Byte]
-    _ <- os.putStream("large-file.bin", ZStream.fromChunk(Chunk.fill(1024)(0.toByte)))
-           .unit
-
-    // Get as a ZStream[Any, NatsError, Byte]
-    _ <- os.getStream("large-file.bin")
-           .tap(b => ZIO.unit) // process each byte chunk
-           .runDrain
+    _  <- os.putStream(
+             "large-file.bin",
+             ZStream.fromChunk(Chunk.fill(1024)(0.toByte))
+           ).unit
   } yield ()
 ```
 
-Use `putStream`/`getStream` for files, media, or any payload that should not be buffered
-entirely in JVM heap.
+## Retrieving objects
 
-## Metadata operations
+`ObjectStore#get[A]` reassembles the chunks and decodes them into `ObjectData[A]`. `ObjectData[A]` bundles `data.value` (the decoded payload) and `data.summary` (an `ObjectSummary` with size, chunk count, and delete status). Use `.payload` to drop the wrapper and get just the decoded value:
 
-```scala mdoc:silent
+```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 import zio.nats.objectstore.*
 
-val metaOps: ZIO[Nats, NatsError, Unit] =
+val retrieve: ZIO[Nats, NatsError, Unit] =
+  for {
+    os   <- ObjectStore.bucket("assets")
+    data <- os.get[Chunk[Byte]]("config.json")
+    _    <- ZIO.debug(s"${data.value.length} bytes, deleted=${data.summary.isDeleted}")
+    raw  <- os.get[Chunk[Byte]]("config.json").payload
+    _    <- ZIO.debug(s"Unwrapped: ${raw.length} bytes")
+  } yield ()
+```
+
+For large objects, `ObjectStore#getStream` returns a `ZStream[Any, NatsError, Byte]` that downloads chunks on demand. Process the stream with standard ZStream operators without pulling the whole object into memory:
+
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.nats.objectstore.*
+
+val retrieveStream: ZIO[Nats, NatsError, Unit] =
   for {
     os <- ObjectStore.bucket("assets")
+    _  <- os.getStream("large-file.bin")
+             .grouped(4096)
+             .tap(chunk => ZIO.debug(s"Received ${chunk.length} bytes"))
+             .runDrain
+  } yield ()
+```
 
-    // Get metadata without downloading the object
-    info <- os.getInfo("logo.png")
-    _    <- ZIO.debug(s"Size: ${info.size}, deleted: ${info.isDeleted}")
+## Metadata, listing, and links
 
-    // Get info including soft-deleted objects
-    deletedInfo <- os.getInfo("logo.png", includingDeleted = true)
+`ObjectStore#getInfo` returns the `ObjectSummary` for an object without downloading its content - useful for checking size or existence before committing to a download. `ObjectStore#updateMeta` replaces name, description, and headers without re-uploading the bytes. `ObjectStore#list` returns a snapshot of all current objects in the bucket.
 
-    // Update metadata in-place (does not re-upload the object)
-    _ <- os.updateMeta("logo.png", ObjectMeta("logo.png", description = Some("Updated logo")))
+`ObjectStore#addLink` creates an alias within the same bucket - reading the alias fetches the bytes of its target. `ObjectStore#addBucketLink` creates a cross-bucket reference so you can resolve objects from another bucket through a single name. To inspect, update, list, and alias objects in one flow:
 
-    // List all objects in the bucket
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.nats.objectstore.*
+
+val metaAndLinks: ZIO[Nats, NatsError, Unit] =
+  for {
+    os      <- ObjectStore.bucket("assets")
+    info    <- os.getInfo("logo.png")
+    _       <- ZIO.debug(s"${info.name}: ${info.size} bytes")
+    _       <- os.updateMeta("logo.png", ObjectMeta("logo.png", description = Some("Updated logo")))
     objects <- os.list
     _       <- ZIO.foreach(objects)(o => ZIO.debug(o.name))
-
-    // Bucket status — entry count, bytes, stream info
-    status <- os.getStatus
-    _      <- ZIO.debug(s"Bucket: ${status.bucketName}")
+    _       <- os.addLink("logo-alias", "logo.png")
   } yield ()
 ```
 
 ## Delete and seal
 
-```scala mdoc:silent
+`ObjectStore#delete` marks an object as deleted and sets `isDeleted = true` on its summary. The object is no longer returned by `get`, but its metadata remains accessible via `getInfo` when you pass `includingDeleted = true`.
+
+`ObjectStore#seal` makes the bucket permanently read-only. All subsequent puts fail; gets and streams continue to work. Use a sealed bucket to publish a versioned snapshot that must never be modified - a released software binary, a signed dataset, or an auditable configuration baseline. To soft-delete an object and then seal the bucket:
+
+```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 import zio.nats.objectstore.*
 
 val deleteAndSeal: ZIO[Nats, NatsError, Unit] =
   for {
-    os <- ObjectStore.bucket("assets")
-
-    // Soft delete — marks as deleted but preserves the entry in history
-    summary <- os.delete("old-asset")
-
-    // Seal — makes the bucket read-only permanently
-    _ <- os.seal().unit
-  } yield ()
-```
-
-A sealed bucket rejects all further puts but continues to serve gets. Use it to publish a
-versioned snapshot that should never change.
-
-## Links
-
-```scala mdoc:silent
-import zio.*
-import zio.nats.*
-import zio.nats.objectstore.*
-
-val linksExample: ZIO[Nats, NatsError, Unit] =
-  for {
-    os <- ObjectStore.bucket("assets")
-
-    // Alias — "alias" resolves to "logo.png" in the same bucket
-    _ <- os.addLink("alias", "logo.png").unit
-
-    // Cross-bucket link — "mirror" resolves to another ObjectStore
-    other <- ObjectStore.bucket("other-bucket")
-    _     <- os.addBucketLink("mirror", other).unit
+    os          <- ObjectStore.bucket("assets")
+    _           <- os.delete("old-asset")
+    deletedInfo <- os.getInfo("old-asset", includingDeleted = true)
+    _           <- ZIO.debug(s"Deleted: ${deletedInfo.isDeleted}")
+    _           <- os.seal()
   } yield ()
 ```
 
 ## Watching for changes
 
-```scala mdoc:silent
+`ObjectStore#watch` returns a `ZStream[Any, NatsError, ObjectSummary]` that delivers the current state of every object in the bucket first, then streams all subsequent changes. Each event is an `ObjectSummary` - check `summary.isDeleted` to distinguish a delete event from a new upload. The stream never completes on its own; fork it alongside your program.
+
+Use `watch` to keep a local index of bucket contents in sync with the server, or to trigger downstream processing whenever a new file arrives. `ObjectStoreWatchOptions` controls what the stream delivers:
+
+| Option | Default | Effect |
+|--------|---------|--------|
+| `ignoreDeletes` | `false` | Suppress events for deleted objects |
+| `includeHistory` | `false` | Start from the first revision rather than the current state |
+| `updatesOnly` | `false` | Skip the initial current-state delivery; only emit new changes |
+
+To watch for new uploads only, skipping the initial state replay and delete events:
+
+```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 import zio.nats.objectstore.*
 
-val watchExample: ZIO[Nats, NatsError, Unit] =
+val watching: ZIO[Nats, NatsError, Unit] =
   for {
     os <- ObjectStore.bucket("assets")
-
-    // Watch all changes — delivers current entries then future changes
-    _ <- os.watch()
-           .tap(summary => ZIO.debug(s"Changed: ${summary.name}"))
-           .runDrain
-           .fork
-
-    // Watch with options
-    _ <- os.watch(ObjectStoreWatchOptions(
-           ignoreDeletes  = true,
-           includeHistory = false,
-           updatesOnly    = true
-         )).runDrain.fork
+    _  <- os.watch()
+             .tap(s => ZIO.debug(s"${s.name} changed, deleted=${s.isDeleted}"))
+             .runDrain
+             .fork
+    _  <- os.watch(
+             ObjectStoreWatchOptions(
+               ignoreDeletes = true,
+               updatesOnly   = true
+             )
+           ).tap(s => ZIO.debug(s"New upload: ${s.name}"))
+             .runDrain
+             .fork
   } yield ()
 ```
 
-The watch stream never completes on its own. Fork it alongside your program.
-
 ## Next steps
 
-- [Key-Value guide](./05-key-value.md) — KV store for smaller, structured data
-- [JetStream guide](./03-jetstream.md) — Object Store is built on JetStream streams
-- [Serialization guide](./02-serialization.md) — decode objects directly into domain types
+- [Configuration guide](./07-configuration.md) - connecting to authenticated or TLS-secured servers with JetStream enabled
+- [JetStream guide](./03-jetstream.md) - Object Store is built on JetStream streams; understanding storage types and retention policies helps with advanced bucket configuration
