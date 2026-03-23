@@ -3,7 +3,7 @@ id: serialization
 title: Serialization
 ---
 
-All `publish`, `subscribe`, and `request` methods are generic over `[A: NatsCodec]`. The codec is resolved at compile time - no casting, no runtime lookup, and no separate encode/decode step in your code.
+All `publish`, `subscribe`, and `request` methods are generic over `[A: NatsCodec]`. The codec is resolved at compile time - no casting, no runtime lookup, and no separate encode/decode step in your code. zio-nats comes batteries-included with zio-blocks, jsoniter-scala, and play-json integrations, and if none of those fit you can [bring your own](#custom-codecs) in a few lines.
 
 ## Built-in codecs
 
