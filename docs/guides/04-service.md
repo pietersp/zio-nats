@@ -208,7 +208,7 @@ Both endpoints are now reachable under the `catalog` prefix: `catalog.stock` and
 
 ### Typed calls with `requestService`
 
-`Nats#requestService` is the preferred way to call a fallible service endpoint. It uses the `ServiceEndpoint` descriptor as the complete contract — the subject, input and output codecs, and error codec are all captured there — and returns `Either[Err, Out]` to cleanly separate domain errors from transport failures:
+`Nats#requestService` is the preferred way to call a fallible service endpoint. It uses the `ServiceEndpoint` descriptor as the complete contract - the subject, input and output codecs, and error codec are all captured there - and returns `Either[Err, Out]` to cleanly separate domain errors from transport failures:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -227,7 +227,7 @@ object StockError   { given Schema[StockError]   = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
-// Shared endpoint descriptor — the complete typed contract
+// Shared endpoint descriptor - the complete typed contract
 val stockEndpoint = ServiceEndpoint[StockRequest, StockReply]("stock-check")
   .withError[StockError]
 
@@ -241,12 +241,12 @@ val checkStock: ZIO[Nats, NatsError, Option[StockReply]] =
 ```
 
 `Nats#requestService` returns:
-- `Right(out)` — the handler succeeded; reply body decoded as `Out`
-- `Left(err)` — the handler failed with a domain `Err`; reply body decoded as `Err`
+- `Right(out)` - the handler succeeded; reply body decoded as `Out`
+- `Left(err)` - the handler failed with a domain `Err`; reply body decoded as `Err`
 - Fails with `NatsError.ServiceCallFailed` for infrastructure errors (codec crash, connection issues)
 - Fails with `NatsError.Timeout` if no reply arrives in time
 
-For this to work, `Err` must have a `NatsCodec[Err]` in scope — the same codec is used on both sides to encode the error body on the server and decode it on the client. This is why `ServiceEndpoint#withError` now requires both `NatsCodec[E]` and `ServiceErrorMapper[E]`.
+For this to work, `Err` must have a `NatsCodec[Err]` in scope - the same codec is used on both sides to encode the error body on the server and decode it on the client. This is why `ServiceEndpoint#withError` now requires both `NatsCodec[E]` and `ServiceErrorMapper[E]`.
 
 ### Calling infallible endpoints
 
