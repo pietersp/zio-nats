@@ -206,6 +206,8 @@ Both endpoints are now reachable under the `catalog` prefix: `catalog.stock` and
 
 ## Calling a service
 
+We have three ways to call a service endpoint: a typed call with `Nats#requestService` that decodes the reply as `Either[Err, Out]`, a raw call with `Nats#request` using `ServiceEndpoint#effectiveSubject` for infallible endpoints, and an untyped `Nats#request` for when the endpoint descriptor is not available.
+
 ### Typed calls with `requestService`
 
 `Nats#requestService` is the preferred way to call a fallible service endpoint. It uses the `ServiceEndpoint` descriptor as the complete contract - the subject, input and output codecs, and error codec are all captured there - and returns `Either[Err, Out]` to cleanly separate domain errors from transport failures:
