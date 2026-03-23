@@ -259,5 +259,6 @@ After receiving a `JetStreamMessage`, call one of these methods to signal the ou
 
 ## Next steps
 
+- [Service Framework guide](./04-service.md) - build discoverable microservices with typed request-reply endpoints on top of NATS
 - [Key-Value guide](./05-key-value.md) - KV is built on JetStream streams and adds a higher-level API for point-in-time lookups and change watches
 - [Configuration guide](./07-configuration.md) - connecting to authenticated or TLS-secured NATS servers with JetStream enabled
