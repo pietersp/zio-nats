@@ -1,0 +1,37 @@
+name: Publish Snapshot
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to publish from
+        required: false
+        default: master
+
+jobs:
+  publish:
+    name: Publish Snapshot to Maven Central
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: coursier/setup-action@v1
+        with:
+          apps: sbt
+
+      - name: Publish Snapshot
+        env:
+          CI_SNAPSHOT_RELEASE: true
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+          PGP_SECRET: ${{ secrets.PGP_SECRET }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+        run: sbt -batch ci-release
