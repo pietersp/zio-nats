@@ -8,7 +8,7 @@ import io.nats.service.{
   ServiceMessageHandler
 }
 import zio._
-import zio.nats.{Headers, NatsCodec, Subject}
+import zio.nats.{ErrorCodecOrNothing, Headers, NatsCodec, NatsMessage, Subject}
 
 import scala.jdk.CollectionConverters._
 
@@ -61,7 +61,12 @@ final class ServiceEndpoint[In, Err, Out](
   val group: Option[ServiceGroup] = None,
   /** Optional key-value metadata attached to this endpoint. */
   val metadata: Map[String, String] = Map.empty
-)(using val inCodec: NatsCodec[In], val outCodec: NatsCodec[Out], val errorMapper: ServiceErrorMapper[Err]):
+)(using
+  val inCodec: NatsCodec[In],
+  val outCodec: NatsCodec[Out],
+  val errorMapper: ServiceErrorMapper[Err],
+  val errCodec: ErrorCodecOrNothing[Err]
+):
 
   /**
    * Bind a handler function to this endpoint, producing a [[BoundEndpoint]].
@@ -112,20 +117,46 @@ final class ServiceEndpoint[In, Err, Out](
     )
 
   /**
+   * The NATS subject this endpoint listens on and that callers should send
+   * requests to.
+   *
+   * Derived from the optional [[subject]] override, the endpoint [[name]], and
+   * any [[group]] prefix chain. For example, an endpoint named `"check"` inside
+   * `ServiceGroup("catalog")` has
+   * `effectiveSubject == Subject("catalog.check")`.
+   *
+   * Use this with [[zio.nats.Nats.requestService]] or directly with
+   * [[zio.nats.Nats.request]] for infallible endpoints.
+   */
+  def effectiveSubject: Subject = {
+    val base = subject.getOrElse(name)
+    group.fold(Subject(base))(g => Subject(groupPrefix(g) + "." + base))
+  }
+
+  private def groupPrefix(g: ServiceGroup): String =
+    g.parent.fold(g.name)(p => groupPrefix(p) + "." + g.name)
+
+  /**
    * Return a copy of this endpoint descriptor with the error type refined to
-   * `E`. Requires a `ServiceErrorMapper[E]` in implicit scope.
+   * `E`. Requires a `NatsCodec[E]` in implicit scope for typed error body
+   * encoding and decoding.
+   *
+   * A `ServiceErrorMapper[E]` is resolved automatically via the universal
+   * fallback (uses `e.toString` with code 500). Provide a specific
+   * [[ServiceErrorMapper]] instance to customise the `Nats-Service-Error`
+   * header value or HTTP-style status code.
    *
    * {{{
-   * given ServiceErrorMapper[UserError] with { ... }
    * val ep = ServiceEndpoint[UserQuery, UserResponse]("lookup").withError[UserError]
    * val bound = ep.implement(q => UserRepo.find(q))
    * }}}
    */
-  def withError[E: ServiceErrorMapper]: ServiceEndpoint[In, E, Out] =
+  def withError[E: NatsCodec: ServiceErrorMapper]: ServiceEndpoint[In, E, Out] =
     new ServiceEndpoint[In, E, Out](name, subject, queueGroup, group, metadata)(using
       inCodec,
       outCodec,
-      summon[ServiceErrorMapper[E]]
+      summon[ServiceErrorMapper[E]],
+      summon[ErrorCodecOrNothing[E]]
     )
 
 // ---------------------------------------------------------------------------
@@ -152,7 +183,12 @@ object ServiceEndpoint:
     group: Option[ServiceGroup] = None,
     metadata: Map[String, String] = Map.empty
   )(using NatsCodec[In], NatsCodec[Out]): ServiceEndpoint[In, Nothing, Out] =
-    new ServiceEndpoint[In, Nothing, Out](name, subject, queueGroup, group, metadata)
+    new ServiceEndpoint[In, Nothing, Out](name, subject, queueGroup, group, metadata)(using
+      summon[NatsCodec[In]],
+      summon[NatsCodec[Out]],
+      summon[ServiceErrorMapper[Nothing]],
+      summon[ErrorCodecOrNothing[Nothing]]
+    )
 
 // ---------------------------------------------------------------------------
 // BoundEndpoint — type-erased, ready-to-register unit
@@ -191,15 +227,17 @@ private[nats] class BoundEndpointLive[In, Err, Out](
     val inCodec     = endpoint.inCodec
     val outCodec    = endpoint.outCodec
     val errorMapper = endpoint.errorMapper
+    val errCodec    = endpoint.errCodec
 
     val jHandler: ServiceMessageHandler = { (jMsg: JServiceMessage) =>
       Unsafe.unsafe { implicit unsafe =>
         runtime.unsafe.fork {
-          val program = for {
+          // Error channel: Left = typed domain error, Right = infrastructure (message, code)
+          val program: IO[Either[Err, (String, Int)], Unit] = for {
             // Decode the incoming bytes as In
             in <- ZIO
                     .fromEither(inCodec.decode(Chunk.fromArray(Option(jMsg.getData).getOrElse(Array.emptyByteArray))))
-                    .mapError(e => ("Decoding failed: " + e.message, 500))
+                    .mapError(e => Right(("Decoding failed: " + e.message, 500)))
 
             // Build the typed request wrapper
             req = ServiceRequest(
@@ -208,21 +246,38 @@ private[nats] class BoundEndpointLive[In, Err, Out](
                     headers = headersFromJava(jMsg)
                   )
 
-            // Run the user handler, converting Err → (String, Int)
-            out <- handler(req).mapError(e => errorMapper.toErrorResponse(e))
+            // Run the user handler — preserve the typed Err in the Left channel
+            out <- handler(req).mapError(e => Left(e))
 
             // Encode the response and send it
             enc <- ZIO
                      .attempt(outCodec.encode(out))
-                     .mapError(e => ("Encoding failed: " + e.getMessage, 500))
+                     .mapError(e => Right(("Encoding failed: " + e.getMessage, 500)))
             _ <- ZIO
                    .attempt(jMsg.respond(conn, enc.toArray))
-                   .mapError(e => ("Response failed: " + e.getMessage, 500))
+                   .mapError(e => Right(("Response failed: " + e.getMessage, 500)))
           } yield ()
 
-          // On any error, send a NATS service error response
-          program.catchAll { case (msg, code) =>
-            ZIO.attempt(jMsg.respondStandardError(conn, msg, code)).ignoreLogged
+          program.catchAll {
+            case Left(err) =>
+              // Domain error: encode typed body + set NATS Micro error headers
+              val encoded           = errCodec.encode(err)
+              val (errMsg, errCode) = errorMapper.toErrorResponse(err)
+              ZIO.attempt {
+                val replyMsg = NatsMessage.toJava(
+                  subject = jMsg.getReplyTo,
+                  data = encoded,
+                  headers = Headers(
+                    "Nats-Service-Error"      -> errMsg,
+                    "Nats-Service-Error-Code" -> errCode.toString
+                  )
+                )
+                conn.publish(replyMsg)
+              }.ignoreLogged
+
+            case Right((msg, code)) =>
+              // Infrastructure error: empty body via respondStandardError (unchanged)
+              ZIO.attempt(jMsg.respondStandardError(conn, msg, code)).ignoreLogged
           }
         }
       }

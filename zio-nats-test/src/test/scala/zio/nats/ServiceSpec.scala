@@ -78,19 +78,72 @@ object ServiceSpec extends ZIOSpecDefault {
       }
     },
 
-    test("handler with domain String error sends a NATS service error response") {
+    test("requestService returns typed reply on success") {
       ZIO.scoped {
         for {
           nats <- ZIO.service[Nats]
-          ep    = ServiceEndpoint[String, String]("maybe-fail").withError[String]
+          ep    = ServiceEndpoint[String, String]("typed-ok").withError[String]
           _    <- nats.service(
-                 ServiceConfig("error-svc", "1.0.0"),
+                 ServiceConfig("typed-ok-svc", "1.0.0"),
+                 ep.implement(s => ZIO.succeed(s.toUpperCase))
+               )
+          _      <- ZIO.sleep(200.millis)
+          result <- nats
+                      .requestService(ep, "hello", 5.seconds)
+                      .mapError(e => new RuntimeException(e.toString))
+        } yield assertTrue(result == "HELLO")
+      }
+    },
+
+    test("requestService fails with typed domain error") {
+      ZIO.scoped {
+        for {
+          nats <- ZIO.service[Nats]
+          ep    = ServiceEndpoint[String, String]("typed-fail").withError[String]
+          _    <- nats.service(
+                 ServiceConfig("typed-fail-svc", "1.0.0"),
+                 ep.implement(_ => ZIO.fail("intentional error"))
+               )
+          _      <- ZIO.sleep(200.millis)
+          result <- nats.requestService(ep, "x", 5.seconds).either
+        } yield assertTrue(result == Left("intentional error"))
+      }
+    },
+
+    test("Nats.request on a fallible endpoint still fails with ServiceCallFailed") {
+      ZIO.scoped {
+        for {
+          nats <- ZIO.service[Nats]
+          ep    = ServiceEndpoint[String, String]("raw-fail").withError[String]
+          _    <- nats.service(
+                 ServiceConfig("raw-fail-svc", "1.0.0"),
                  ep.implement(_ => ZIO.fail("intentional error"))
                )
           _ <- ZIO.sleep(200.millis)
-          // Service sends a NATS service error; the caller gets an error response header
-          result <- nats.request[String, String](Subject("maybe-fail"), "x", 5.seconds).either
-        } yield assertTrue(result.isLeft || result.isRight) // service responded in some form
+          // Untyped caller: still gets ServiceCallFailed, not the decoded error
+          result <- nats.request[String, String](Subject("raw-fail"), "x", 5.seconds).either
+        } yield assertTrue(result match {
+          case Left(_: NatsError.ServiceCallFailed) => true
+          case _                                    => false
+        })
+      }
+    },
+
+    test("requestService with grouped endpoint routes to the correct subject") {
+      ZIO.scoped {
+        for {
+          nats <- ZIO.service[Nats]
+          grp   = ServiceGroup("ops")
+          ep    = ServiceEndpoint[String, String]("ping", group = Some(grp)).withError[String]
+          _    <- nats.service(
+                 ServiceConfig("ops-svc", "1.0.0"),
+                 ep.implement(s => ZIO.succeed(s"pong:$s"))
+               )
+          _      <- ZIO.sleep(200.millis)
+          result <- nats
+                      .requestService(ep, "test", 5.seconds)
+                      .mapError(e => new RuntimeException(e.toString))
+        } yield assertTrue(result == "pong:test")
       }
     },
 

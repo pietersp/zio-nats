@@ -4,7 +4,13 @@ import io.nats.client.{Connection => JConnection, ConnectionListener, ErrorListe
 import io.nats.service.{Service => JService}
 import zio._
 import zio.nats.config.NatsConfig
-import zio.nats.service.{BoundEndpoint, NatsService, NatsServiceLive, ServiceConfig}
+import zio.nats.service.{
+  BoundEndpoint,
+  NatsService,
+  NatsServiceLive,
+  ServiceConfig,
+  ServiceEndpoint => ServiceEndpointDescriptor
+}
 import zio.stream._
 
 import java.util.concurrent.LinkedBlockingQueue
@@ -67,7 +73,9 @@ trait Nats {
    *
    * Fails with [[NatsError.DecodingError]] if the reply cannot be decoded as
    * `B`. Fails with [[NatsError.Timeout]] if no reply is received within
-   * `timeout`.
+   * `timeout`. Fails with [[NatsError.ServiceCallFailed]] if the responder is a
+   * NATS Micro service endpoint that sent an error response (detected via the
+   * standard `Nats-Service-Error` / `Nats-Service-Error-Code` headers).
    */
   def request[A: NatsCodec, B: NatsCodec](
     subject: Subject,
@@ -134,6 +142,49 @@ trait Nats {
 
   /** Bytes waiting to be flushed to the server. */
   def outgoingPendingBytes: UIO[Long]
+
+  /**
+   * Typed service call: send `input` to the endpoint's subject and return the
+   * decoded reply.
+   *
+   * Both domain errors and transport failures surface in the ZIO error channel:
+   *
+   *   - Succeeds with `out: Out` when the handler replies successfully.
+   *   - Fails with `err: Err` when the handler returns a domain error.
+   *   - Fails with [[NatsError.ServiceCallFailed]] for infrastructure errors
+   *     (empty body with `Nats-Service-Error` header).
+   *   - Fails with [[NatsError.Timeout]] if no reply arrives within `timeout`.
+   *
+   * Because the error channel is `NatsError | Err`, Scala 3 union types widen
+   * automatically when composing multiple `requestService` calls:
+   *
+   * {{{
+   * // IO[StockError | PriceError | NatsError, (StockReply, PriceReply)]
+   * nats.requestService(stockEp, stockReq, 5.seconds)
+   *   .zipPar(nats.requestService(priceEp, priceReq, 5.seconds))
+   * }}}
+   *
+   * The [[service.ServiceEndpoint]] descriptor is the authority on the subject,
+   * input/output types, and codecs — it stays pure data and is not modified.
+   *
+   * ==Example==
+   * {{{
+   * val ep = ServiceEndpoint[StockRequest, StockReply]("check")
+   *            .withError[StockError]
+   *
+   * val available: IO[StockError | NatsError, Int] =
+   *   nats.requestService(ep, StockRequest("item-1"), 5.seconds)
+   *     .map(_.available)
+   * }}}
+   *
+   * For infallible endpoints (`Err = Nothing`) use [[request]] directly with
+   * `endpoint.effectiveSubject`.
+   */
+  def requestService[In, Err: NatsCodec, Out](
+    endpoint: ServiceEndpointDescriptor[In, Err, Out],
+    input: In,
+    timeout: Duration
+  ): IO[NatsError | Err, Out]
 
   /**
    * Create and start a NATS microservice.
@@ -239,9 +290,8 @@ object Nats {
     } yield new NatsLive(conn, hub)
 
   /** Wire jnats connection- and error-listeners to push events into `queue`. */
-  private def buildOptions(config: NatsConfig, queue: LinkedBlockingQueue[NatsEvent]): Options = {
-    config.toOptionsBuilder
-    .connectionListener { (conn: JConnection, eventType: ConnectionListener.Events) =>
+  private def buildOptions(config: NatsConfig, queue: LinkedBlockingQueue[NatsEvent]): Options =
+    config.toOptionsBuilder.connectionListener { (conn: JConnection, eventType: ConnectionListener.Events) =>
       val url   = Option(conn.getConnectedUrl).getOrElse("unknown")
       val event = eventType match {
         case ConnectionListener.Events.CONNECTED          => NatsEvent.Connected(url)
@@ -261,7 +311,6 @@ object Nats {
           queue.put(NatsEvent.ExceptionOccurred(exp))
       })
       .build()
-  }
 
   /**
    * Acquire a jnats connection; release drains and closes it when the Scope
@@ -351,9 +400,77 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
               ZIO.fail(NatsError.Timeout(s"No reply received for subject '${subject.value}' within $timeout"))
             case Some(jMsg) =>
               val msg = NatsMessage.fromJava(jMsg)
-              ZIO
-                .fromEither(msg.decode[B])
-                .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
+              // Check for NATS Micro protocol error headers before decoding.
+              // When a service handler fails, jnats sends an empty body with
+              // Nats-Service-Error / Nats-Service-Error-Code headers. Decoding
+              // an empty body would silently succeed (e.g. "" for String), so
+              // we must intercept this at the protocol level.
+              msg.headers.get("Nats-Service-Error").headOption match {
+                case Some(errMsg) =>
+                  val code = msg.headers
+                    .get("Nats-Service-Error-Code")
+                    .headOption
+                    .flatMap(_.toIntOption)
+                    .getOrElse(500)
+                  ZIO.fail(NatsError.ServiceCallFailed(errMsg, code))
+                case None =>
+                  ZIO
+                    .fromEither(msg.decode[B])
+                    .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
+              }
+          }
+      }
+
+  override def requestService[In, Err, Out](
+    endpoint: ServiceEndpointDescriptor[In, Err, Out],
+    input: In,
+    timeout: Duration
+  )(using errCodec: NatsCodec[Err]): IO[NatsError | Err, Out] =
+    ZIO
+      .attempt(endpoint.inCodec.encode(input))
+      .mapError(e =>
+        NatsError.SerializationError(
+          s"Failed to encode request for subject '${endpoint.effectiveSubject.value}': ${e.toString}",
+          e
+        )
+      )
+      .flatMap { bytes =>
+        ZIO
+          .attemptBlocking(
+            Option(conn.request(endpoint.effectiveSubject.value, bytes.toArray, timeout.asJava))
+          )
+          .mapError(NatsError.fromThrowable)
+          .flatMap {
+            case None =>
+              ZIO.fail(
+                NatsError.Timeout(
+                  s"No reply received for subject '${endpoint.effectiveSubject.value}' within $timeout"
+                )
+              )
+            case Some(jMsg) =>
+              val msg = NatsMessage.fromJava(jMsg)
+              msg.headers.get("Nats-Service-Error").headOption match {
+                case Some(errHeader) =>
+                  val code = msg.headers
+                    .get("Nats-Service-Error-Code")
+                    .headOption
+                    .flatMap(_.toIntOption)
+                    .getOrElse(500)
+                  if (msg.payload.nonEmpty)
+                    // Typed domain error — decode body as Err, fail in error channel
+                    ZIO
+                      .fromEither(errCodec.decode(msg.payload))
+                      .mapError(_ => NatsError.ServiceCallFailed(errHeader, code))
+                      .flatMap(err => ZIO.fail(err))
+                  else
+                    // Infrastructure error — empty body
+                    ZIO.fail(NatsError.ServiceCallFailed(errHeader, code))
+                case None =>
+                  // Success — decode body as Out
+                  ZIO
+                    .fromEither(endpoint.outCodec.decode(msg.payload))
+                    .mapError(e => NatsError.DecodingError(e.message, e))
+              }
           }
       }
 

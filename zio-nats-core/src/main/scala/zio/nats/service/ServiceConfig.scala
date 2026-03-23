@@ -62,11 +62,14 @@ enum QueueGroupPolicy:
 /**
  * Typeclass for converting handler error types to NATS service error responses.
  *
- * NATS service errors are a `(message, code)` pair surfaced to the caller via
- * the `Nats-Service-Error` and `Nats-Service-Error-Code` headers.
+ * NATS service errors are a `(message, code)` pair surfaced to callers via the
+ * `Nats-Service-Error` and `Nats-Service-Error-Code` headers. These headers are
+ * set for NATS Micro protocol compatibility (monitoring, discovery,
+ * cross-language clients).
  *
- * Built-in instances are provided for [[zio.nats.NatsError]] and [[String]].
- * Define your own for domain error types:
+ * A universal fallback instance is provided — `e.toString` with code 500 — so
+ * no explicit instance is required for custom domain error types. Override the
+ * default for custom header values or HTTP-style status codes:
  *
  * {{{
  * enum UserError:
@@ -85,7 +88,7 @@ trait ServiceErrorMapper[E]:
    */
   def toErrorResponse(e: E): (String, Int)
 
-object ServiceErrorMapper:
+object ServiceErrorMapper extends LowPriorityServiceErrorMappers:
 
   /**
    * Default mapper for [[zio.nats.NatsError]]: sends the error message with
@@ -104,3 +107,19 @@ object ServiceErrorMapper:
    */
   given ServiceErrorMapper[Nothing] with
     def toErrorResponse(e: Nothing): (String, Int) = throw new AssertionError("unreachable")
+
+/**
+ * Lower-priority given instances for [[ServiceErrorMapper]].
+ *
+ * The universal fallback lives here so that specific instances in
+ * [[ServiceErrorMapper]] companion always take precedence.
+ */
+private[nats] trait LowPriorityServiceErrorMappers:
+
+  /**
+   * Universal fallback mapper: uses `e.toString` as the error message with code
+   * 500. Enables `withError[E]` for any `E` without requiring an explicit
+   * `ServiceErrorMapper[E]` instance.
+   */
+  given [E]: ServiceErrorMapper[E] with
+    def toErrorResponse(e: E): (String, Int) = (e.toString, 500)
