@@ -7,13 +7,13 @@
 </div>
 <div class="main-signature mono-small-block">
  <div class="signature">
-  <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/jetstream/JsEnvelope.html" t="n" class="documentableName ">JsEnvelope</a>[<span t="k">+</span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/jetstream/JsEnvelope.html#A" t="t">A</a>](<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/jetstream/JsEnvelope.html#value:A" t="n">value</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/jetstream/JsEnvelope.html#A" t="t">A</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/jetstream/JsEnvelope.html#message:JetStreamMessage" t="n">message</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/jetstream/JetStreamMessage.html" t="t">JetStreamMessage</a>)
+  <span class="modifiers"><span t="k">final case </span></span><span class="kind"><span t="k">class </span></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/JsEnvelope.html" t="n" class="documentableName ">JsEnvelope</a>[<span t="k">+</span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/JsEnvelope.html#A" t="t">A</a>](<span t="k"></span><span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/JsEnvelope.html#value:A" t="n">value</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/JsEnvelope.html#A" t="t">A</a>, <span t="k"></span><a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/JsEnvelope.html#message:JetStreamMessage" t="n">message</a>: <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/JetStreamMessage.html" t="t">JetStreamMessage</a>)
  </div>
 </div>
 <div class="cover">
  <div class="doc">
-  <p>A decoded JetStream message value paired with its raw <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/jetstream/JetStreamMessage.html">JetStreamMessage</a>.</p>
-  <p>Returned by <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/jetstream/Consumer.html">Consumer</a> and <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/jetstream/OrderedConsumer.html">OrderedConsumer</a> so callers have access to both the decoded payload and the full message for acknowledgement operations and metadata (headers, subject, reply-to).</p>
+  <p>A decoded JetStream message value paired with its raw <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/JetStreamMessage.html">JetStreamMessage</a>.</p>
+  <p>Returned by <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/Consumer.html">Consumer</a> and <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/OrderedConsumer.html">OrderedConsumer</a> so callers have access to both the decoded payload and the full message for acknowledgement operations and metadata (headers, subject, reply-to).</p>
   <div class="snippet mono-small-block">
    <pre><code class="language-"><span line-number="1" class=""><span class="tooltip-container"></span>consumer.fetch[Order]().map { env =&gt;
 </span><span line-number="2" class=""><span class="tooltip-container"></span> // env.value   — the decoded Order
@@ -30,7 +30,7 @@
     message
    </dt>
    <dd class="body-medium">
-    <p>The raw <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/jetstream/JetStreamMessage.html">JetStreamMessage</a> that was received.</p>
+    <p>The raw <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/JetStreamMessage.html">JetStreamMessage</a> that was received.</p>
    </dd>
    <dt class="body-small">
     value
@@ -49,7 +49,7 @@
      <button type="button" class="label-only-button" onclick="zoomOut()">Reset zoom</button><button type="button" class="label-only-button" onclick="hideGraph()">Hide graph</button><button type="button" class="label-only-button" onclick="showGraph()">Show graph</button>
      <svg id="graph"></svg>
      <script type="text/dot" id="dot"> digraph g {
- node0 [id=node0, label="<span style=\"color: #FFFFFF;\">class <a href=\"https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/jetstream/JsEnvelope.html\" t=\"n\">JsEnvelope</a>[<span t=\"t\">A</span>]</span>", class="class vertex"];
+ node0 [id=node0, label="<span style=\"color: #FFFFFF;\">class <a href=\"https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+41-33387606-SNAPSHOT/zio/nats/jetstream/JsEnvelope.html\" t=\"n\">JsEnvelope</a>[<span t=\"t\">A</span>]</span>", class="class vertex"];
 node1 [id=node1, label="<span style=\"color: #FFFFFF;\">class <span data-unresolved-link=\"\" t=\"n\">Object</span></span>", class="class vertex"];
 node2 [id=node2, label="<span style=\"color: #FFFFFF;\">class <span data-unresolved-link=\"\" t=\"n\">Any</span></span>", class="class vertex"];
 node3 [id=node3, label="<span style=\"color: #FFFFFF;\">trait <span data-unresolved-link=\"\" t=\"n\">Matchable</span></span>", class="trait vertex"];
