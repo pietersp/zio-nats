@@ -12,8 +12,8 @@
 </div>
 <div class="cover">
  <div class="doc">
-  <p>play-json integration for <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>.</p>
-  <p>Bridges <code>Format[A]</code> (play-json's combined read/write codec) to the library's <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> typeclass. The bridge <code>given fromPlayJsonFormat</code> is the primary integration point: after <code>import zio.nats.{given, *}</code>, any <code>Format[A]</code> that is in implicit scope is automatically promoted to a <code>NatsCodec[A]</code>.</p>
+  <p>play-json integration for <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>.</p>
+  <p>Bridges <code>Format[A]</code> (play-json's combined read/write codec) to the library's <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a> typeclass. The bridge <code>given fromPlayJsonFormat</code> is the primary integration point: after <code>import zio.nats.{given, *}</code>, any <code>Format[A]</code> that is in implicit scope is automatically promoted to a <code>NatsCodec[A]</code>.</p>
   <p>JSON is serialised as UTF-8 bytes.</p>
   <p>==Typical usage==</p>
   <div class="snippet mono-small-block">
@@ -116,7 +116,7 @@ node3 -> node2;
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">def </span></span><a href="NatsCodecPlayJson$.html#fromPlayJson-fffff370" t="n" class="documentableName ">fromPlayJson</a>[<span t="k"></span><span data-unresolved-link="" t="t">A</span>](<span t="k"></span><span t="k"></span><span data-unresolved-link="" t="n">format</span>: <a href="https://www.playframework.com/documentation/latest/api/scala/play/api/libs/json/Format.html" t="t">Format</a>[<span t="t">A</span>]): <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<span data-unresolved-link="" t="t">A</span>]
+            <span class="modifiers"></span><span class="kind"><span t="k">def </span></span><a href="NatsCodecPlayJson$.html#fromPlayJson-fffff370" t="n" class="documentableName ">fromPlayJson</a>[<span t="k"></span><span data-unresolved-link="" t="t">A</span>](<span t="k"></span><span t="k"></span><span data-unresolved-link="" t="n">format</span>: <a href="https://www.playframework.com/documentation/latest/api/scala/play/api/libs/json/Format.html" t="t">Format</a>[<span t="t">A</span>]): <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<span data-unresolved-link="" t="t">A</span>]
            </div>
           </div>
          </div>
@@ -126,11 +126,11 @@ node3 -> node2;
            <div class="originInfo"></div>
            <div class="memberDocumentation">
             <div class="documentableBrief doc">
-             <p>Wrap a play-json <code>Format[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
+             <p>Wrap a play-json <code>Format[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
             </div>
             <div class="cover">
              <div class="doc">
-              <p>Wrap a play-json <code>Format[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
+              <p>Wrap a play-json <code>Format[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
               <p>Use this for an explicit one-off codec. For automatic bridging via implicit resolution, ensure a <code>given Format[A]</code> is in scope and use <code>import zio.nats.{given, *}</code> — the <code>fromPlayJsonFormat</code> given handles the rest.</p>
              </div>
              <h2 class="h200">Value parameters</h2>
@@ -154,7 +154,7 @@ node3 -> node2;
           <button class="icon-button ar show-content"></button>
           <div class="header monospace mono-medium">
            <div class="signature">
-            <span class="modifiers"></span><span class="kind"><span t="k">def </span></span><a href="NatsCodecPlayJson$.html#wrap-fffff370" t="n" class="documentableName ">wrap</a>[<span t="k"></span><span data-unresolved-link="" t="t">A</span>](<span t="k"></span><span t="k"></span><span data-unresolved-link="" t="n">format</span>: <a href="https://www.playframework.com/documentation/latest/api/scala/play/api/libs/json/Format.html" t="t">Format</a>[<span t="t">A</span>]): <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<span data-unresolved-link="" t="t">A</span>]
+            <span class="modifiers"></span><span class="kind"><span t="k">def </span></span><a href="NatsCodecPlayJson$.html#wrap-fffff370" t="n" class="documentableName ">wrap</a>[<span t="k"></span><span data-unresolved-link="" t="t">A</span>](<span t="k"></span><span t="k"></span><span data-unresolved-link="" t="n">format</span>: <a href="https://www.playframework.com/documentation/latest/api/scala/play/api/libs/json/Format.html" t="t">Format</a>[<span t="t">A</span>]): <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/NatsCodec.html" t="t">NatsCodec</a>[<span data-unresolved-link="" t="t">A</span>]
            </div>
           </div>
          </div>
@@ -164,14 +164,14 @@ node3 -> node2;
            <div class="originInfo"></div>
            <div class="memberDocumentation">
             <div class="documentableBrief doc">
-             <p>Wrap a play-json <code>Format[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
+             <p>Wrap a play-json <code>Format[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
             </div>
             <div class="cover">
              <div class="doc">
-              <p>Wrap a play-json <code>Format[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
+              <p>Wrap a play-json <code>Format[A]</code> as a <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/NatsCodec.html">NatsCodec</a>[A].</p>
               <p>Encoding delegates to <code>Json.stringify</code>; decoding delegates to <code>Json.parse</code></p>
               <ul>
-               <li><code>validate[A]</code>, mapping any <code>JsError</code> or thrown exception to <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+38-c9c422b3-SNAPSHOT/zio/nats/NatsDecodeError.html">NatsDecodeError</a>.</li>
+               <li><code>validate[A]</code>, mapping any <code>JsError</code> or thrown exception to <a href="https://javadoc.io/page/io.github.pietersp/zio-nats-core/0.1.0-RC2+40-e4248fbc-SNAPSHOT/zio/nats/NatsDecodeError.html">NatsDecodeError</a>.</li>
               </ul>
              </div>
              <h2 class="h200">Value parameters</h2>
