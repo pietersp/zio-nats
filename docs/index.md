@@ -6,7 +6,7 @@ slug: /
 
 ## Overview
 
-[NATS](https://nats.io) is a lightweight, high-performance messaging system. It organises messages around **subjects** — dot-separated strings like `orders.created` or `payments.>` — and lets any number of producers and consumers exchange messages without knowing about each other. zio-nats brings this to ZIO 2 with a clean, purely functional API.
+[NATS](https://nats.io) is a lightweight, high-performance messaging system. It organises messages around **subjects** - dot-separated strings like `orders.created`, or `payments.US.west.store1` - and lets any number of producers and consumers exchange messages without knowing about each other. zio-nats brings this to ZIO 2 with a clean, purely functional API.
 
 - **Pub/sub with Core NATS** - producers and consumers are fully decoupled; neither knows about the other. Core NATS is at-most-once delivery: fast and lightweight, but if no subscriber is listening when a message arrives, it is gone. Use queue groups to spread load across multiple instances of a service.
 - **JetStream** - when you can't afford to lose messages, JetStream persists them to durable streams. Consumers can catch up after downtime, replay from any point, and process at their own pace. At-least-once delivery is the default; exactly-once delivery is also supported for the cases where duplicates are not acceptable.
@@ -14,9 +14,8 @@ slug: /
 - **Object Store** - distribute large binary objects across your NATS cluster without standing up S3 or a separate file store. A natural fit for ML models, compiled assets, or config bundles that need to be available to all your services.
 - **Service framework** - NATS has a built-in microservice protocol (Micro) that gives you request-reply endpoints with automatic service discovery, health checks, and stats; no service mesh, no sidecar, no extra infrastructure
 - Type-safe serialization - batteries-included zio-blocks integration for domain types, with jsoniter-scala and play-json also supported; easy to bring your own
-- Ergonomic by design - no raw jnats types, no callbacks, no adapters; the API feels like it was written for ZIO from the ground up
+- Ergonomic by design - no raw jnats types, no callbacks, no adapters, simple imports; the API feels like it was written for ZIO from the ground up
 
-`import zio.nats.*` is the only import you need.
 
 ## A taste of the API
 
