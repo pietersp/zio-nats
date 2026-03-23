@@ -36,7 +36,7 @@ For domain types like `OrderPlaced` or `PriceUpdate`, read on.
 [zio-blocks](https://zio.dev/zio-blocks) derives codecs from a compile-time `Schema`. It is included in the batteries-included `zio-nats` artifact and is the recommended approach for domain types - define the schema once and every format (JSON, Avro, MsgPack) becomes available with no extra code per type.
 
 :::warning
-zio-blocks is not yet stable. The schema derivation API that zio-nats uses appears to be settling, and our surface with the library is intentionally small, but breaking changes are possible as zio-blocks evolves toward a stable release. Check the [zio-blocks releases](https://github.com/zio/zio-blocks) when upgrading.
+[zio-blocks](https://zio.dev/zio-blocks) is not yet stable. The schema derivation API that zio-nats uses appears to be settling, and our surface with the library is intentionally small, but breaking changes are possible as zio-blocks evolves toward a stable release. Check the [zio-blocks releases](https://github.com/zio/zio-blocks) when upgrading.
 :::
 
 ### Setup
