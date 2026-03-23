@@ -319,6 +319,5 @@ val ticks: ZIO[Nats, NatsError, Unit] =
 
 ## Next steps
 
-- [Pub/Sub guide](./01-pubsub.md) - the underlying publish/subscribe mechanics
 - [JetStream guide](./03-jetstream.md) - persistent messaging with typed payloads
 - [Modules reference](../reference/03-modules.md) - which artifact to add for each integration
