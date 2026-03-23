@@ -3,26 +3,25 @@ id: testing
 title: Testing
 ---
 
-# Testing
+`zio-nats-testkit` starts a real NATS server in a Docker container via [testcontainers](https://testcontainers.com) and provides a wired `Nats` layer pointing at it. There are no mocks to maintain and no manual server setup - your tests run against the same protocol your production code uses.
 
-> Integration tests against a real NATS server — no mocks required.
-
-`zio-nats-testkit` starts a NATS container via [testcontainers](https://testcontainers.com)
-and provides a `Nats` layer wired to it. Your tests run against a real server with no manual
-setup.
-
-## Prerequisites
-
-- Docker (or Podman — see note below)
-- `zio-test` in your test dependencies
+:::warning
+Docker must be running on the test machine. See [Podman / WSL](#podman--wsl) if you use Podman instead.
+:::
 
 ## Installation
+
+Add the testkit to your test dependencies:
 
 ```scala
 libraryDependencies += "io.github.pietersp" %% "zio-nats-testkit" % "@VERSION@" % Test
 ```
 
-## Basic test
+## Writing your first test
+
+`NatsTestLayers.nats` is a `ZLayer` that starts a NATS container, waits for it to be ready, and provides a `Nats` service connected to it. Use `.provideShared` to start the container once and share it across every test in the suite - container startup takes a few seconds and sharing it keeps the suite fast.
+
+Because NATS subjects are global within the server (not scoped per-test), running tests concurrently risks one test's subscription receiving another test's messages. `@@ sequential` serialises execution. `@@ withLiveClock` is required because `ZIO.sleep` and timeouts need the live clock, not ZIO's virtual test clock:
 
 ```scala
 import zio.*
@@ -48,18 +47,11 @@ object PublishSubscribeSpec extends ZIOSpecDefault {
 }
 ```
 
-**What's happening:**
-
-1. `NatsTestLayers.nats` — a `ZLayer` that starts a NATS container (once per suite, shared across all tests) and provides a `Nats` service connected to it.
-2. `.provideShared(...)` — Docusaurus uses the same container instance for every test in the suite. Starting a container takes a few seconds; sharing it keeps the suite fast.
-3. `@@ sequential` — runs tests one at a time. NATS subjects are not namespaced per-test, so concurrent tests can interfere with each other's subscriptions.
-4. `@@ withLiveClock` — required because `ZIO.sleep` and timeouts inside tests need the live clock, not ZIO's test clock.
-5. `@@ timeout(60.seconds)` — fails the suite if it takes longer than 60 seconds, guarding against a stuck container startup.
+`@@ timeout(60.seconds)` on the whole suite guards against a stuck container startup - if the suite takes longer than 60 seconds the test run fails rather than hanging indefinitely.
 
 ## JetStream, KV, and Object Store
 
-The testcontainer is started with `--js` (JetStream enabled), so all APIs work without any
-extra configuration:
+The NATS container starts with JetStream enabled, so every API works without extra server configuration. Compose the layers you need on top of `NatsTestLayers.nats` using `>+>`:
 
 ```scala
 import zio.*
@@ -73,7 +65,7 @@ import zio.nats.testkit.NatsTestLayers
 object JetStreamSpec extends ZIOSpecDefault {
   def spec = suite("JetStreamSpec")(
 
-    test("publishes to a stream") {
+    test("stores a message and returns a sequence number") {
       for {
         jsm <- ZIO.service[JetStreamManagement]
         js  <- ZIO.service[JetStream]
@@ -88,22 +80,20 @@ object JetStreamSpec extends ZIOSpecDefault {
 }
 ```
 
-Add whatever layers your tests need on top of `NatsTestLayers.nats` using `>+>`.
+The same pattern applies to KV and Object Store - add `KeyValue.live(bucketName)`, `KeyValueManagement.live`, `ObjectStore.live(bucketName)`, or `ObjectStoreManagement.live` to the layer chain as needed.
 
 ## Podman / WSL
 
-If you use Podman instead of Docker, set these environment variables before running tests:
+The exact setup for Podman varies by OS, Podman version, and WSL configuration - treat the following as a starting point rather than a definitive recipe. If you use Podman instead of Docker, set these two environment variables before running tests:
 
 ```bash
 export DOCKER_HOST=unix:///tmp/podman/podman-machine-default-api.sock
 export TESTCONTAINERS_RYUK_DISABLED=true
 ```
 
-`TESTCONTAINERS_RYUK_DISABLED=true` is required because Podman does not support the Ryuk
-container reaper that testcontainers uses by default.
+`TESTCONTAINERS_RYUK_DISABLED=true` is required because Podman does not support the Ryuk container reaper that testcontainers uses by default for cleanup.
 
 ## Next steps
 
-- [Pub/Sub guide](./01-pubsub.md) — what to test
-- [Error handling reference](../reference/02-error-handling.md) — assert on specific `NatsError` variants
-- [Modules reference](../reference/03-modules.md) — all available artifacts and their scopes
+- [Modules reference](../reference/03-modules.md) - artifact coordinates for each integration
+- [Error handling reference](../reference/02-error-handling.md) - assert on specific `NatsError` variants
