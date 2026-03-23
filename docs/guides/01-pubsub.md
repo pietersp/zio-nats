@@ -3,154 +3,223 @@ id: pubsub
 title: Pub/Sub
 ---
 
-# Pub/Sub
+## Publishing
 
-> Publish messages, subscribe to subjects, use queue groups, and send request-reply RPCs.
+`Nats#publish` fires a message to a subject and returns immediately. Every active subscriber on that subject receives a copy; the publisher neither knows nor cares who is listening. This makes it a natural fit for event broadcasting - when an order is placed, a single publish to `shop.orders` lets a warehouse service, a payment processor, and a notification service each react independently without any of them being coupled to each other or to the publisher.
 
-## Prerequisites
+Messages are delivered at-most-once. If no subscriber is listening when a message arrives, it is dropped silently.
 
-- [Quick start](../quickstart.md) completed — you have a working `Nats` layer
+### Fire-and-forget
 
-## Publish
+The simplest publish takes a subject and a payload. The type of the payload selects the `NatsCodec` automatically:
 
 ```scala mdoc:silent
 import zio.*
 import zio.nats.*
 
-val publishExamples: ZIO[Nats, NatsError, Unit] =
+val publishBasic: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
     for {
-      // UTF-8 string — built-in NatsCodec[String]
-      _ <- nats.publish(Subject("events.user"), "payload")
-
-      // Raw bytes — built-in NatsCodec[Chunk[Byte]]
-      _ <- nats.publish(Subject("events.user"), Chunk.fromArray("raw".getBytes))
-
-      // With headers
-      _ <- nats.publish(
-             Subject("events.user"),
-             "payload",
-             PublishParams(headers = Headers("Content-Type" -> "application/json"))
-           )
-
-      // With reply-to
-      _ <- nats.publish(
-             Subject("events.user"),
-             "payload",
-             PublishParams(replyTo = Some(Subject("_INBOX.reply")))
-           )
+      _ <- nats.publish(Subject("shop.orders"), "order-123")
+      _ <- nats.publish(Subject("shop.orders"), Chunk.fromArray("order-123".getBytes))
     } yield ()
   }
 ```
 
-**What's happening:**
+`"order-123"` resolves `NatsCodec[String]` (UTF-8 encode). `Chunk.fromArray(...)` resolves `NatsCodec[Chunk[Byte]]` (identity - no conversion). Both are built-in; no setup required.
 
-1. `Subject("events.user")` — `Subject` is an opaque type alias for `String`. It compiles to a plain `String` at runtime with no overhead.
-2. The second argument's type selects the codec automatically. `String` → UTF-8 encode. `Chunk[Byte]` → identity (no conversion).
-3. `PublishParams` is optional. It carries headers and reply-to. Omit it when you don't need either.
+### With headers
 
-## Headers
+Headers travel with every message and are useful for metadata that consumers need without deserializing the payload - a trace ID for distributed tracing, a source tag for routing, or a schema version for compatibility checks.
 
-`Headers` is an immutable multi-value map. Build it, read it, and merge it:
+`Headers` is an immutable multi-value map. We build one first:
 
 ```scala mdoc:silent
 import zio.nats.*
 
-val h = Headers("X-Trace" -> "abc", "Content-Type" -> "application/json")
-
-val traceValues: Chunk[String] = h.get("X-Trace")           // Chunk("abc")
-val withExtra: Headers         = h.add("X-Trace", "def")    // Chunk("abc", "def") for X-Trace
+val traceHeaders = Headers("X-Trace-Id" -> "req-abc123", "X-Source" -> "checkout")
 ```
 
-## Subscribe
+`.get` returns all values for a key as a `Chunk[String]`. `.add` appends to existing values rather than replacing them:
 
-`subscribe[A]` returns a `ZStream` of `Envelope[A]`. The underlying NATS subscription opens
-when the stream is consumed and closes when it is interrupted or completed.
+```scala mdoc
+traceHeaders.get("X-Trace-Id")
+traceHeaders.add("X-Trace-Id", "req-def456").get("X-Trace-Id")
+```
+
+To publish with headers, pass a `PublishParams`:
 
 ```scala mdoc:silent
 import zio.*
 import zio.nats.*
 
-val subscribeExamples: ZIO[Nats, NatsError, Unit] =
+val publishWithHeaders: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
-    for {
-      // Typed — payload decoded as UTF-8
-      _ <- nats.subscribe[String](Subject("events.>"))
-             .tap(env => ZIO.debug(s"${env.message.subject}: ${env.value}"))
-             .runDrain
-
-      // Raw bytes — full NatsMessage available via env.message
-      _ <- nats.subscribe[Chunk[Byte]](Subject("events.>"))
-             .tap(env => ZIO.debug(s"${env.message.subject}: ${env.message.dataAsString}"))
-             .runDrain
-    } yield ()
+    nats.publish(
+      Subject("shop.orders"),
+      "order-123",
+      PublishParams(headers = traceHeaders)
+    )
   }
 ```
 
-**What's happening:**
+### With reply-to
 
-1. `subscribe[String]` — the type parameter selects `NatsCodec[String]` (built-in, UTF-8). The decoded value is `env.value`.
-2. `subscribe[Chunk[Byte]]` — selects the identity codec. Useful when you need the raw bytes or when another layer will decode them.
-3. `env.message` is the raw `NatsMessage`. It carries `.subject`, `.headers`, `.replyTo`, and `.dataAsString`. It is available on both typed and raw subscriptions.
-4. NATS subjects support wildcards: `*` matches one token, `>` matches one or more tokens.
-5. `runDrain` runs the stream until interrupted. In practice, fork it alongside your application logic.
-
-## Queue groups
-
-A queue group distributes messages across all subscribers sharing the same group name. Each
-message is delivered to exactly one member of the group — useful for worker pools.
+A reply-to subject tells the receiver where to send a response. In NATS, these are typically `_INBOX` subjects - short-lived ephemeral subjects that a single client listens on. `Nats#request` creates and manages an inbox automatically for simple request-reply (see [Request-Reply](#request-reply)). You only need to set a reply-to manually when building a custom pattern, such as a scatter-gather that fans out to multiple services and collects all their replies:
 
 ```scala mdoc:silent
 import zio.*
 import zio.nats.*
 
-val queueGroupExample: ZIO[Nats, NatsError, Unit] =
+val publishWithReplyTo: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
-    nats.subscribe[String](Subject("work.queue"), Some(QueueGroup("workers")))
-      .tap(env => ZIO.debug(s"Worker processing: ${env.value}"))
+    nats.publish(
+      Subject("shop.pricing"),
+      "item-456",
+      PublishParams(replyTo = Some(Subject("_INBOX.my-gather-123")))
+    )
+  }
+```
+
+## Subscribing
+
+A subscriber receives messages as a `ZStream[Nats, NatsError, Envelope[A]]`. Each `Envelope[A]` carries two things:
+
+- `env.value` - the decoded payload, typed as `A`
+- `env.message` - the raw NATS message, with `.subject`, `.headers`, `.replyTo`, and `.dataAsString`
+
+Most of the time `env.value` is all you need. Reach for `env.message` when you need to inspect headers, read the subject the message arrived on, or send a reply.
+
+The NATS subscription opens when the stream starts consuming and closes when the stream is interrupted or completes. NATS subjects support two wildcards:
+
+- `*` matches a single token: `shop.orders.*` matches `shop.orders.new` but not `shop.orders.new.express`
+- `>` matches one or more trailing tokens: `shop.orders.>` matches `shop.orders.new`, `shop.orders.new.express`, and anything deeper
+
+### Typed payload
+
+Pass the expected type as a type parameter and `NatsCodec[A]` is resolved at compile time - the payload is decoded automatically on every incoming message. `A` can be any type with a `NatsCodec` in scope: a plain `String`, a `Chunk[Byte]`, or a domain type like `OrderPlaced` with a derived codec (see [Serialization](./02-serialization.md)). This is the right choice whenever your service cares about the content: a notification service subscribing to `shop.orders.>` to send confirmation emails only needs the decoded order ID, not raw bytes or message metadata:
+
+```scala mdoc:silent
+import zio.*
+import zio.nats.*
+
+val subscribeWithEnvelope: ZIO[Nats, NatsError, Unit] =
+  ZIO.serviceWithZIO[Nats] { nats =>
+    nats.subscribe[String](Subject("shop.orders.>"))
+      .tap(env => ZIO.debug(s"Order on ${env.message.subject}: ${env.value}"))
       .runDrain
   }
 ```
 
-`QueueGroup` is an opaque type alias for `String`. Omit it (pass `None` or no second argument)
-for a regular fan-out subscription where every subscriber receives every message.
-
-## Request-Reply
-
-`request` sends a message and waits for a single reply. It is the NATS pattern for synchronous
-RPC over an async transport.
+If you only need the decoded values and have no use for the envelope metadata, use `.map(_.value)` to unwrap the stream:
 
 ```scala mdoc:silent
 import zio.*
 import zio.nats.*
 
-val rpcExample: ZIO[Nats, NatsError, Unit] =
+val subscribeValues: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
-    for {
-      // Returns Envelope[String] — decoded reply + raw metadata
-      env <- nats.request[String, String](
-               Subject("rpc.greet"),
-               "Alice",
-               timeout = 5.seconds
-             )
-      _ <- ZIO.debug(s"Reply: ${env.value}")
-
-      // .payload strips the Envelope wrapper — returns just the decoded value
-      reply <- nats.request[String, String](Subject("rpc.greet"), "Bob", 5.seconds).payload
-      _     <- ZIO.debug(s"Reply: $reply")
-    } yield ()
+    nats.subscribe[String](Subject("shop.orders.>"))
+      .map(_.value)
+      .tap(orderId => ZIO.debug(s"Processing: $orderId"))
+      .runDrain
   }
 ```
 
-**What's happening:**
+### Raw bytes
 
-1. The two type parameters are `[In, Out]`: the request payload type and the expected reply type.
-2. zio-nats creates an ephemeral `_INBOX` subject for the reply automatically.
-3. `timeout` is required — `request` fails with `NatsError.Timeout` if no reply arrives in time.
-4. `.payload` is an extension method on `IO[NatsError, Envelope[A]]` that strips the `Envelope` wrapper, returning `IO[NatsError, A]`.
+Subscribe as `Chunk[Byte]` when you want to handle decoding yourself or pass messages through without touching the payload. This is useful for proxies, log archivers, or bridges to third-party systems - a message bridge forwarding order events to an analytics platform does not need to decode them, it just passes the bytes through:
+
+```scala mdoc:silent
+import zio.*
+import zio.nats.*
+
+val subscribeRaw: ZIO[Nats, NatsError, Unit] =
+  ZIO.serviceWithZIO[Nats] { nats =>
+    nats.subscribe[Chunk[Byte]](Subject("shop.orders.>"))
+      .tap(env => ZIO.debug(s"Forwarding ${env.value.length} bytes from ${env.message.subject}"))
+      .runDrain
+  }
+```
+
+## Queue groups
+
+A queue group distributes messages across all subscribers sharing the same group name, delivering each message to exactly one member. This is the Core NATS pattern for running multiple instances of a worker service without each instance processing every message. Deploy three fulfillment workers all subscribed to `shop.fulfillment` with the same group name and NATS spreads orders evenly across them - no coordination logic required.
+
+Pass a `QueueGroup` as the second argument to `Nats#subscribe`:
+
+```scala mdoc:silent
+import zio.*
+import zio.nats.*
+
+val fulfillmentWorker: ZIO[Nats, NatsError, Unit] =
+  ZIO.serviceWithZIO[Nats] { nats =>
+    nats.subscribe[String](Subject("shop.fulfillment"), Some(QueueGroup("fulfillment-workers")))
+      .tap(env => ZIO.debug(s"Fulfilling order: ${env.value}"))
+      .runDrain
+  }
+```
+
+Start as many instances as you need with the same `QueueGroup` name and NATS distributes messages across them automatically. Scale up by adding instances; scale down by stopping them. No re-configuration, no locks, no extra infrastructure.
+
+## Request-Reply
+
+Request-reply is Core NATS's pattern for synchronous RPC over an async transport. `Nats#request` publishes a message and waits for a single reply, making it feel like a function call while staying entirely within NATS - no HTTP servers, no extra routing infrastructure. It is a natural fit for lookups and validations: a checkout service confirming stock with the inventory service, or a pricing service returning a quote on demand. `Nats#request` handles the entire exchange - it creates an ephemeral `_INBOX` subject, subscribes to it, attaches it as the reply-to on the outgoing message, waits for the response, then cleans up.
+
+### Basic request
+
+The two type parameters are `[In, Out]`: the request payload type and the expected reply type. To show the typed nature, we define a `StockStatus` reply type. `available` is the number of units ready to ship; `onHold` is the number reserved by pending orders. We use zio-blocks to derive a codec (see [Serialization](./02-serialization.md) for details):
+
+```scala mdoc:silent
+import zio.nats.*
+import zio.blocks.schema.Schema
+import zio.blocks.schema.json.JsonFormat
+
+case class StockStatus(available: Int, onHold: Int)
+object StockStatus {
+  given Schema[StockStatus] = Schema.derived
+}
+
+val codecs = NatsCodec.fromFormat(JsonFormat)
+import codecs.derived
+```
+
+A `timeout` is required - if no reply arrives in time, `Nats#request` fails with `NatsError.Timeout`:
+
+```scala mdoc:silent
+import zio.*
+import zio.nats.*
+
+val stockCheck: ZIO[Nats, NatsError, Envelope[StockStatus]] =
+  ZIO.serviceWithZIO[Nats] { nats =>
+    nats.request[String, StockStatus](
+      Subject("shop.inventory"),
+      "item-456",
+      timeout = 5.seconds
+    )
+  }
+```
+
+### Unwrapping the reply
+
+`Nats#request` returns an `Envelope[Out]`, giving access to both the decoded reply and the raw metadata. Similarly to how `.map(_.value)` unwraps a subscription stream to a `ZStream` of plain values, `.payload` unwraps a single `IO[NatsError, Envelope[A]]` to give you just the decoded value:
+
+```scala mdoc:silent
+import zio.*
+import zio.nats.*
+
+val stockLevel: ZIO[Nats, NatsError, StockStatus] =
+  ZIO.serviceWithZIO[Nats] { nats =>
+    nats.request[String, StockStatus](
+          Subject("shop.inventory"),
+          "item-456",
+          5.seconds
+        ).payload
+  }
+```
 
 ## Next steps
 
-- [Serialization guide](./02-serialization.md) — publish and subscribe with domain types (not just `String`/`Chunk[Byte]`)
-- [JetStream guide](./03-jetstream.md) — persistent, replay-able messaging with delivery guarantees
-- [Configuration guide](./06-configuration.md) — connecting to authenticated or TLS-secured servers
+- [Serialization guide](./02-serialization.md) - publish and subscribe with domain types, not just `String` and `Chunk[Byte]`
+- [JetStream guide](./03-jetstream.md) - durable streams, at-least-once and exactly-once delivery
+- [Configuration guide](./06-configuration.md) - connecting to authenticated or TLS-secured servers
