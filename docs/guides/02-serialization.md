@@ -107,7 +107,7 @@ val encoded = NatsCodec[ShipmentEvent].encode(
 new String(encoded.toArray)
 ```
 
-The JSON keys are snake_case; the Scala fields remain camelCase. Subscribers with the same schema decode the snake_case JSON back into the camelCase Scala type automatically.
+The JSON keys are snake_case; the Scala fields remain camelCase. Subscribers with the same schema decode the snake_case JSON back into the camelCase Scala type automatically. For the full range of schema modifiers and format options, see the [zio-blocks documentation](https://zio.dev/zio-blocks/).
 
 ### Available formats
 
