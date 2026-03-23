@@ -178,6 +178,10 @@ val priceUpdateCodec: NatsCodec[PriceUpdate] =
   NatsCodecJsoniter.fromJsoniter(JsonCodecMaker.make[PriceUpdate])
 ```
 
+:::tip
+If jsoniter is your only serialization layer, you can drop the zio-blocks transitive dependency entirely. Pair `zio-nats-jsoniter` with `zio-nats-core` instead of `zio-nats` and your build stays lean.
+:::
+
 ## play-json
 
 [play-json](https://github.com/playframework/play-json) works the same way as jsoniter - place a `given Format[A]` in scope and it is bridged to `NatsCodec[A]` automatically. This is useful when your project already defines play-json `Format` instances and you want to reuse them without any additional codec setup.
@@ -207,6 +211,10 @@ val shipmentEvents: ZIO[Nats, NatsError, Unit] =
 ```
 
 Use `NatsCodecPlayJson.fromPlayJson(format)` for an explicit one-off codec.
+
+:::tip
+Already on play-json and not planning to add zio-blocks? Swap `zio-nats` for `zio-nats-core` + `zio-nats-play-json` and keep the dependency tree minimal.
+:::
 
 ## Mixing codecs
 
