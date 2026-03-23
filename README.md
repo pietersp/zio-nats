@@ -2,6 +2,7 @@
 
 NATS is one of the fastest messaging systems available — lightweight, cloud-native, and built for scale. zio-nats brings the full NATS ecosystem into ZIO 2: subscriptions become `ZStream`s, services become `ZLayer`s, errors are typed, and not a single callback touches your code.
 
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/pietersp/zio-nats)
 ![Scala 3](https://img.shields.io/badge/scala-3-blue)
 ![ZIO 2](https://img.shields.io/badge/ZIO-2-red)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green)
