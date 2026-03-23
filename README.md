@@ -1,1032 +1,138 @@
 # zio-nats
 
-A ZIO 2 wrapper for the [jnats](https://github.com/nats-io/nats.java) NATS client.
+NATS is one of the fastest messaging systems available — lightweight, cloud-native, and built for scale. zio-nats brings the full NATS ecosystem into ZIO 2: subscriptions become `ZStream`s, services become `ZLayer`s, errors are typed, and not a single callback touches your code.
 
 ![Scala 3](https://img.shields.io/badge/scala-3-blue)
 ![ZIO 2](https://img.shields.io/badge/ZIO-2-red)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green)
 
-- Idiomatic ZIO 2 services with `ZLayer` for every subsystem
-- Full API coverage: core pub/sub, JetStream, Key-Value, Object Store
-- `ZStream`-based subscriptions and consumers — no callbacks in user code
-- Typed error model (`NatsError` sealed ADT)
-- Type-safe serialization — built-in `Chunk[Byte]`/`String` codecs; [zio-blocks](https://zio.dev/zio-blocks) integration included by default
-- Zero raw jnats types in user code — `import zio.nats.*` is all you need
-- Scala 3
+---
 
-## Installation
+## Why zio-nats
 
-Add to `build.sbt`:
+**Everything is a stream.** `Nats#subscribe`, `Consumer#consume`, `KeyValue#watch`, and `ObjectStore#watch` all return `ZStream`. Backpressure, interruption, and resource cleanup are handled automatically.
 
-```scala
-// ── Option A: batteries-included ────────────────────────────────────────────
-// Includes pub/sub, JetStream, KV, Object Store, Service Framework,
-// and zio-blocks type-safe serialization.
-libraryDependencies += "io.github.pietersp" %% "zio-nats" % "<version>"
+**Full NATS coverage.** Core pub/sub, JetStream persistent messaging, Key-Value store, Object Store, and the Service Framework — the complete NATS API in one library.
 
-// ── Option B: core only (no zio-blocks) ─────────────────────────────────────
-// Use this when you want jsoniter-scala or a fully custom NatsCodec[A]
-// instead of zio-blocks.
-libraryDependencies += "io.github.pietersp" %% "zio-nats-core" % "<version>"
+**Type-safe from publish to subscribe.** One `Schema` derivation covers every format — JSON, Avro, MsgPack. Prefer jsoniter-scala or play-json? Bring your own codec and it bridges automatically.
 
-// ── Optional add-on: jsoniter-scala serialization ───────────────────────────
-// Pair with zio-nats-core (instead of zio-blocks) or add alongside zio-nats
-// (to use jsoniter for selected types while keeping zio-blocks for others).
-libraryDependencies += "io.github.pietersp" %% "zio-nats-jsoniter" % "<version>"
+**Testing without mocks.** `NatsTestLayers.nats` starts a real NATS server in Docker. One line, no infrastructure to manage, no mocks to drift from the real protocol.
 
-// ── Optional add-on: play-json serialization ─────────────────────────────────
-// Pair with zio-nats-core (instead of zio-blocks) or add alongside zio-nats
-// (to use play-json for selected types while keeping zio-blocks for others).
-libraryDependencies += "io.github.pietersp" %% "zio-nats-play-json" % "<version>"
-
-// ── Testkit ──────────────────────────────────────────────────────────────────
-// Integration test helpers — starts a NATS container via testcontainers.
-libraryDependencies += "io.github.pietersp" %% "zio-nats-testkit" % "<version>" % Test
-```
-
+---
 
 ## Quick start
 
-Requires a running NATS server (`nats-server`).
+```scala
+libraryDependencies += "io.github.pietersp" %% "zio-nats" % "<version>"
+```
+
+Start a local NATS server:
+
+```sh
+docker run -p 4222:4222 nats
+```
+
+Subscribe and publish:
 
 ```scala
-import zio._
-import zio.nats._
-import zio.nats.config.NatsConfig
+import zio.*
+import zio.nats.*
 
-object Main extends ZIOAppDefault {
-  val program: ZIO[Nats, NatsError, Unit] =
-    for {
+object HelloNats extends ZIOAppDefault {
+  def run =
+    (for {
       nats  <- ZIO.service[Nats]
       fiber <- nats.subscribe[String](Subject("greetings"))
-                 .take(3)
+                 .take(1)
                  .tap(env => Console.printLine(s"Received: ${env.value}").orDie)
                  .runDrain
                  .fork
-      _     <- ZIO.sleep(200.millis)
-      _     <- ZIO.foreachDiscard(1 to 3) { i =>
-                 nats.publish(Subject("greetings"), s"Hello #$i")
-               }
+      _     <- ZIO.sleep(100.millis)
+      _     <- nats.publish(Subject("greetings"), "Hello, NATS!")
       _     <- fiber.join
-    } yield ()
-
-  val run: ZIO[Any, Throwable, Unit] =
-    program
-      .provide(NatsConfig.live, Nats.live)
-      .mapError(e => new RuntimeException(e.getMessage))
+    } yield ()).provide(Nats.default)
 }
 ```
 
-> `Subject` and `QueueGroup` are opaque types from `import zio.nats._` — no additional import needed.
-> `nats.subscribe[String]` decodes each payload as UTF-8 and wraps it in an `Envelope[String]`. Use `Chunk[Byte]` instead to receive raw bytes, with `env.message` giving access to headers, subject, and reply-to.
+`Nats.default` connects to `localhost:4222`. Every other service — JetStream, KV, Object Store — is a `ZLayer` derived from it.
 
-## Core concepts
+---
 
-`Nats` is the root service. All other services are derived from it:
+## Highlights
 
-```
-NatsConfig
-    └── Nats.live              ← core connection (pub/sub/request-reply)
-            ├── JetStream.live              ← JetStream publishing + consumer access
-            ├── JetStreamManagement.live    ← stream + consumer admin
-            ├── KeyValueManagement.live     ← KV bucket admin
-            ├── KeyValue.live(name)         ← KV bucket service (ZLayer)
-            ├── ObjectStoreManagement.live  ← Object Store admin
-            └── ObjectStore.live(name)      ← Object Store bucket service (ZLayer)
-```
+### Typed domain messages
 
-`KeyValue.live(name)` and `ObjectStore.live(name)` are `ZLayer`s — the idiomatic way to wire a bucket service into an application's dependency graph. `KeyValue.bucket(name)` and `ObjectStore.bucket(name)` remain available as `ZIO` effects for programmatic use inside a for-comprehension.
-
-All services are wired via `ZLayer`. Use `>+>` to keep all prior services in scope:
-
-```scala
-val appLayer =
-  ZLayer.succeed(NatsConfig.default) >>>
-  Nats.live >+>
-  JetStream.live >+>
-  JetStreamManagement.live >+>
-  KeyValueManagement.live
-```
-
-## Authentication & TLS
-
-Both are configured directly on `NatsConfig` — always use `Nats.live`.
-
-### Authentication
-
-Pick one `NatsAuth` variant:
-
-```scala
-// Anonymous (default)
-NatsConfig()
-
-// Static token
-NatsConfig(auth = NatsAuth.Token("s3cr3t"))
-
-// Username + password
-NatsConfig(auth = NatsAuth.UserPassword("alice", "p4ssw0rd"))
-
-// NKey/JWT from a .creds file (e.g. Synadia Cloud)
-NatsConfig(auth = NatsAuth.CredentialFile(Paths.get("/run/secrets/nats.creds")))
-
-// Programmatic AuthHandler — for dynamic credential rotation or credentials
-// that cannot be expressed as static text (e.g. NKey signing with a key
-// fetched from Vault at startup)
-NatsConfig(auth = NatsAuth.Custom(myAuthHandler))
-```
-
-### TLS
-
-Pick one `NatsTls` variant:
-
-```scala
-// No TLS (default)
-NatsConfig()
-
-// TLS using the JVM's system trust store — for servers with public CA certs
-NatsConfig(tls = NatsTls.SystemDefault)
-
-// mTLS via JVM keystore/truststore files
-NatsConfig(tls = NatsTls.KeyStore(
-  keyStorePath       = Paths.get("/certs/client.jks"),
-  keyStorePassword   = "changeit",
-  trustStorePath     = Some(Paths.get("/certs/ca.jks")),
-  trustStorePassword = Some("changeit")
-))
-
-// Pre-built SSLContext — for certificates loaded at runtime
-// (e.g. fetched from AWS Secrets Manager, Vault, or an HSM)
-NatsConfig(tls = NatsTls.Custom(mySSLContext))
-```
-
-Authentication and TLS are independent — use either, both, or neither. They operate at different layers: TLS secures the TCP connection; auth identifies your client to the NATS permission system.
-
-## Loading config from the environment
-
-`NatsConfig.fromConfig` is a `ZLayer` that reads connection settings from ZIO's built-in config system (no extra dependencies — `zio.Config` is in `zio-core`).
-
-```scala
-// Replace NatsConfig.live with NatsConfig.fromConfig in your layer graph
-val app: ZIO[Nats, Throwable, Unit] = ???
-
-app.provide(
-  Nats.live,
-  NatsConfig.fromConfig   // reads from NATS_ env vars by default
-)
-```
-
-With the default `ConfigProvider` (environment variables + system properties), keys are normalised to `UPPER_SNAKE_CASE` under the `NATS_` prefix. Multiple servers are comma-separated:
-
-| Setting | Env var |
-|---------|---------|
-| `servers` (single) | `NATS_SERVERS=nats://broker:4222` |
-| `servers` (multiple) | `NATS_SERVERS=nats://a:4222,nats://b:4222` |
-| `auth.type` | `NATS_AUTH_TYPE=token` |
-| `auth.value` (token) | `NATS_AUTH_VALUE=s3cr3t` |
-| `connection-timeout` | `NATS_CONNECTION_TIMEOUT=PT5S` |
-| `max-reconnects` | `NATS_MAX_RECONNECTS=60` |
-| `tls.type` | `NATS_TLS_TYPE=system-default` |
-| `socket-read-timeout` | `NATS_SOCKET_READ_TIMEOUT=PT0.5S` (500 ms) |
-
-All fields have defaults; only values you want to override need to be set.
-
-**Duration format** — ISO-8601: `PT5S` = 5 seconds, `PT2M` = 2 minutes, `PT0.1S` = 100 ms. All timeout fields, including `socket-read-timeout`, use this format.
-
-**Auth type values**: `no-auth`, `token`, `user-password`, `credential-file`.
-
-**TLS type values**: `disabled`, `system-default`, `key-store`.
-
-### HOCON loading
-
-Add `dev.zio::zio-config-typesafe` and install `TypesafeConfigProvider` at startup:
-
-```scala
-import zio.config.typesafe.TypesafeConfigProvider
-
-override val bootstrap: ZLayer[Any, Config.Error, Unit] =
-  Runtime.setConfigProvider(TypesafeConfigProvider.fromResourcePath())
-```
-
-Then add `application.conf`:
-
-```hocon
-nats {
-  servers = ["nats://broker:4222"]
-  connection-timeout = "PT5S"
-  auth {
-    type  = token
-    value = ${?NATS_TOKEN}   # still read from env if desired
-  }
-}
-```
-
-### Custom nesting
-
-The descriptor reads keys at the root level (no `nats.` prefix). Apply your own nesting if your config lives elsewhere. `nested` calls stack from inner to outer — the last call becomes the outermost namespace:
-
-```scala
-// Config lives at myapp.nats.* (e.g. HOCON: myapp { nats { servers = [...] } })
-ZIO.config(NatsConfig.config.nested("nats").nested("myapp"))
-```
-
-### Programmatic config
-
-`NatsTls.Custom` and `NatsAuth.Custom` hold runtime Java objects and are intentionally not reachable from text config. Build `NatsConfig` directly when you need them:
-
-```scala
-NatsConfig(auth = NatsAuth.Custom(myAuthHandler), tls = NatsTls.Custom(mySSLContext))
-```
-
-## Pub/Sub & Request-Reply
-
-### Publish
-
-```scala
-// nats: Nats obtained via ZIO.service[Nats]
-
-// UTF-8 string (built-in NatsCodec[String])
-nats.publish(Subject("events.user"), "payload")
-
-// Raw bytes (built-in NatsCodec[Chunk[Byte]])
-nats.publish(Subject("events.user"), bytes)
-
-// With headers
-nats.publish(
-  Subject("events.user"),
-  bytes,
-  PublishParams(headers = Headers("Content-Type" -> "application/json"))
-)
-
-// With reply-to
-nats.publish(
-  Subject("events.user"),
-  bytes,
-  PublishParams(replyTo = Some(Subject("_INBOX.reply")))
-)
-```
-
-`Headers` supports multi-value headers and merging:
-
-```scala
-val h = Headers("X-Trace" -> "abc", "Content-Type" -> "application/json")
-h.get("X-Trace")        // Chunk("abc")
-h.add("X-Trace", "def") // Headers with Chunk("abc", "def") for X-Trace
-```
-
-### Subscribe
-
-`subscribe[A]` returns a `ZStream` of `Envelope[A]`. The underlying jnats `Dispatcher` is created when the stream is consumed and closed automatically when the stream is interrupted. Every `Envelope` carries both the decoded value and the raw `NatsMessage`:
-
-```scala
-// nats: Nats obtained via ZIO.service[Nats]
-
-// Typed String — payload decoded as UTF-8 via built-in NatsCodec[String]
-nats.subscribe[String](Subject("events.>"))
-  .tap(env => ZIO.debug(s"${env.message.subject}: ${env.value}"))
-  .runDrain
-
-// Raw bytes — identity codec, full NatsMessage available via env.message
-nats.subscribe[Chunk[Byte]](Subject("events.>"))
-  .tap(env => ZIO.debug(s"${env.message.subject}: ${env.message.dataAsString}"))
-  .runDrain
-```
-
-### Queue groups
-
-Messages are load-balanced across all subscribers in the same queue group:
-
-```scala
-// Typed — decoded payload in Envelope
-nats.subscribe[WorkItem](Subject("work.queue"), Some(QueueGroup("workers")))
-  .map(_.value)
-  .tap(item => process(item))
-  .runDrain
-
-// Raw bytes
-nats.subscribe[Chunk[Byte]](Subject("work.queue"), Some(QueueGroup("workers")))
-  .tap(env => process(env.message))
-  .runDrain
-```
-
-### Request-Reply
-
-```scala
-// Returns Envelope[B] — decoded value + raw NatsMessage metadata
-val reply: IO[NatsError, Envelope[Chunk[Byte]]] =
-  nats.request[Chunk[Byte], Chunk[Byte]](Subject("rpc.add"), payload, timeout = 5.seconds)
-
-// .payload strips the Envelope wrapper, returning only the decoded value
-val value: IO[NatsError, Chunk[Byte]] =
-  nats.request[Chunk[Byte], Chunk[Byte]](Subject("rpc.add"), payload, timeout = 5.seconds).payload
-```
-
-## Type-Safe Serialization (zio-blocks)
-
-zio-nats supports type-safe publish/subscribe using [zio-blocks Schema](https://zio.dev/zio-blocks). Provide a `given Schema[T]` and a `NatsCodec` derived from a format, and the library handles serialization automatically.
-
-### Setup
-
-Define schemas for your types and install a codec builder:
+Define a schema once and publish or subscribe with any domain type across any wire format, with no per-call codec configuration:
 
 ```scala
 import zio.blocks.schema.Schema
 import zio.blocks.schema.json.JsonFormat
 
-case class Person(name: String, age: Int)
-object Person {
-  given schema: Schema[Person] = Schema.derived
-}
+case class OrderPlaced(orderId: String, total: Double)
+object OrderPlaced { given Schema[OrderPlaced] = Schema.derived }
 
-// Build a NatsCodec for all Schema-annotated types using JSON.
 val codecs = NatsCodec.fromFormat(JsonFormat)
+import codecs.derived  // NatsCodec[OrderPlaced] is now in scope
 
-// The codec for Person is derived eagerly here — at this import site —
-// not buried inside the first publish call. If Person has no Schema, or
-// the format cannot derive a codec for it, an exception is thrown
-// immediately at startup, before any message is sent.
-import codecs.derived  // NatsCodec[Person] is now in scope
+nats.publish(Subject("orders.new"), OrderPlaced("ord-1", 59.99))
+nats.subscribe[OrderPlaced](Subject("orders.>")).map(_.value).runDrain
 ```
 
-### Codec construction guarantees
+Switch `JsonFormat` to `AvroFormat` or `MsgPackFormat` and the wire format changes — your domain code does not.
 
-The `import codecs.derived` line is where the codec is compiled and cached. Two consequences:
+### JetStream — persistent, at-least-once delivery
 
-1. **Fail-fast** — a missing `Schema`, unsupported type, or incompatible format surfaces immediately at the `import` site, not inside the first `publish` call during production load.
-2. **Safe encode** — once successfully constructed, `NatsCodec[A].encode(value)` calls a pre-built codec and never re-derives. Any serialization failure during publishing surfaces as a typed `NatsError.SerializationError` in the ZIO error channel, not as a JVM exception or untyped defect.
-
-### Type-Safe Publish
+Messages survive server restarts. Consumer positions are tracked server-side and resume exactly where they left off after a crash or reconnect:
 
 ```scala
-// nats: Nats obtained via ZIO.service[Nats]
+// Publish with a delivery guarantee — blocks until the server confirms storage
+val ack: PublishAck = js.publish(Subject("orders.new"), order)
 
-// Encoding is handled by the pre-built NatsCodec[Person].
-// Failures (e.g. OOM inside the serializer) surface as NatsError.SerializationError.
-nats.publish(Subject("users"), Person("Alice", 30))
-```
-
-### Type-Safe Subscribe
-
-`subscribe[A]` returns a `ZStream` of `Envelope[A]`. Each `Envelope` holds the decoded value and the raw `NatsMessage` (headers, subject, reply-to).
-
-```scala
-// nats: Nats obtained via ZIO.service[Nats]
-
-// Access decoded value via .value
-nats.subscribe[Person](Subject("users"))
-  .map(_.value)
-  .tap(person => ZIO.debug(s"Got: ${person.name}"))
-  .runDrain
-
-// Or use the .payload extension to strip the Envelope from the whole stream
-nats.subscribe[Person](Subject("users")).payload
-  .tap(person => ZIO.debug(s"Got: ${person.name}"))
-  .runDrain
-
-// Keep the full Envelope for header access
-nats.subscribe[Person](Subject("users"))
-  .tap(env => ZIO.debug(s"Headers: ${env.message.headers}, Person: ${env.value}"))
+// Consume durably — ack each message to advance the server-side cursor
+consumer.consume[OrderPlaced]()
+  .mapZIO(env => fulfill(env.value) *> env.message.ack)
   .runDrain
 ```
 
-Queue-group subscriptions also support typed decoding:
+### Reactive Key-Value store
+
+Every bucket change streams to your application in real time. Use it for live configuration, feature flags, or any shared state that needs to stay in sync across services:
 
 ```scala
-nats.subscribe[Order](Subject("orders"), QueueGroup("processors")).payload
-  .tap(order => ZIO.debug(s"order: ${order.id}"))
-  .runDrain
-```
-
-### JetStream Type-Safe Publish
-
-```scala
-js.publish(Subject("events"), Event("click", timestamp))
-```
-
-### Per-type codec override
-
-Multiple formats can coexist. Override for a specific type with a plain `given`:
-
-```scala
-given auditCodec: NatsCodec[AuditEvent] =
-  NatsCodec.fromFormat(BsonFormat).derived[AuditEvent]
-```
-
-### Available formats
-
-`zio-nats-zio-blocks` brings in `zio-blocks-schema` (JSON) transitively. For other formats add the corresponding artifact alongside it:
-
-```scala
-// build.sbt — add format artifacts as needed alongside zio-nats
-libraryDependencies += "dev.zio" %% "zio-blocks-schema-avro"     % "0.0.29"    // Avro
-libraryDependencies += "dev.zio" %% "zio-blocks-schema-toon"     % "0.0.29"    // Toon
-libraryDependencies += "dev.zio" %% "zio-blocks-schema-msgpack"  % "0.0.29"    // MessagePack
-libraryDependencies += "dev.zio" %% "zio-blocks-schema-thrift"   % "0.0.29"    // Thrift
-libraryDependencies += "dev.zio" %% "zio-blocks-schema-bson"     % "0.0.29"    // BSON
-```
-
-```scala
-import zio.blocks.schema.json.JsonFormat
-import zio.blocks.schema.avro.AvroFormat
-import zio.blocks.schema.toon.ToonFormat
-
-val jsonCodecs  = NatsCodec.fromFormat(JsonFormat)
-val avroCodecs  = NatsCodec.fromFormat(AvroFormat)
-```
-
-## Type-Safe Serialization (jsoniter-scala)
-
-As an alternative (or complement) to zio-blocks, `zio-nats-jsoniter` integrates with
-[jsoniter-scala](https://github.com/plokhotnyuk/jsoniter-scala) for high-performance JSON
-serialization.
-
-Add the dependency — choose the base artifact that matches your setup:
-
-```scala
-// Replace zio-blocks entirely: core + jsoniter
-libraryDependencies += "io.github.pietersp" %% "zio-nats-core"    % "<version>"
-libraryDependencies += "io.github.pietersp" %% "zio-nats-jsoniter" % "<version>"
-
-// Or add jsoniter alongside zio-blocks (selected types use jsoniter, rest use zio-blocks)
-libraryDependencies += "io.github.pietersp" %% "zio-nats"          % "<version>"
-libraryDependencies += "io.github.pietersp" %% "zio-nats-jsoniter" % "<version>"
-```
-
-### Automatic bridging (recommended)
-
-Place a `given JsonValueCodec[A]` in scope and use `import zio.nats.{given, *}`. The top-level
-`given fromJsonValueCodec` bridges it to `NatsCodec[A]` automatically — no builder step required.
-A `NotGiven[NatsCodec[A]]` guard ensures it never shadows built-in codecs (`String`,
-`Chunk[Byte]`) or any explicit `given NatsCodec[A]` you provide:
-
-> **Note:** In Scala 3, package-level `given` instances are not imported by a plain `import zio.nats.*`.
-> Use `import zio.nats.{given, *}` to bring the bridging given into scope.
-
-```scala
-import com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec
-import com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker
-import zio.nats.{given, *}
-
-case class Person(name: String, age: Int)
-object Person {
-  given JsonValueCodec[Person] = JsonCodecMaker.make
-}
-
-// NatsCodec[Person] is resolved automatically — just use the service:
-nats.publish(Subject("persons"), Person("Alice", 30))
-nats.subscribe[Person](Subject("persons")).payload
-  .tap(p => ZIO.debug(s"Got: ${p.name}"))
-  .runDrain
-```
-
-### Explicit one-off codec
-
-Use `NatsCodecJsoniter.fromJsoniter` when you need a codec without putting one into implicit scope:
-
-```scala
-val codec: NatsCodec[Person] = NatsCodecJsoniter.fromJsoniter(JsonCodecMaker.make[Person])
-```
-
-### Coexistence with zio-blocks
-
-Both integrations can be used in the same project. Per-type overrides are plain `given val`s:
-
-```scala
-import zio.nats.{given, *}   // required to activate the fromJsonValueCodec bridge
-
-// Most types use zio-blocks:
-val codecs = NatsCodec.fromFormat(JsonFormat)
-import codecs.derived
-
-// One type uses jsoniter instead:
-given JsonValueCodec[FastEvent] = JsonCodecMaker.make
-// NatsCodec[FastEvent] resolved via fromJsonValueCodec; other types use zio-blocks
-```
-
-## Type-Safe Serialization (play-json)
-
-As an alternative (or complement) to zio-blocks, `zio-nats-play-json` integrates with
-[play-json](https://github.com/playframework/play-json) for JSON serialization.
-
-Add the dependency — choose the base artifact that matches your setup:
-
-```scala
-// Replace zio-blocks entirely: core + play-json
-libraryDependencies += "io.github.pietersp" %% "zio-nats-core"     % "<version>"
-libraryDependencies += "io.github.pietersp" %% "zio-nats-play-json" % "<version>"
-
-// Or add play-json alongside zio-blocks (selected types use play-json, rest use zio-blocks)
-libraryDependencies += "io.github.pietersp" %% "zio-nats"           % "<version>"
-libraryDependencies += "io.github.pietersp" %% "zio-nats-play-json" % "<version>"
-```
-
-### Automatic bridging (recommended)
-
-Place a `given Format[A]` in scope and use `import zio.nats.{given, *}`. The top-level
-`given fromPlayJsonFormat` bridges it to `NatsCodec[A]` automatically — no builder step required.
-Same `NotGiven[NatsCodec[A]]` guard applies — built-in and explicit codecs always win:
-
-```scala
-import play.api.libs.json.{Format, Json}
-import zio.nats.{given, *}
-
-case class Person(name: String, age: Int)
-object Person {
-  given Format[Person] = Json.format[Person]
-}
-
-// NatsCodec[Person] is resolved automatically — just use the service:
-nats.publish(Subject("persons"), Person("Alice", 30))
-nats.subscribe[Person](Subject("persons")).payload
-  .tap(p => ZIO.debug(s"Got: ${p.name}"))
-  .runDrain
-```
-
-### Explicit one-off codec
-
-Use `NatsCodecPlayJson.fromPlayJson` when you need a codec without putting one into implicit scope:
-
-```scala
-val codec: NatsCodec[Person] = NatsCodecPlayJson.fromPlayJson(Json.format[Person])
-```
-
-## JetStream
-
-Requires JetStream-enabled NATS: `nats-server -js` or `docker run -p 4222:4222 nats -js`.
-
-### Publishing
-
-```scala
-// given NatsCodec[Order] in scope
-val layer = ZLayer.succeed(NatsConfig.default) >>> Nats.live >>> JetStream.live
-
-val publish =
-  for {
-    js  <- ZIO.service[JetStream]
-    ack <- js.publish(Subject("orders.new"), order)
-    _   <- Console.printLine(s"seq=${ack.seqno}")
-  } yield ()
-```
-
-Publish with duplicate detection via message ID, using `JsPublishParams`:
-
-```scala
-val ack = js.publish(
-  Subject("orders.new"),
-  order,
-  JsPublishParams(options = Some(PublishOptions(messageId = Some("order-42"))))
-)
-```
-
-Publish with headers:
-
-```scala
-val ack = js.publish(
-  Subject("orders.new"),
-  order,
-  JsPublishParams(headers = Headers("X-Source" -> "checkout"))
-)
-```
-
-Publish asynchronously (fire-and-forget, collect acks later):
-
-```scala
-// Returns IO[NatsError, Task[PublishAck]] — the inner Task resolves when the server acks
-val futureAck: IO[NatsError, Task[PublishAck]] =
-  js.publishAsync(Subject("orders.new"), order)
-```
-
-### Management
-
-Create streams and consumers using `JetStreamManagement`. All config types are plain Scala case classes — no builders required:
-
-```scala
-val layer =
-  ZLayer.succeed(NatsConfig.default) >>>
-  Nats.live >+>
-  JetStreamManagement.live
-
-val setup = for {
-  jsm <- ZIO.service[JetStreamManagement]
-  _   <- jsm.addStream(
-           StreamConfig(
-             name        = "ORDERS",
-             subjects    = List("orders.>"),
-             storageType = StorageType.Memory
-           )
-         )
-  _   <- jsm.addOrUpdateConsumer(
-           "ORDERS",
-           ConsumerConfig.durable("processor").copy(
-             filterSubject = Some("orders.>"),
-             ackPolicy     = AckPolicy.Explicit
-           )
-         )
-} yield ()
-```
-
-### Consuming — durable Consumer
-
-Get a `Consumer` handle from `JetStream.consumer`, then use its methods directly:
-
-```scala
-for {
-  js       <- ZIO.service[JetStream]
-  consumer <- js.consumer("ORDERS", "processor")
-
-  // Bounded fetch — each env.value is a decoded Order; env.message holds ack ops
-  _ <- consumer.fetch[Order](FetchOptions(maxMessages = 10, expiresIn = 5.seconds))
-         .mapZIO(env => process(env.value) *> env.message.ack)
-         .runDrain
-
-  // Indefinite push-style consume
-  _ <- consumer.consume[Order]()
-         .mapZIO(env => process(env.value) *> env.message.ack)
-         .runDrain
-
-  // Pull-based iterate (retries on empty polls)
-  _ <- consumer.iterate[Order]()
-         .mapZIO(env => process(env.value) *> env.message.ack)
-         .runDrain
-
-  // Single next message (returns None if no message within timeout)
-  env <- consumer.next[Order](5.seconds)
-} yield ()
-```
-
-All four methods are generic `[A: NatsCodec]` and return `JsEnvelope[A]`, which bundles:
-- `env.value` — the decoded domain type
-- `env.message` — the raw `JetStreamMessage` for ack/nak/term/inProgress and metadata
-
-### Consuming — OrderedConsumer
-
-An ordered consumer guarantees strict in-order delivery and automatically re-creates itself on reconnect or sequence gaps. Unlike a durable consumer it requires no server-side state.
-
-```scala
-for {
-  js      <- ZIO.service[JetStream]
-  ordered <- js.orderedConsumer("EVENTS", OrderedConsumerConfig(
-               filterSubjects = List("events.>"),
-               deliverPolicy  = Some(DeliverPolicy.All)
-             ))
-  _ <- ordered.consume[MyEvent]()
-         .tap(env => ZIO.debug(env.value.toString))
-         .runDrain
-} yield ()
-```
-
-`OrderedConsumer` exposes the same `fetch[A]` / `consume[A]` / `iterate[A]` / `next[A]` methods as `Consumer`.
-
-#### Ack methods on `JetStreamMessage`
-
-| Method                 | Effect                                        |
-|------------------------|-----------------------------------------------|
-| `msg.ack`              | Acknowledge successful processing             |
-| `msg.ackSync(timeout)` | Ack and wait for server confirmation          |
-| `msg.nak`              | Request redelivery immediately                |
-| `msg.nakWithDelay(d)`  | Request redelivery after delay                |
-| `msg.term`             | Terminate — do not redeliver                  |
-| `msg.inProgress`       | Extend ack deadline (work-in-progress signal) |
-
-`msg.decode[A]` decodes the payload using the given `NatsCodec[A]`.
-
-## Key-Value store
-
-### Setup
-
-```scala
-val layer = ZLayer.succeed(NatsConfig.default) >>> Nats.live >+> KeyValueManagement.live
-
-val createBucket = (for {
-  kvm <- ZIO.service[KeyValueManagement]
-  _   <- kvm.create(KeyValueConfig(name = "config", storageType = StorageType.Memory))
-} yield ()).provide(layer)
-```
-
-### Operations
-
-```scala
-// Obtain a bucket handle (requires Nats in the environment)
-val kv: ZIO[Nats, NatsError, KeyValue] = KeyValue.bucket("config")
-
-// Put — returns the new revision number
-kv.put("feature.flag", "true")   // IO[NatsError, Long]
-kv.put("payload", bytes)
-
-// Get — returns KeyValueEntry or None
-kv.get("feature.flag")                     // IO[NatsError, Option[KeyValueEntry]]
-kv.get("feature.flag", revision = 3L)      // get by revision
-
-// Compare-and-swap
-kv.create("lock", bytes)                               // create-only (fails if key exists)
-kv.create("lease", bytes, ttl = Some(30.seconds))      // create with per-entry TTL
-kv.update("lock", newBytes, expectedRevision = 3)      // update only if revision matches
-
-// Delete / purge
-kv.delete("stale-key")                                 // soft delete — history preserved
-kv.delete("stale-key", expectedRevision = Some(5))     // conditional delete
-kv.purge("old-key")                                    // remove all history for the key
-kv.purge("old-key", expectedRevision = Some(5))        // conditional purge
-kv.purge("old-key", markerTtl = Some(5.minutes))       // purge with TTL on tombstone marker
-
-// Enumerate — eagerly loads all keys
-kv.keys()                       // IO[NatsError, List[String]]
-kv.keys(List("foo.*"))          // filter by subject pattern
-kv.keys(List("foo.*", "bar.*")) // multiple filters
-
-// Enumerate — streaming (memory-efficient for large buckets)
-kv.consumeKeys()                        // ZStream[Any, NatsError, String]
-kv.consumeKeys(List("foo.*"))
-kv.consumeKeys(List("foo.*", "bar.*"))
-
-kv.history("key")   // IO[NatsError, List[KeyValueEntry]]
-
-// Purge delete/purge markers
-kv.purgeDeletes()                             // removes markers older than 30 minutes
-kv.purgeDeletes(threshold = Some(1.hour))     // custom threshold
-```
-
-### Watch for changes
-
-```scala
-// Watch a single key — never completes unless interrupted
-kv.watch("feature.flag")   // ZStream[Any, NatsError, KeyValueEntry]
-kv.watchAll()              // watch entire bucket
-
-// Watch with options
-kv.watch("feature.>", KeyValueWatchOptions(
-  ignoreDeletes   = true,  // skip delete/purge markers
-  includeHistory  = true,  // start from first entry per key (not just latest)
-  updatesOnly     = true,  // only deliver new writes after watch starts
-  fromRevision    = Some(42L)  // resume from a specific revision
-))
-kv.watchAll(KeyValueWatchOptions(metaOnly = true))  // headers only, skip values
-```
-
-`KeyValueEntry` fields: `.key`, `.value: Chunk[Byte]`, `.revision: Long`, `.operation: KeyValueOperation`, `.bucketName`, `.valueAsString` (UTF-8 decode), `.decode[A]` (typed decode).
-
-## Object Store
-
-```scala
-// Management
-val layer = ZLayer.succeed(NatsConfig.default) >>> Nats.live >+> ObjectStoreManagement.live
-
-val createBucket = (for {
-  osm <- ZIO.service[ObjectStoreManagement]
-  _   <- osm.create(ObjectStoreConfig(name = "assets", storageType = StorageType.Memory))
-} yield ()).provide(layer)
-
-// Obtain a bucket handle (requires Nats in the environment)
-val os: ZIO[Nats, NatsError, ObjectStore] = ObjectStore.bucket("assets")
-
-// Put / Get — returns ObjectData[A] wrapping the decoded value + ObjectSummary metadata
-os.put("config.json", configBytes)           // IO[NatsError, ObjectSummary]
-os.get[Chunk[Byte]]("config.json")           // IO[NatsError, ObjectData[Chunk[Byte]]]
-os.get[MyConfig]("config.json")             // IO[NatsError, ObjectData[MyConfig]]
-os.get[MyConfig]("config.json").payload     // IO[NatsError, MyConfig]  (strips wrapper)
-
-// With custom metadata
-os.put(ObjectMeta("logo.png", description = Some("Brand logo")), imageBytes)
-
-// Streaming put/get — avoids loading the full object into memory
-os.putStream("video.mp4", ZStream.fromFile(path))    // IO[NatsError, ObjectSummary]
-os.getStream("video.mp4")                            // ZStream[Any, NatsError, Byte]
-
-// Metadata
-os.getInfo("logo.png")                       // IO[NatsError, ObjectSummary]
-os.getInfo("logo.png", includingDeleted = true)
-
-// Mutation
-os.updateMeta("logo.png", ObjectMeta("logo.png", description = Some("Updated")))
-os.delete("old-asset")                       // IO[NatsError, ObjectSummary] — soft delete
-
-// Links
-os.addLink("alias", "logo.png")              // link to another object in this bucket
-os.addBucketLink("mirror", otherStore)       // link to another ObjectStore bucket
-
-// Seal (make read-only)
-os.seal()                                    // IO[NatsError, ObjectStoreBucketStatus]
-
-os.list                                      // IO[NatsError, List[ObjectSummary]]
-os.getStatus                                 // IO[NatsError, ObjectStoreBucketStatus]
-
-// Watch for changes
-os.watch()                                   // ZStream[Any, NatsError, ObjectSummary]
-os.watch(ObjectStoreWatchOptions(
-  ignoreDeletes  = true,
-  includeHistory = true,
-  updatesOnly    = true
-))
-```
-
-`ObjectSummary` fields: `.name`, `.size: Long`, `.chunks: Long`, `.description: Option[String]`, `.isDeleted: Boolean`.
-
-`ObjectData[A]` fields: `.value: A` (decoded payload), `.summary: ObjectSummary` (metadata). Use the `.payload` extension to strip the wrapper: `os.get[A]("key").payload`.
-
-## Connection Events
-
-`Nats.lifecycleEvents` is a `ZStream[Any, Nothing, NatsEvent]` that emits connection state changes. Fork it alongside your program:
-
-```scala
-for {
-  nats <- ZIO.service[Nats]
-  _    <- nats.lifecycleEvents
-            .tap(e => ZIO.logInfo(s"[nats] $e"))
-            .runDrain
-            .fork
-  _    <- program
-} yield ()
-```
-
-Filter to specific events:
-
-```scala
-nats.lifecycleEvents
-  .collect { case NatsEvent.Disconnected(url) => url }
-  .tap(url => ZIO.logWarning(s"Disconnected from $url"))
+kv.watchAll[FeatureConfig](KeyValueWatchOptions())
+  .collect { case KvEvent.Put(env) => env.value }
+  .tap(cfg => applyConfig(cfg))
   .runDrain
   .fork
 ```
 
-Event ADT:
-
-| Event                    | When                               |
-|--------------------------|------------------------------------|
-| `Connected(url)`         | Initial connection established     |
-| `Disconnected(url)`      | Connection lost                    |
-| `Reconnected(url)`       | Reconnection successful            |
-| `ServersDiscovered`      | New cluster route discovered       |
-| `Closed`                 | Connection permanently closed      |
-| `LameDuckMode`           | Server entering lame-duck shutdown |
-| `Error(message)`         | Non-fatal error string from server |
-| `ExceptionOccurred(ex)`  | Exception from the client          |
-
-## Connection utilities
+### Integration tests with a real server
 
 ```scala
-nats.status                        // URIO[Nats, ConnectionStatus]
-nats.serverInfo                    // IO[NatsError, NatsServerInfo]
-nats.rtt                           // IO[NatsError, Duration]
-nats.connectedUrl                  // URIO[Nats, Option[String]]
-nats.statistics                    // URIO[Nats, ConnectionStats]
-nats.outgoingPendingMessageCount   // URIO[Nats, Long]
-nats.outgoingPendingBytes          // URIO[Nats, Long]
-nats.flush(timeout = 1.second)     // IO[NatsError, Unit]
-```
-
-`ConnectionStats` fields: `.inMsgs`, `.outMsgs`, `.inBytes`, `.outBytes`, `.reconnects`, `.droppedCount`, and more.
-
-## Error handling
-
-All operations return `IO[NatsError, A]`. `NatsError` is a sealed trait with exhaustive pattern matching:
-
-```scala
-import zio.nats.NatsError._
-
-nats.publish(Subject("subject"), bytes).catchAll {
-  case ConnectionClosed(msg)                    => ZIO.logError(s"Connection closed: $msg")
-  case Timeout(msg)                             => ZIO.logWarning(s"Timed out: $msg")
-  case SerializationError(msg, _)               => ZIO.logError(s"Encode failed: $msg")
-  case JetStreamApiError(msg, code, apiCode, _) => ZIO.logError(s"JetStream API $code/$apiCode: $msg")
-  case KeyNotFound(key)                         => ZIO.logInfo(s"Key $key not found")
-  case DecodingError(msg, _)                    => ZIO.logError(s"Decode failed: $msg")
-  case other                                    => ZIO.logError(other.message)
-}
-```
-
-Sub-sealed traits for domain grouping:
-
-- `NatsError.JetStreamError` — all JetStream errors
-- `NatsError.KeyValueError` — includes `KeyNotFound`
-- `NatsError.ObjectStoreError`
-
-## Testing
-
-Add the testkit dependency:
-
-```scala
-libraryDependencies += "io.github.pietersp" %% "zio-nats-testkit" % "<version>" % Test
-```
-
-`NatsTestLayers.nats` starts a NATS container (via testcontainers) and provides a `Nats` service wired to it. Use `.provideShared` to start the container once per suite:
-
-```scala
-import zio.test._
-import zio.test.TestAspect._
-import zio.nats.testkit.NatsTestLayers
-
-object MySpec extends ZIOSpecDefault {
-  def spec = suite("MySpec")(
-    test("publishes and receives") {
+object OrderSpec extends ZIOSpecDefault {
+  def spec = suite("OrderSpec")(
+    test("processes a placed order") {
       for {
-        nats  <- ZIO.service[Nats]
-        fiber <- nats.subscribe[Chunk[Byte]](Subject("t")).take(1).runCollect.fork
-        _     <- ZIO.sleep(200.millis)
-        _     <- nats.publish(Subject("t"), "hi")
-        msgs  <- fiber.join
-      } yield assertTrue(msgs.head.dataAsString == "hi")
+        nats <- ZIO.service[Nats]
+        // ... your test
+      } yield assertTrue(true)
     }
-  ).provideShared(NatsTestLayers.nats) @@ sequential @@ withLiveClock @@ timeout(60.seconds)
+  ).provideShared(NatsTestLayers.nats) @@ sequential @@ withLiveClock
 }
 ```
 
-> **Podman / WSL users:** Set `DOCKER_HOST=unix:///tmp/podman/podman-machine-default-api.sock`
-> and `TESTCONTAINERS_RYUK_DISABLED=true` in your test environment.
+`NatsTestLayers.nats` starts a NATS container via [testcontainers](https://testcontainers.com), waits for it to be ready, and provides a fully wired `Nats` service. `.provideShared` starts the container once for the whole suite — fast and cheap.
 
-The testcontainer is started with `--js` so JetStream, KV, and Object Store APIs are all available in tests.
+---
 
-## NatsConfig reference
+## Documentation
 
-```scala
-NatsConfig(
-  // Connection
-  servers                              = List("nats://localhost:4222"),
-  connectionName                       = None,
-  connectionTimeout                    = 2.seconds,
-  reconnectWait                        = 2.seconds,
-  maxReconnects                        = 60,        // -1 = unlimited
-  pingInterval                         = 2.minutes,
-  requestCleanupInterval               = 5.seconds,
-  bufferSize                           = 64 * 1024, // bytes
-  noEcho                               = false,
-  utf8Support                          = false,
-  inboxPrefix                          = "_INBOX.",
-  // Authentication — pick one variant (mutually exclusive by construction):
-  auth                                 = NatsAuth.NoAuth,
-  // auth                              = NatsAuth.Token("s3cr3t"),
-  // auth                              = NatsAuth.UserPassword("alice", "p4ss"),
-  // auth                              = NatsAuth.CredentialFile(Paths.get("/app/nats.creds")),
-  // auth                              = NatsAuth.Custom(myAuthHandler),   // runtime AuthHandler
-  // TLS — pick one variant:
-  tls                                  = NatsTls.Disabled,
-  // tls                               = NatsTls.SystemDefault,
-  // tls                               = NatsTls.KeyStore(keyStorePath = ..., keyStorePassword = "..."),
-  // tls                               = NatsTls.Custom(mySSLContext),     // runtime SSLContext
-  // Reconnect tuning
-  reconnectJitter                      = 100.millis,
-  reconnectJitterTls                   = 1.second,
-  reconnectBufferSize                  = 8 * 1024 * 1024, // bytes; 0 = disable
-  // Outbound queue
-  maxMessagesInOutgoingQueue           = 0,         // 0 = unlimited
-  discardMessagesWhenOutgoingQueueFull = false,
-  writeQueuePushTimeout                = Duration.Zero, // Zero = block indefinitely
-  // Socket tuning
-  socketWriteTimeout                   = Duration.Zero,
-  socketReadTimeout                    = Duration.Zero,
-  // Protocol
-  maxControlLine                       = 0,         // 0 = jnats default
-  maxPingsOut                          = 2,
-  // Lifecycle
-  drainTimeout                         = 30.seconds
-)
-```
+Full guides and API reference at **[pietersp.github.io/zio-nats](https://pietersp.github.io/zio-nats/)**.
 
-Convenience constructors:
+[Quick start](https://pietersp.github.io/zio-nats/quickstart) · [Pub/Sub](https://pietersp.github.io/zio-nats/guides/pubsub) · [Serialization](https://pietersp.github.io/zio-nats/guides/serialization) · [JetStream](https://pietersp.github.io/zio-nats/guides/jetstream) · [Key-Value](https://pietersp.github.io/zio-nats/guides/key-value) · [Object Store](https://pietersp.github.io/zio-nats/guides/object-store) · [Testing](https://pietersp.github.io/zio-nats/guides/testing) · [Modules](https://pietersp.github.io/zio-nats/reference/modules)
 
-```scala
-NatsConfig.default          // localhost:4222, no auth, no TLS
-NatsConfig("nats://host:4222")
-```
+---
 
-`Nats.default` is a `ZLayer` using `NatsConfig.default` — useful for local dev:
+## License
 
-```scala
-program.provide(Nats.default)
-```
-
-### Migration from previous versions
-
-| Before | After |
-|--------|-------|
-| `NatsConfig(token = Some("x"))` | `NatsConfig(auth = NatsAuth.Token("x"))` |
-| `NatsConfig(username = Some("u"), password = Some("p"))` | `NatsConfig(auth = NatsAuth.UserPassword("u", "p"))` |
-| `NatsConfig(credentialPath = Some(p))` | `NatsConfig(auth = NatsAuth.CredentialFile(p))` |
-| `NatsConfig(authHandler = Some(h))` | `NatsConfig(auth = NatsAuth.Custom(h))` |
-| `NatsConfig(tlsFirst = true)` | `NatsConfig(tls = NatsTls.KeyStore(..., tlsFirst = true))` |
-| `NatsConfig(tlsContext = Some(ctx))` | `NatsConfig(tls = NatsTls.Custom(ctx))` |
-| `NatsConfig(optionsCustomizer = f)` | Not supported — use named fields directly |
-| `StreamConfig(maxMsgSize = n: Long)` | `StreamConfig(maxMsgSize = n: Int)` |
-| `KeyValueConfig(maxValueSize = n: Long)` | `KeyValueConfig(maxValueSize = n: Int)` |
-
-## Examples
-
-See [`examples/`](examples/) for runnable apps. `QuickStartApp` requires only a plain NATS server; all others require JetStream (`docker run -p 4222:4222 nats -js`).
-
-| File                                                                             | What it shows                                                    |
-|----------------------------------------------------------------------------------|------------------------------------------------------------------|
-| [`QuickStartApp`](examples/src/main/scala/QuickStartApp.scala)                   | Connect, publish, subscribe, receive 3 messages                  |
-| [`TypedMessagingApp`](examples/src/main/scala/TypedMessagingApp.scala)           | Type-safe pub/sub with `NatsCodec` and `Envelope[A]`             |
-| [`JetStreamApp`](examples/src/main/scala/JetStreamApp.scala)                     | JetStream publish, fetch, consume, ordered consumer              |
-| [`KeyValueApp`](examples/src/main/scala/KeyValueApp.scala)                       | KV put/get/watch/history with typed codec                        |
-| [`ObjectStoreApp`](examples/src/main/scala/ObjectStoreApp.scala)                 | Object store chunked upload, streaming, links, watch             |
-| [`ServiceApp`](examples/src/main/scala/ServiceApp.scala)                         | Service framework: typed endpoints, discovery, stats             |
-| [`RealisticApp`](examples/src/main/scala/RealisticApp.scala)                     | JetStream + KV end-to-end order processing                       |
-
-```
-sbt "zioNatsExamples/runMain QuickStartApp"
-sbt "zioNatsExamples/runMain TypedMessagingApp"
-sbt "zioNatsExamples/runMain JetStreamApp"
-sbt "zioNatsExamples/runMain KeyValueApp"
-sbt "zioNatsExamples/runMain ObjectStoreApp"
-sbt "zioNatsExamples/runMain ServiceApp"
-sbt "zioNatsExamples/runMain RealisticApp"
-```
+Apache 2.0.
