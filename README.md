@@ -166,7 +166,7 @@ object OrderSpec extends ZIOSpecDefault {
 
 Full guides and API reference at **[pietersp.github.io/zio-nats](https://pietersp.github.io/zio-nats/)**.
 
-[Quick start](https://pietersp.github.io/zio-nats/quickstart) · [Pub/Sub](https://pietersp.github.io/zio-nats/guides/pubsub) · [Serialization](https://pietersp.github.io/zio-nats/guides/serialization) · [JetStream](https://pietersp.github.io/zio-nats/guides/jetstream) · [Key-Value](https://pietersp.github.io/zio-nats/guides/key-value) · [Object Store](https://pietersp.github.io/zio-nats/guides/object-store) · [Testing](https://pietersp.github.io/zio-nats/guides/testing) · [Modules](https://pietersp.github.io/zio-nats/reference/modules)
+[Quick start](https://pietersp.github.io/zio-nats/quickstart) · [Pub/Sub](https://pietersp.github.io/zio-nats/guides/pubsub) · [Serialization](https://pietersp.github.io/zio-nats/guides/serialization) · [JetStream](https://pietersp.github.io/zio-nats/guides/jetstream) · [Key-Value](https://pietersp.github.io/zio-nats/guides/key-value) · [Object Store](https://pietersp.github.io/zio-nats/guides/object-store) · [Service Framework](https://pietersp.github.io/zio-nats/guides/service) · [Testing](https://pietersp.github.io/zio-nats/guides/testing) · [Modules](https://pietersp.github.io/zio-nats/reference/modules)
 
 ---
 
