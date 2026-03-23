@@ -3,195 +3,191 @@ id: key-value
 title: Key-Value Store
 ---
 
-# Key-Value Store
+The NATS Key-Value store is a named bucket of key-value pairs where every write creates a new revision. The full history of each key is preserved up to a configurable limit, giving you versioned storage with the ability to read past values, watch for changes in real time, and resume a watch after a restart without missing updates. KV is built on JetStream streams under the hood - the same persistence, replication, and delivery guarantees apply.
 
-> A versioned key-value store with watch support, built on JetStream.
+## Creating a bucket
 
-The **Key-Value store** is a named bucket of key-value pairs. Every write is a new revision —
-the full history of each key is preserved (up to a configurable limit). You can read the
-current value, read by revision, or watch a stream of changes in real time.
+A **bucket** is the top-level namespace for a KV store. Each bucket is independent and must be created on the server before any reads or writes. Use `KeyValueManagement` to create and manage buckets. The `name` field is the only required field; everything else has a sensible default. Use `StorageType.Memory` for ephemeral data (fast, non-durable) and `StorageType.File` (the default) for persistence across server restarts:
 
-## Prerequisites
-
-- [Quick start](../quickstart.md) completed
-- JetStream-enabled NATS server:
-
-```bash
-docker run --rm -p 4222:4222 nats -js
-```
-
-## Setup
-
-Create a bucket with `KeyValueManagement`:
-
-```scala mdoc:silent
+```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 import zio.nats.kv.*
 
 val createBucket: ZIO[KeyValueManagement, NatsError, Unit] =
   ZIO.serviceWithZIO[KeyValueManagement] { kvm =>
-    kvm.create(KeyValueConfig(name = "config", storageType = StorageType.Memory)).unit
+    kvm.create(
+      KeyValueConfig(
+        name             = "config",
+        storageType      = StorageType.Memory,
+        maxHistoryPerKey = 10,
+        ttl              = Some(24.hours)
+      )
+    ).unit
   }
-
-val managementLayer =
-  ZLayer.succeed(NatsConfig.default) >>> Nats.live >+> KeyValueManagement.live
 ```
 
-**What's happening:**
+`maxHistoryPerKey` controls how many revisions per key the server retains - once exceeded, the oldest revision is dropped. `ttl` sets a default expiry for all entries in the bucket; individual writes can override this with a per-entry TTL when calling `create`.
 
-1. `KeyValueConfig(name = "config", ...)` — defines the bucket. `name` is the only required field.
-2. `storageType = StorageType.Memory` — stores data in memory (fast, non-durable). Use `StorageType.File` for persistence across server restarts.
-3. `kvm.create` creates the bucket if it does not exist. Use `kvm.update` to modify an existing bucket's config.
+## Reads and writes
 
-## Basic operations
+`KeyValue.bucket` returns a `KeyValue` handle for an existing bucket. `put` encodes the value with `NatsCodec[A]` and returns the revision number the server assigned. `get` returns the current value wrapped in `Option[KvEnvelope[A]]` - `None` if the key has never been written or was purged. `KvEnvelope[A]` bundles `env.value` (the decoded payload), `env.entry.revision` (the revision number), and `env.entry.key` (the key name).
 
-```scala mdoc:silent
+`A` can be any type with a `NatsCodec` in scope - a plain `String`, `Chunk[Byte]`, or a domain type like `FeatureConfig` with a derived codec (see [Serialization](./02-serialization.md)). Write and read a feature flag:
+
+```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 import zio.nats.kv.*
 
-val kvOps: ZIO[Nats, NatsError, Unit] =
+val readWrite: ZIO[Nats, NatsError, Unit] =
   for {
-    kv <- KeyValue.bucket("config")
-
-    // Put — returns the new revision number
-    rev <- kv.put("feature.flag", "true")
+    kv  <- KeyValue.bucket("config")
+    rev <- kv.put("feature.dark-mode", "true")
     _   <- ZIO.debug(s"Written at revision $rev")
-
-    // Get — returns Some(KvEnvelope[String]) or None; type param selects the codec
-    entry <- kv.get[String]("feature.flag")
-    _     <- ZIO.foreach(entry)(e => ZIO.debug(s"Value: ${e.value}"))
-
-    // Get by specific revision
-    historical <- kv.get[String]("feature.flag", revision = Some(1L))
-
-    // Compare-and-swap — create only if key does not exist
-    _ <- kv.create("lock", Chunk.fromArray("locked".getBytes))
-
-    // Create with per-entry TTL
-    _ <- kv.create("lease", Chunk.fromArray("data".getBytes), ttl = Some(30.seconds))
-
-    // Update only if the current revision matches
-    _ <- kv.update("feature.flag", Chunk.fromArray("false".getBytes), expectedRevision = rev)
-
-    // Soft delete — history is preserved, a delete marker is added
-    _ <- kv.delete("stale-key")
-
-    // Conditional delete
-    _ <- kv.delete("feature.flag", expectedRevision = Some(2L))
-
-    // Purge — removes all history for the key
-    _ <- kv.purge("old-key")
+    env <- kv.get[String]("feature.dark-mode")
+    _   <- ZIO.foreach(env)(e =>
+             ZIO.debug(s"${e.entry.key} = ${e.value} (rev ${e.entry.revision})")
+           )
   } yield ()
 ```
 
-**What's happening:**
+`delete` places a tombstone marker on a key and preserves all previous history. Subsequent `get` calls return `None`, but the history remains accessible via `history`. `purge` removes all history including the tombstone, permanently erasing the key from the bucket:
 
-1. `KeyValue.bucket("config")` — obtains a `KeyValue` handle for the named bucket. This is a `ZIO[Nats, NatsError, KeyValue]` effect, so it needs `Nats` in scope.
-2. `kv.put(key, value)` — encodes the value with `NatsCodec[A]` and writes it. `String` and `Chunk[Byte]` work out of the box. For domain types, put a `NatsCodec[A]` in scope (see [Serialization](./02-serialization.md)).
-3. `kv.create` fails if the key already exists. Use it to implement distributed locks or idempotent initialisation.
-4. `kv.update` fails if the current revision does not match — this is optimistic concurrency control.
-5. `kv.delete` adds a tombstone marker but keeps the history. `kv.purge` removes all history, including the marker.
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.nats.kv.*
 
-## Return types
+val deleteAndPurge: ZIO[Nats, NatsError, Unit] =
+  for {
+    kv <- KeyValue.bucket("config")
+    _  <- kv.put("temp.key", "value")
+    _  <- kv.delete("temp.key")  // tombstone placed; history preserved
+    _  <- kv.purge("old.key")    // all history removed
+  } yield ()
+```
 
-`get` and `history` return decoded values wrapped in `KvEnvelope[A]`:
+## Optimistic concurrency
 
-| `KvEnvelope[A]` field | Type | Description |
-|---|---|---|
-| `.value` | `A` | The decoded value |
-| `.entry` | `KeyValueEntry` | Metadata — key, revision, operation, bucket name |
-| `.entry.key` | `String` | The key |
-| `.entry.revision` | `Long` | Revision number for this write |
-| `.entry.bucketName` | `String` | Name of the bucket |
+`create` writes a value only if the key does not currently exist - it fails if the key is already present or has a tombstone from a previous `delete`. `update` writes only if the stored revision matches `expectedRevision`, failing if another writer modified the key between your `get` and your `update`.
 
-`watch` and `watchAll` emit `KvEvent[A]` — a sealed enum:
+These two operations together give you compare-and-swap semantics over NATS - useful for distributed locking, idempotent initialisation, or any shared-state update that must not silently overwrite a concurrent write:
 
-| `KvEvent[A]` variant | Contents | When |
-|---|---|---|
-| `KvEvent.Put(envelope)` | `KvEnvelope[A]` | A value was written |
-| `KvEvent.Delete(entry)` | `KeyValueEntry` | Key was soft-deleted |
-| `KvEvent.Purge(entry)` | `KeyValueEntry` | Key history was purged |
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.nats.kv.*
+
+val cas: ZIO[Nats, NatsError, Unit] =
+  for {
+    kv  <- KeyValue.bucket("config")
+
+    // Fails if the key already exists
+    rev <- kv.create("lock.checkout", "worker-1")
+
+    // Fails if the stored revision is not `rev`
+    _   <- kv.update("lock.checkout", "worker-2", expectedRevision = rev)
+
+    // Per-entry TTL overrides the bucket default for this key only
+    _   <- kv.create("lease.session-42", "active", ttl = Some(30.seconds))
+  } yield ()
+```
+
+## Revisions and history
+
+Every `put`, `create`, and `update` increments the revision counter for that key. `get` accepts an optional `revision` parameter to read any retained past value by its exact revision number. `history` returns all retained revisions in chronological order, up to the `maxHistoryPerKey` limit set when the bucket was created:
+
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.nats.kv.*
+
+val revisions: ZIO[Nats, NatsError, Unit] =
+  for {
+    kv   <- KeyValue.bucket("config")
+    _    <- kv.put("threshold", "100")
+    _    <- kv.put("threshold", "200")
+    old  <- kv.get[String]("threshold", revision = Some(1L))
+    all  <- kv.history[String]("threshold")
+    _    <- ZIO.debug(s"${all.length} revisions; first was ${old.map(_.value)}")
+  } yield ()
+```
 
 ## Listing keys
 
-```scala mdoc:silent
+`keys` loads all current key names into a `List[String]` in one shot. Pass a filter list using NATS wildcard syntax (`*` for one token, `>` for one-or-more trailing tokens) to scope the result to a subset of keys. For large buckets, prefer `consumeKeys` - it returns a `ZStream[Any, NatsError, String]` and emits keys incrementally without loading the full set into memory:
+
+```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 import zio.nats.kv.*
 
-val listKeys: ZIO[Nats, NatsError, Unit] =
+val listing: ZIO[Nats, NatsError, Unit] =
   for {
-    kv <- KeyValue.bucket("config")
-
-    // Eager — loads all keys into a List
-    allKeys     <- kv.keys()
-    filtered    <- kv.keys(List("feature.*"))
-    multiFilter <- kv.keys(List("feature.*", "flag.*"))
-
-    // Streaming — memory-efficient for large buckets
-    _ <- kv.consumeKeys().tap(k => ZIO.debug(k)).runDrain
-    _ <- kv.consumeKeys(List("feature.*")).runDrain
-
-    // Full history for a key — type param selects the codec for decoded values
-    history <- kv.history[String]("feature.flag")
-    _       <- ZIO.debug(s"${history.length} revisions")
+    kv   <- KeyValue.bucket("config")
+    all  <- kv.keys()
+    feat <- kv.keys(List("feature.*"))
+    _    <- ZIO.debug(s"${all.length} total, ${feat.length} feature flags")
+    _    <- kv.consumeKeys(List("feature.*"))
+               .tap(k => ZIO.debug(k))
+               .runDrain
   } yield ()
 ```
-
-Use `consumeKeys` instead of `keys` when the bucket may have thousands of entries.
 
 ## Watching for changes
 
-`watch` returns a `ZStream` that never completes on its own — it delivers new changes as they
-arrive. Fork it alongside your main program and interrupt it when you are done.
+`watch` returns a `ZStream[Any, NatsError, KvEvent[A]]` that never completes on its own. By default it replays the current value of each matching key first, then streams all subsequent changes - a natural fit for loading initial state and keeping it live without a separate `get` call at startup. `KvEvent` is a sealed type with three cases: `KvEvent.Put(envelope)` for writes, `KvEvent.Delete(entry)` for soft deletes, and `KvEvent.Purge(entry)` for history purges.
 
-```scala mdoc:silent
+Watch all feature flags and react to each new value, filtering out deletions with `collect`:
+
+```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
 import zio.nats.kv.*
 
-val watchExample: ZIO[Nats, NatsError, Unit] =
+val liveFlags: ZIO[Nats, NatsError, Unit] =
   for {
     kv <- KeyValue.bucket("config")
-
-    // Watch specific keys — delivers current value then all future changes
-    // watch emits KvEvent[A]: Put(envelope), Delete(entry), Purge(entry)
-    _ <- kv.watch[String](List("feature.flag"))
-           .collect { case KvEvent.Put(env) => env.value }
-           .tap(v => ZIO.debug(s"New value: $v"))
-           .runDrain
-           .fork
-
-    // Watch the entire bucket
-    _ <- kv.watchAll[String]()
-           .tap(e => ZIO.debug(e.toString))
-           .runDrain
-           .fork
-
-    // Watch with options
-    _ <- kv.watch[String](
-           List("feature.>"),
-           KeyValueWatchOptions(
-             ignoreDeletes  = true,   // only deliver Put events (no Delete/Purge)
-             includeHistory = true,   // start from the first revision per key
-             updatesOnly    = true,   // only deliver new writes (skip current value)
-             fromRevision   = Some(42L) // resume from a specific revision
-           )
-         ).runDrain.fork
+    _  <- kv.watch[String](List("feature.>"))
+             .collect { case KvEvent.Put(env) => env.value }
+             .tap(v => ZIO.debug(s"Flag updated: $v"))
+             .runDrain
+             .fork
   } yield ()
 ```
 
-**What's happening:**
+`KeyValueWatchOptions` controls what the stream delivers and where it starts:
 
-1. By default, `watch` delivers the current value of the key first, then streams future changes. This makes it suitable for initialising local state from the server and keeping it in sync.
-2. `updatesOnly = true` skips the initial delivery — use this when you only care about changes after the watch starts.
-3. `ignoreDeletes = true` filters out `Delete` and `Purge` operations.
-4. `fromRevision` lets you resume a watch after a restart without missing changes.
+| Option | Default | Effect |
+|--------|---------|--------|
+| `ignoreDeletes` | `false` | Suppress `Delete` and `Purge` events |
+| `includeHistory` | `false` | Start from the first retained revision per key rather than the current value |
+| `updatesOnly` | `false` | Skip the initial current-value delivery; only emit new changes after the watch starts |
+| `fromRevision` | `None` | Resume from a specific revision - useful for restarting without reprocessing |
+
+Resume a watch from a known revision to pick up exactly where a previous session left off:
+
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.nats.kv.*
+
+val resumeWatch: ZIO[Nats, NatsError, Unit] =
+  for {
+    kv <- KeyValue.bucket("config")
+    _  <- kv.watchAll[String](
+             KeyValueWatchOptions(
+               fromRevision  = Some(100L),
+               ignoreDeletes = true
+             )
+           ).tap(e => ZIO.debug(e.toString))
+             .runDrain
+             .fork
+  } yield ()
+```
 
 ## Next steps
 
-- [Object Store guide](./06-object-store.md) — bucket storage for binary blobs
-- [JetStream guide](./03-jetstream.md) — KV is built on JetStream; understanding streams helps with advanced config
-- [Serialization guide](./02-serialization.md) — store and retrieve typed domain objects
+- [Object Store guide](./06-object-store.md) - bucket storage for larger binary objects
+- [JetStream guide](./03-jetstream.md) - KV is built on JetStream; understanding streams and retention policies helps with advanced bucket configuration
