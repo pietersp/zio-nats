@@ -50,11 +50,10 @@ val store: ZIO[Nats, NatsError, Unit] =
     os <- ObjectStore.bucket("assets")
 
     // Raw bytes - image loaded from disk or another source
-    imgSummary <- os.put(
-                    ObjectMeta("logo.png", description = Some("Brand logo")),
-                    Chunk.fromArray(Array[Byte](0x89.toByte, 0x50, 0x4e, 0x47)) // PNG header bytes
-                  )
-    _          <- ZIO.debug(s"Image: ${imgSummary.size} bytes in ${imgSummary.chunks} chunks")
+    _ <- os.put(
+           ObjectMeta("logo.png", description = Some("Brand logo")),
+           Chunk.fromArray(Array[Byte](0x89.toByte, 0x50, 0x4e, 0x47)) // PNG header bytes
+         )
 
     // Plain string - a README or licence file
     _          <- os.put("README.md", "# Assets\nBrand assets for the shop service.")
