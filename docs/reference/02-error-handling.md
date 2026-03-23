@@ -3,79 +3,72 @@ id: error-handling
 title: Error Handling
 ---
 
-# Error Handling
-
-> The `NatsError` sealed ADT — every error the library can produce.
-
-All zio-nats operations return `IO[NatsError, A]`. `NatsError` is a sealed trait with
-exhaustive sub-types, so you can pattern-match without a catch-all — the compiler will warn
-if you miss a case.
-
-## Catching all errors
-
-```scala
-import zio.*
-import zio.nats.*
-import zio.nats.NatsError.*
-
-nats.publish(Subject("subject"), "payload").catchAll {
-  case ConnectionClosed(msg)                    => ZIO.logError(s"Connection closed: $msg")
-  case Timeout(msg)                             => ZIO.logWarning(s"Timed out: $msg")
-  case SerializationError(msg, _)               => ZIO.logError(s"Encode failed: $msg")
-  case DecodingError(msg, _)                    => ZIO.logError(s"Decode failed: $msg")
-  case JetStreamApiError(msg, code, apiCode, _) => ZIO.logError(s"JetStream API $code/$apiCode: $msg")
-  case JetStreamPublishFailed(msg, _)           => ZIO.logError(s"Publish failed: $msg")
-  case JetStreamConsumeFailed(msg, _)           => ZIO.logError(s"Consume failed: $msg")
-  case KeyNotFound(key)                         => ZIO.logInfo(s"Key not found: $key")
-  case other                                    => ZIO.logError(s"NATS error: ${other.message}")
-}
-```
+`NatsError` is a sealed ADT - every error zio-nats can produce is one of the variants below. All operations return `IO[NatsError, A]`, so the compiler knows exactly which errors are possible at each call site.
 
 ## Error variants
 
-| Error | Message field | When it occurs |
-|---|---|---|
-| `ConnectionClosed` | `msg: String` | Operation attempted on a closed connection |
-| `Timeout` | `msg: String` | Request-reply or flush exceeded its timeout |
-| `SerializationError` | `msg: String`, `cause: Option[Throwable]` | `NatsCodec[A].encode` failed |
-| `DecodingError` | `msg: String`, `cause: Option[Throwable]` | `NatsCodec[A].decode` failed on an incoming message |
-| `JetStreamApiError` | `msg`, `statusCode`, `apiCode`, `cause` | Server returned a JetStream API error |
-| `JetStreamPublishFailed` | `msg: String`, `cause: Option[Throwable]` | Server rejected a JetStream publish |
-| `JetStreamConsumeFailed` | `msg: String`, `cause: Option[Throwable]` | Consumer stream terminated unexpectedly |
-| `KeyNotFound` | `key: String` | `kv.get(key)` returned no entry |
-| `ServiceOperationFailed` | `msg: String`, `cause: Option[Throwable]` | Service framework operation failed |
-| `ServiceStartFailed` | `msg: String`, `cause: Option[Throwable]` | Service framework failed to start |
-| `ObjectStoreOperationFailed` | `msg: String`, `cause: Option[Throwable]` | Object Store operation failed |
-| `UnexpectedError` | `msg: String`, `cause: Option[Throwable]` | Catch-all for unexpected jnats exceptions |
+| Variant                      | Fields                                                               | When it occurs                                              |
+|------------------------------|----------------------------------------------------------------------|-------------------------------------------------------------|
+| `ConnectionFailed`           | `message: String`, `cause: IOException`                             | Initial TCP connection could not be established             |
+| `ConnectionClosed`           | `message: String`                                                    | Operation attempted on a closed or lost connection          |
+| `AuthenticationFailed`       | `message: String`, `cause: IOException`                             | Server rejected the credentials                             |
+| `Timeout`                    | `message: String`                                                    | Request-reply or flush exceeded its timeout                 |
+| `PublishFailed`              | `message: String`, `cause: Throwable`                               | Core NATS publish rejected by the server                    |
+| `RequestFailed`              | `message: String`, `cause: Throwable`                               | Request-reply call failed                                   |
+| `SubscriptionFailed`         | `message: String`, `cause: Throwable`                               | Subscribe call rejected by the server                       |
+| `SerializationError`         | `message: String`, `cause: Throwable`                               | `NatsCodec[A].encode` failed                                |
+| `DecodingError`              | `message: String`, `cause: Throwable`                               | `NatsCodec[A].decode` failed on an incoming message         |
+| `JetStreamApiError`          | `message: String`, `errorCode: Int`, `apiErrorCode: Int`, `cause: JetStreamApiException` | Server returned a JetStream API error |
+| `JetStreamPublishFailed`     | `message: String`, `cause: Throwable`                               | Server rejected a JetStream publish                         |
+| `JetStreamConsumeFailed`     | `message: String`, `cause: Throwable`                               | Consumer stream terminated unexpectedly                     |
+| `KeyValueOperationFailed`    | `message: String`, `cause: Throwable`                               | KV operation failed (server error or connection issue)      |
+| `KeyNotFound`                | `key: String`                                                        | A KV operation required a key that does not exist           |
+| `ObjectStoreOperationFailed` | `message: String`, `cause: Throwable`                               | Object Store operation failed                               |
+| `ObjectNotFound`             | `name: String`                                                       | Object Store `get` for a name that does not exist           |
+| `ObjectAlreadyExists`        | `name: String`                                                       | Object Store `put` for a name that is already sealed        |
+| `ServiceOperationFailed`     | `message: String`, `cause: Throwable`                               | Service framework runtime operation failed                  |
+| `ServiceStartFailed`         | `message: String`, `cause: Throwable`                               | Service framework failed to start                           |
+| `GeneralError`               | `message: String`, `cause: Throwable`                               | Catch-all for unexpected jnats exceptions                   |
+
+All variants except `KeyNotFound`, `ObjectNotFound`, and `ObjectAlreadyExists` carry a `message: String` field. Every variant is a case class, so they can be pattern-matched exhaustively.
 
 ## Sub-sealed traits
 
-Group errors by domain for broader pattern matches:
+Group errors by domain for broader pattern matches. Use these when you want to handle an entire feature area uniformly rather than listing each variant:
 
 ```scala
 import zio.nats.NatsError
 
-// Match any JetStream error
+// Catch any JetStream error
 someEffect.catchSome {
   case e: NatsError.JetStreamError => ZIO.logError(s"JetStream: ${e.message}")
 }
 
-// Match any KV error
+// Catch any KV error
 kvEffect.catchSome {
   case e: NatsError.KeyValueError => ZIO.logError(s"KV: ${e.message}")
 }
 ```
 
-| Sub-sealed trait | Members |
-|---|---|
-| `NatsError.JetStreamError` | `JetStreamApiError`, `JetStreamPublishFailed`, `JetStreamConsumeFailed` |
-| `NatsError.KeyValueError` | `KeyNotFound` |
-| `NatsError.ObjectStoreError` | `ObjectStoreOperationFailed` |
-| `NatsError.ServiceError` | `ServiceOperationFailed`, `ServiceStartFailed` |
+| Sub-sealed trait              | Members                                                                         |
+|-------------------------------|---------------------------------------------------------------------------------|
+| `NatsError.JetStreamError`    | `JetStreamApiError`, `JetStreamPublishFailed`, `JetStreamConsumeFailed`         |
+| `NatsError.KeyValueError`     | `KeyValueOperationFailed`, `KeyNotFound`                                        |
+| `NatsError.ObjectStoreError`  | `ObjectStoreOperationFailed`, `ObjectNotFound`, `ObjectAlreadyExists`           |
+| `NatsError.ServiceError`      | `ServiceOperationFailed`, `ServiceStartFailed`                                  |
 
 ## Common handling patterns
 
-**Retry on disconnect:**
+**Log and continue** - use `message` which is defined on all variants:
+
+```scala
+import zio.*
+import zio.nats.*
+
+effect.catchAll(e => ZIO.logError(s"NATS error: ${e.message}"))
+```
+
+**Retry on connection loss:**
 
 ```scala
 import zio.*
@@ -83,13 +76,13 @@ import zio.nats.*
 
 def withRetry[A](effect: IO[NatsError, A]): IO[NatsError, A] =
   effect.retry(
-    Schedule.recurWhile[NatsError](_ == NatsError.ConnectionClosed(""))
+    Schedule.recurWhile[NatsError] { case _: NatsError.ConnectionClosed => true; case _ => false }
       && Schedule.recurs(3)
       && Schedule.exponential(500.millis)
   )
 ```
 
-**Surface as application error:**
+**Map to a simpler error type:**
 
 ```scala
 import zio.*
@@ -99,17 +92,17 @@ def publish(nats: Nats, subject: Subject, msg: String): IO[String, Unit] =
   nats.publish(subject, msg).mapError(_.message)
 ```
 
-**Ignore `KeyNotFound` — treat as `None`:**
+**Handle missing keys** - `KeyValue#get` returns `Option[KvEnvelope[A]]` where `None` means the key was never written or was purged. `KeyNotFound` is raised by operations that require the key to already exist, such as `update` with an expected revision:
 
 ```scala
 import zio.*
 import zio.nats.*
-import zio.nats.kv.*
 
-def getOrNone(kv: KeyValue, key: String): IO[NatsError, Option[KeyValueEntry]] =
-  kv.get(key)
+// Returns None for a missing key - no KeyNotFound to handle
+val value: IO[NatsError, Option[KvEnvelope[String]]] =
+  kv.get[String]("my-key")
+
+// Raises KeyNotFound if the key does not exist
+val updated: IO[NatsError, Long] =
+  kv.update("my-key", "new-value", expectedRevision = 5L)
 ```
-
-`kv.get` already returns `IO[NatsError, Option[KeyValueEntry]]` — `None` for a missing key.
-`KeyNotFound` is raised only by operations that require the key to exist (e.g. `kv.update`
-with an `expectedRevision` that does not match).
