@@ -28,9 +28,10 @@ title: Error Handling
 | `ObjectAlreadyExists`        | `name: String`                                                       | Object Store `put` for a name that is already sealed        |
 | `ServiceOperationFailed`     | `message: String`, `cause: Throwable`                               | Service framework runtime operation failed                  |
 | `ServiceStartFailed`         | `message: String`, `cause: Throwable`                               | Service framework failed to start                           |
+| `ServiceCallFailed`          | `message: String`, `code: Int`                                      | Remote service handler responded with an error              |
 | `GeneralError`               | `message: String`, `cause: Throwable`                               | Catch-all for unexpected jnats exceptions                   |
 
-All variants except `KeyNotFound`, `ObjectNotFound`, and `ObjectAlreadyExists` carry a `message: String` field. Every variant is a case class, so they can be pattern-matched exhaustively.
+All variants except `KeyNotFound`, `ObjectNotFound`, `ObjectAlreadyExists`, and `ServiceCallFailed` carry both a `message: String` and a `cause: Throwable`. `ServiceCallFailed` carries `message` and `code: Int` (the numeric error code from the remote service). Every variant is a case class, so they can be pattern-matched exhaustively.
 
 ## Sub-sealed traits
 
@@ -55,7 +56,7 @@ kvEffect.catchSome {
 | `NatsError.JetStreamError`    | `JetStreamApiError`, `JetStreamPublishFailed`, `JetStreamConsumeFailed`         |
 | `NatsError.KeyValueError`     | `KeyValueOperationFailed`, `KeyNotFound`                                        |
 | `NatsError.ObjectStoreError`  | `ObjectStoreOperationFailed`, `ObjectNotFound`, `ObjectAlreadyExists`           |
-| `NatsError.ServiceError`      | `ServiceOperationFailed`, `ServiceStartFailed`                                  |
+| `NatsError.ServiceError`      | `ServiceOperationFailed`, `ServiceStartFailed`, `ServiceCallFailed`             |
 
 ## Common handling patterns
 
@@ -92,7 +93,7 @@ def publish(nats: Nats, subject: Subject, msg: String): IO[String, Unit] =
   nats.publish(subject, msg).mapError(_.message)
 ```
 
-**Handle missing keys** - `KeyValue#get` returns `Option[KvEnvelope[A]]` where `None` means the key was never written or was purged. `KeyNotFound` is raised by operations that require the key to already exist, such as `update` with an expected revision:
+**Handle missing keys** - `KeyValue#get` returns `Option[KvEnvelope[A]]` where `None` means the key was never written or was purged. `KeyNotFound` is raised by operations that require the key to already exist, such as `KeyValue#update` with an expected revision:
 
 ```scala
 import zio.*
@@ -105,4 +106,35 @@ val value: IO[NatsError, Option[KvEnvelope[String]]] =
 // Raises KeyNotFound if the key does not exist
 val updated: IO[NatsError, Long] =
   kv.update("my-key", "new-value", expectedRevision = 5L)
+```
+
+**Handle service call errors (typed)** - use `Nats#requestService` with a shared `ServiceEndpoint` descriptor to receive typed domain errors as `Left(err)` rather than a stringly-typed `ServiceCallFailed`. `NatsCodec[Err]` must be in scope:
+
+```scala
+import zio.*
+import zio.nats.*
+
+// Endpoint shared between server and client
+val ep = ServiceEndpoint[String, String]("do-thing").withError[String]
+
+val result: IO[NatsError, Option[String]] =
+  nats.requestService(ep, "input", 5.seconds).map {
+    case Right(out) => Some(out)
+    case Left(err)  => None  // typed String error from the handler
+  }
+```
+
+**Handle service call errors (untyped)** - when the endpoint descriptor is not available, `Nats#request` still detects the `Nats-Service-Error` header and fails with `ServiceCallFailed`. This covers infrastructure errors from `Nats#requestService` too:
+
+```scala
+import zio.*
+import zio.nats.*
+
+val result: IO[NatsError, Option[String]] =
+  nats.request[String, String](Subject("my-service.do-thing"), "input", 5.seconds)
+    .map(env => Some(env.value))
+    .catchSome {
+      case NatsError.ServiceCallFailed(msg, code) =>
+        ZIO.logWarning(s"Service error $code: $msg").as(None)
+    }
 ```
