@@ -7,9 +7,9 @@ import zio.Chunk
  * Automatically bridge any `Format[A]` in implicit scope to [[NatsCodec]][A].
  *
  * This is a top-level given in `package zio.nats`. In Scala 3, package-level
- * given instances are not imported by a plain wildcard `import zio.nats.*`.
- * Use `import zio.nats.{given, *}` (or `import zio.nats.given`) to bring this
- * given into scope.
+ * given instances are not imported by a plain wildcard `import zio.nats.*`. Use
+ * `import zio.nats.{given, *}` (or `import zio.nats.given`) to bring this given
+ * into scope.
  *
  * The `NotGiven[NatsCodec[A]]` guard ensures this given does not shadow
  * built-in codecs (e.g. `NatsCodec[String]`, `NatsCodec[Chunk[Byte]]`) or any
@@ -93,7 +93,8 @@ object NatsCodecPlayJson {
    *
    * Use this for an explicit one-off codec. For automatic bridging via implicit
    * resolution, ensure a `given Format[A]` is in scope and use
-   * `import zio.nats.{given, *}` — the `fromPlayJsonFormat` given handles the rest.
+   * `import zio.nats.{given, *}` — the `fromPlayJsonFormat` given handles the
+   * rest.
    *
    * @param format
    *   A play-json `Format[A]` (typically obtained via `Json.format[Person]` or

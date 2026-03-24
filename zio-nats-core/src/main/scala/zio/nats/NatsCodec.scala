@@ -62,3 +62,41 @@ object NatsCodec {
       Right(new String(bytes.toArray, StandardCharsets.UTF_8))
   }
 }
+
+// ---------------------------------------------------------------------------
+// ErrorCodecOrNothing — internal bridge for service framework error encoding
+// ---------------------------------------------------------------------------
+
+/**
+ * Internal type class that provides [[NatsCodec]]-like behaviour for a service
+ * handler's error type `E`, including a safe instance for `Nothing`.
+ *
+ * Used by [[zio.nats.service.ServiceEndpoint]] to encode domain errors into the
+ * reply body on the server side, and by [[zio.nats.Nats.requestService]] to
+ * decode them on the client side.
+ *
+ * Users never interact with this type class directly: it is resolved
+ * automatically from whatever `NatsCodec[E]` is in scope when
+ * [[zio.nats.service.ServiceEndpoint.withError]] is called.
+ */
+private[nats] sealed trait ErrorCodecOrNothing[E]:
+  def encode(e: E): Chunk[Byte]
+  def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, E]
+
+private[nats] object ErrorCodecOrNothing:
+
+  /**
+   * Safe instance for infallible endpoints (`Err = Nothing`).
+   *
+   * Both methods are statically unreachable: a handler typed `IO[Nothing, Out]`
+   * can never produce a `Nothing` value.
+   */
+  given ErrorCodecOrNothing[Nothing] with
+    def encode(e: Nothing): Chunk[Byte]                              = e // unreachable
+    def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, Nothing] =
+      Left(NatsDecodeError("Unexpected typed error payload for infallible endpoint"))
+
+  /** Derive an instance from any `NatsCodec[E]` in scope. */
+  given fromNatsCodec[E](using c: NatsCodec[E]): ErrorCodecOrNothing[E] with
+    def encode(e: E): Chunk[Byte]                              = c.encode(e)
+    def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, E] = c.decode(bytes)

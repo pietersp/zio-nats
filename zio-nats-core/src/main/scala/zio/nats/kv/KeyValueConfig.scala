@@ -40,7 +40,8 @@ case class RepublishConfig(
  * @param description
  *   Optional human-readable description.
  * @param maxValueSize
- *   Maximum size of a single value in bytes (-1 = unlimited). Must fit in a 32-bit signed integer.
+ *   Maximum size of a single value in bytes (-1 = unlimited). Must fit in a
+ *   32-bit signed integer.
  * @param maxBucketSize
  *   Maximum total bytes for the bucket (-1 = unlimited).
  * @param maxHistoryPerKey

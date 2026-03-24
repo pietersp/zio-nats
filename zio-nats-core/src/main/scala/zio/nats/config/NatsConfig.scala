@@ -10,15 +10,15 @@ import java.nio.file.Paths
  *
  * Provides a Scala-friendly API over `io.nats.client.Options.Builder`.
  *
- * === Authentication ===
+ * ===Authentication===
  *
  * Set the `auth` field to one of the [[NatsAuth]] variants. Only one
- * authentication method can be active at a time; impossible combinations
- * (e.g. token and user/password simultaneously) cannot be constructed.
- * Use [[NatsAuth.Custom]] for dynamic credential rotation via a programmatic
+ * authentication method can be active at a time; impossible combinations (e.g.
+ * token and user/password simultaneously) cannot be constructed. Use
+ * [[NatsAuth.Custom]] for dynamic credential rotation via a programmatic
  * `io.nats.client.AuthHandler`.
  *
- * === TLS ===
+ * ===TLS===
  *
  * Set the `tls` field to one of the [[NatsTls]] variants. Use
  * [[NatsTls.Custom]] for a pre-built `javax.net.ssl.SSLContext` when
@@ -48,17 +48,19 @@ import java.nio.file.Paths
  * @param inboxPrefix
  *   Prefix for auto-generated reply-to inboxes (default: `_INBOX.`).
  * @param auth
- *   Authentication method (default: [[NatsAuth.NoAuth]]). Use [[NatsAuth.Token]],
- *   [[NatsAuth.UserPassword]], or [[NatsAuth.CredentialFile]] for authenticated
- *   connections.
+ *   Authentication method (default: [[NatsAuth.NoAuth]]). Use
+ *   [[NatsAuth.Token]], [[NatsAuth.UserPassword]], or
+ *   [[NatsAuth.CredentialFile]] for authenticated connections.
  * @param tls
- *   TLS configuration (default: [[NatsTls.Disabled]]). Use [[NatsTls.SystemDefault]]
- *   for public-CA-signed servers, or [[NatsTls.KeyStore]] for mTLS.
+ *   TLS configuration (default: [[NatsTls.Disabled]]). Use
+ *   [[NatsTls.SystemDefault]] for public-CA-signed servers, or
+ *   [[NatsTls.KeyStore]] for mTLS.
  * @param reconnectJitter
- *   Random jitter added to [[reconnectWait]] to avoid thundering herd on reconnect
- *   (default: 100ms).
+ *   Random jitter added to [[reconnectWait]] to avoid thundering herd on
+ *   reconnect (default: 100ms).
  * @param reconnectJitterTls
- *   Jitter for TLS connections, which are more expensive to establish (default: 1s).
+ *   Jitter for TLS connections, which are more expensive to establish (default:
+ *   1s).
  * @param reconnectBufferSize
  *   Maximum bytes to buffer for in-flight publishes during a reconnect window
  *   (default: 8 MiB). Set to 0 to disable buffering.
@@ -68,23 +70,23 @@ import java.nio.file.Paths
  *   If true, new messages are discarded when the outbound queue is full instead
  *   of blocking (default: false).
  * @param writeQueuePushTimeout
- *   How long to wait when the outbound queue is full before giving up
- *   (default: [[Duration.Zero]] = block indefinitely).
+ *   How long to wait when the outbound queue is full before giving up (default:
+ *   [[Duration.Zero]] = block indefinitely).
  * @param socketWriteTimeout
  *   Socket-level write timeout to prevent hanging on a dead connection
  *   (default: [[Duration.Zero]] = no timeout).
  * @param socketReadTimeout
- *   Socket-level read timeout to prevent hanging on a dead connection
- *   (default: [[Duration.Zero]] = no timeout).
+ *   Socket-level read timeout to prevent hanging on a dead connection (default:
+ *   [[Duration.Zero]] = no timeout).
  * @param maxControlLine
  *   Maximum length of a NATS protocol control line in bytes; must match the
  *   server's `max_control_line` setting (default: 0 = jnats default).
  * @param maxPingsOut
- *   Maximum number of client PINGs in-flight before the connection is considered
- *   stale and closed (default: 2).
+ *   Maximum number of client PINGs in-flight before the connection is
+ *   considered stale and closed (default: 2).
  * @param drainTimeout
- *   Maximum time to wait for subscriptions to drain when the connection's ZLayer
- *   scope ends (default: 30s).
+ *   Maximum time to wait for subscriptions to drain when the connection's
+ *   ZLayer scope ends (default: 30s).
  */
 final case class NatsConfig(
   servers: List[String] = List("nats://localhost:4222"),
@@ -151,13 +153,21 @@ final case class NatsConfig(
 
 object NatsConfig {
 
-  /** Default config connecting to `nats://localhost:4222` with no auth and no TLS. */
+  /**
+   * Default config connecting to `nats://localhost:4222` with no auth and no
+   * TLS.
+   */
   val default: NatsConfig = NatsConfig()
 
-  /** Config for a single server URL with all other settings at their defaults. */
+  /**
+   * Config for a single server URL with all other settings at their defaults.
+   */
   def apply(server: String): NatsConfig = NatsConfig(servers = List(server))
 
-  /** ZLayer providing a default [[NatsConfig]] connecting to `nats://localhost:4222`. */
+  /**
+   * ZLayer providing a default [[NatsConfig]] connecting to
+   * `nats://localhost:4222`.
+   */
   val live: ULayer[NatsConfig] = ZLayer.succeed(default)
 
   // ---------------------------------------------------------------------------
@@ -168,16 +178,30 @@ object NatsConfig {
   // Using case classes (not tuples) ensures Zippable does not try to flatten
   // their fields into the outer zip chain.
   private final case class ConnGroup(
-    servers: List[String], connectionName: Option[String], connectionTimeout: Duration,
-    reconnectWait: Duration, maxReconnects: Int, pingInterval: Duration,
-    requestCleanupInterval: Duration, bufferSize: Int, noEcho: Boolean,
-    utf8Support: Boolean, inboxPrefix: String, drainTimeout: Duration
+    servers: List[String],
+    connectionName: Option[String],
+    connectionTimeout: Duration,
+    reconnectWait: Duration,
+    maxReconnects: Int,
+    pingInterval: Duration,
+    requestCleanupInterval: Duration,
+    bufferSize: Int,
+    noEcho: Boolean,
+    utf8Support: Boolean,
+    inboxPrefix: String,
+    drainTimeout: Duration
   )
   private final case class TunGroup(
-    reconnectJitter: Duration, reconnectJitterTls: Duration, reconnectBufferSize: Long,
-    maxMessagesInOutgoingQueue: Int, discardMessagesWhenOutgoingQueueFull: Boolean,
-    writeQueuePushTimeout: Duration, socketWriteTimeout: Duration, socketReadTimeout: Duration,
-    maxControlLine: Int, maxPingsOut: Int
+    reconnectJitter: Duration,
+    reconnectJitterTls: Duration,
+    reconnectBufferSize: Long,
+    maxMessagesInOutgoingQueue: Int,
+    discardMessagesWhenOutgoingQueueFull: Boolean,
+    writeQueuePushTimeout: Duration,
+    socketWriteTimeout: Duration,
+    socketReadTimeout: Duration,
+    maxControlLine: Int,
+    maxPingsOut: Int
   )
 
   // Validates that a server URL is a parseable URI with a non-empty host.
@@ -186,14 +210,22 @@ object NatsConfig {
     try {
       val uri = new URI(url)
       if (uri.getScheme == null || uri.getHost == null || uri.getHost.isEmpty)
-        Left(Config.Error.InvalidData(Chunk.empty,
-          s"'$url' is not a valid NATS server URL — expected e.g. nats://host:4222 or tls://host:4222"))
+        Left(
+          Config.Error.InvalidData(
+            Chunk.empty,
+            s"'$url' is not a valid NATS server URL — expected e.g. nats://host:4222 or tls://host:4222"
+          )
+        )
       else
         Right(url)
     } catch {
       case _: java.net.URISyntaxException =>
-        Left(Config.Error.InvalidData(Chunk.empty,
-          s"'$url' is not a valid NATS server URL — expected e.g. nats://host:4222 or tls://host:4222"))
+        Left(
+          Config.Error.InvalidData(
+            Chunk.empty,
+            s"'$url' is not a valid NATS server URL — expected e.g. nats://host:4222 or tls://host:4222"
+          )
+        )
     }
 
   // Auth: all sub-fields are read as optional strings so that mapOrFail can dispatch
@@ -205,46 +237,53 @@ object NatsConfig {
   // NatsAuth.Keys is the single source of truth for all type key strings.
   private val authConfig: Config[NatsAuth] =
     (Config.string("type").optional.nested("auth") zip
-     Config.string("value").optional.nested("auth") zip
-     Config.string("username").optional.nested("auth") zip
-     Config.string("password").optional.nested("auth") zip
-     Config.string("path").optional.nested("auth")
-    ).mapOrFail {
-      case (None,                              _,       _,       _,       _      ) => Right(NatsAuth.NoAuth)
-      case (Some(NatsAuth.Keys.noAuth),        _,       _,       _,       _      ) => Right(NatsAuth.NoAuth)
-      case (Some(NatsAuth.Keys.token),         Some(v), _,       _,       _      ) => Right(NatsAuth.Token(v))
-      case (Some(NatsAuth.Keys.token),         None,    _,       _,       _      ) =>
-        Left(Config.Error.MissingData(Chunk.empty,
-          s"auth.value is required when auth.type = ${NatsAuth.Keys.token}"))
-      case (Some(NatsAuth.Keys.userPassword),  _,       Some(u), Some(p), _      ) => Right(NatsAuth.UserPassword(u, p))
-      case (Some(NatsAuth.Keys.userPassword),  _,       _,       _,       _      ) =>
-        Left(Config.Error.MissingData(Chunk.empty,
-          s"auth.username and auth.password are required when auth.type = ${NatsAuth.Keys.userPassword}"))
-      case (Some(NatsAuth.Keys.credentialFile),_,       _,       _,       Some(p)) => Right(NatsAuth.CredentialFile(Paths.get(p)))
-      case (Some(NatsAuth.Keys.credentialFile),_,       _,       _,       None   ) =>
-        Left(Config.Error.MissingData(Chunk.empty,
-          s"auth.path is required when auth.type = ${NatsAuth.Keys.credentialFile}"))
-      case (Some(t),                           _,       _,       _,       _      ) =>
-        Left(Config.Error.InvalidData(Chunk.empty,
-          s"Unknown auth.type '$t'. Valid values: ${NatsAuth.Keys.noAuth}, ${NatsAuth.Keys.token}, " +
-          s"${NatsAuth.Keys.userPassword}, ${NatsAuth.Keys.credentialFile}. " +
-          "NatsAuth.Custom requires programmatic NatsConfig construction."))
+      Config.string("value").optional.nested("auth") zip
+      Config.string("username").optional.nested("auth") zip
+      Config.string("password").optional.nested("auth") zip
+      Config.string("path").optional.nested("auth")).mapOrFail {
+      case (None, _, _, _, _)                            => Right(NatsAuth.NoAuth)
+      case (Some(NatsAuth.Keys.noAuth), _, _, _, _)      => Right(NatsAuth.NoAuth)
+      case (Some(NatsAuth.Keys.token), Some(v), _, _, _) => Right(NatsAuth.Token(v))
+      case (Some(NatsAuth.Keys.token), None, _, _, _)    =>
+        Left(Config.Error.MissingData(Chunk.empty, s"auth.value is required when auth.type = ${NatsAuth.Keys.token}"))
+      case (Some(NatsAuth.Keys.userPassword), _, Some(u), Some(p), _) => Right(NatsAuth.UserPassword(u, p))
+      case (Some(NatsAuth.Keys.userPassword), _, _, _, _)             =>
+        Left(
+          Config.Error.MissingData(
+            Chunk.empty,
+            s"auth.username and auth.password are required when auth.type = ${NatsAuth.Keys.userPassword}"
+          )
+        )
+      case (Some(NatsAuth.Keys.credentialFile), _, _, _, Some(p)) => Right(NatsAuth.CredentialFile(Paths.get(p)))
+      case (Some(NatsAuth.Keys.credentialFile), _, _, _, None)    =>
+        Left(
+          Config.Error
+            .MissingData(Chunk.empty, s"auth.path is required when auth.type = ${NatsAuth.Keys.credentialFile}")
+        )
+      case (Some(t), _, _, _, _) =>
+        Left(
+          Config.Error.InvalidData(
+            Chunk.empty,
+            s"Unknown auth.type '$t'. Valid values: ${NatsAuth.Keys.noAuth}, ${NatsAuth.Keys.token}, " +
+              s"${NatsAuth.Keys.userPassword}, ${NatsAuth.Keys.credentialFile}. " +
+              "NatsAuth.Custom requires programmatic NatsConfig construction."
+          )
+        )
     }
 
   // TLS: same mapOrFail approach as authConfig.
   // NatsTls.configTypeKey and NatsTls.Keys serve the same role as for auth above.
   private val tlsConfig: Config[NatsTls] =
     (Config.string("type").optional.nested("tls") zip
-     Config.string("key-store-path").optional.nested("tls") zip
-     Config.string("key-store-password").optional.nested("tls") zip
-     Config.string("trust-store-path").optional.nested("tls") zip
-     Config.string("trust-store-password").optional.nested("tls") zip
-     Config.string("algorithm").optional.nested("tls") zip
-     Config.boolean("tls-first").withDefault(false).nested("tls")
-    ).mapOrFail {
-      case (None,                           _, _, _, _, _, _) => Right(NatsTls.Disabled)
-      case (Some(NatsTls.Keys.disabled),    _, _, _, _, _, _) => Right(NatsTls.Disabled)
-      case (Some(NatsTls.Keys.systemDefault), _, _, _, _, _, _) => Right(NatsTls.SystemDefault)
+      Config.string("key-store-path").optional.nested("tls") zip
+      Config.string("key-store-password").optional.nested("tls") zip
+      Config.string("trust-store-path").optional.nested("tls") zip
+      Config.string("trust-store-password").optional.nested("tls") zip
+      Config.string("algorithm").optional.nested("tls") zip
+      Config.boolean("tls-first").withDefault(false).nested("tls")).mapOrFail {
+      case (None, _, _, _, _, _, _)                                                    => Right(NatsTls.Disabled)
+      case (Some(NatsTls.Keys.disabled), _, _, _, _, _, _)                             => Right(NatsTls.Disabled)
+      case (Some(NatsTls.Keys.systemDefault), _, _, _, _, _, _)                        => Right(NatsTls.SystemDefault)
       case (Some(NatsTls.Keys.keyStore), Some(ksp), Some(kspw), tsp, tspw, alg, first) =>
         Right(NatsTls.KeyStore(Paths.get(ksp), kspw, tsp.map(Paths.get(_)), tspw, alg, first))
       case (Some(NatsTls.Keys.keyStore), ksp, kspw, _, _, _, _) =>
@@ -252,33 +291,41 @@ object NatsConfig {
           Option.when(ksp.isEmpty)("tls.key-store-path"),
           Option.when(kspw.isEmpty)("tls.key-store-password")
         ).flatten
-        Left(Config.Error.MissingData(Chunk.empty,
-          s"${missing.mkString(" and ")} ${if (missing.size > 1) "are" else "is"} required when tls.type = ${NatsTls.Keys.keyStore}"))
+        Left(
+          Config.Error.MissingData(
+            Chunk.empty,
+            s"${missing.mkString(" and ")} ${if (missing.size > 1) "are" else "is"} required when tls.type = ${NatsTls.Keys.keyStore}"
+          )
+        )
       case (Some(t), _, _, _, _, _, _) =>
-        Left(Config.Error.InvalidData(Chunk.empty,
-          s"Unknown tls.type '$t'. Valid values: ${NatsTls.Keys.disabled}, ${NatsTls.Keys.systemDefault}, " +
-          s"${NatsTls.Keys.keyStore}. NatsTls.Custom requires programmatic NatsConfig construction."))
+        Left(
+          Config.Error.InvalidData(
+            Chunk.empty,
+            s"Unknown tls.type '$t'. Valid values: ${NatsTls.Keys.disabled}, ${NatsTls.Keys.systemDefault}, " +
+              s"${NatsTls.Keys.keyStore}. NatsTls.Custom requires programmatic NatsConfig construction."
+          )
+        )
     }
 
   /**
    * ZIO [[Config]] descriptor for [[NatsConfig]].
    *
-   * All fields default to their [[NatsConfig]] case class defaults — only values
-   * you want to override need to be present. All duration and timeout fields use
-   * ISO-8601 format (e.g. `PT5S` for 5 seconds, `PT2M` for 2 minutes,
-   * `PT0.5S` for 500 ms). The `servers` list uses the config provider's sequence
-   * delimiter (comma by default for env vars, native list syntax for HOCON).
-   * Each server URL is validated at load time (must be a parseable URI with a
-   * non-empty host); invalid URLs produce a [[Config.Error.InvalidData]] before
-   * any connection is attempted.
+   * All fields default to their [[NatsConfig]] case class defaults — only
+   * values you want to override need to be present. All duration and timeout
+   * fields use ISO-8601 format (e.g. `PT5S` for 5 seconds, `PT2M` for 2
+   * minutes, `PT0.5S` for 500 ms). The `servers` list uses the config
+   * provider's sequence delimiter (comma by default for env vars, native list
+   * syntax for HOCON). Each server URL is validated at load time (must be a
+   * parseable URI with a non-empty host); invalid URLs produce a
+   * [[Config.Error.InvalidData]] before any connection is attempted.
    *
    * `NatsAuth.Custom` and `NatsTls.Custom` are not reachable via text config —
    * construct [[NatsConfig]] programmatically when you need those variants.
    *
    * This descriptor reads keys at the root level — there is no `nats.` prefix.
-   * Use [[fromConfig]] for the conventional `nats`-prefixed layer.
-   * For a different prefix, apply your own nesting — note that `nested` calls
-   * stack from inner to outer (last call = outermost namespace):
+   * Use [[fromConfig]] for the conventional `nats`-prefixed layer. For a
+   * different prefix, apply your own nesting — note that `nested` calls stack
+   * from inner to outer (last call = outermost namespace):
    * {{{
    *   // Config lives at myapp.nats.* (e.g. HOCON: myapp { nats { servers = [...] } })
    *   ZIO.config(NatsConfig.config.nested("nats").nested("myapp"))
@@ -288,76 +335,114 @@ object NatsConfig {
     // Each group is mapped to a private case class so Zippable never tries to
     // flatten the fields across groups.  The final zip is a clean 4-element tuple.
     val connGroupConfig: Config[ConnGroup] =
-      (Config.listOf("servers", Config.string.mapOrFail(validateNatsUrl))
-         .withDefault(List("nats://localhost:4222")) zip
-       Config.string("connection-name").optional zip
-       Config.duration("connection-timeout").withDefault(2.seconds) zip
-       Config.duration("reconnect-wait").withDefault(2.seconds) zip
-       Config.int("max-reconnects").withDefault(60) zip
-       Config.duration("ping-interval").withDefault(2.minutes) zip
-       Config.duration("request-cleanup-interval").withDefault(5.seconds) zip
-       Config.int("buffer-size").withDefault(64 * 1024) zip
-       Config.boolean("no-echo").withDefault(false) zip
-       Config.boolean("utf8-support").withDefault(false) zip
-       Config.string("inbox-prefix").withDefault("_INBOX.") zip
-       Config.duration("drain-timeout").withDefault(30.seconds)
-      ).map { case (servers, connectionName, connectionTimeout, reconnectWait, maxReconnects,
-                    pingInterval, requestCleanupInterval, bufferSize, noEcho, utf8Support,
-                    inboxPrefix, drainTimeout) =>
-        ConnGroup(servers, connectionName, connectionTimeout, reconnectWait, maxReconnects,
-                  pingInterval, requestCleanupInterval, bufferSize, noEcho, utf8Support,
-                  inboxPrefix, drainTimeout)
+      (Config
+        .listOf("servers", Config.string.mapOrFail(validateNatsUrl))
+        .withDefault(List("nats://localhost:4222")) zip
+        Config.string("connection-name").optional zip
+        Config.duration("connection-timeout").withDefault(2.seconds) zip
+        Config.duration("reconnect-wait").withDefault(2.seconds) zip
+        Config.int("max-reconnects").withDefault(60) zip
+        Config.duration("ping-interval").withDefault(2.minutes) zip
+        Config.duration("request-cleanup-interval").withDefault(5.seconds) zip
+        Config.int("buffer-size").withDefault(64 * 1024) zip
+        Config.boolean("no-echo").withDefault(false) zip
+        Config.boolean("utf8-support").withDefault(false) zip
+        Config.string("inbox-prefix").withDefault("_INBOX.") zip
+        Config.duration("drain-timeout").withDefault(30.seconds)).map {
+        case (
+              servers,
+              connectionName,
+              connectionTimeout,
+              reconnectWait,
+              maxReconnects,
+              pingInterval,
+              requestCleanupInterval,
+              bufferSize,
+              noEcho,
+              utf8Support,
+              inboxPrefix,
+              drainTimeout
+            ) =>
+          ConnGroup(
+            servers,
+            connectionName,
+            connectionTimeout,
+            reconnectWait,
+            maxReconnects,
+            pingInterval,
+            requestCleanupInterval,
+            bufferSize,
+            noEcho,
+            utf8Support,
+            inboxPrefix,
+            drainTimeout
+          )
       }
 
     val tunGroupConfig: Config[TunGroup] =
       (Config.duration("reconnect-jitter").withDefault(100.millis) zip
-       Config.duration("reconnect-jitter-tls").withDefault(1.second) zip
-       Config.long("reconnect-buffer-size").withDefault(8L * 1024 * 1024) zip
-       Config.int("max-messages-in-outgoing-queue").withDefault(0) zip
-       Config.boolean("discard-messages-when-outgoing-queue-full").withDefault(false) zip
-       Config.duration("write-queue-push-timeout").withDefault(Duration.Zero) zip
-       Config.duration("socket-write-timeout").withDefault(Duration.Zero) zip
-       Config.duration("socket-read-timeout").withDefault(Duration.Zero) zip
-       Config.int("max-control-line").withDefault(0) zip
-       Config.int("max-pings-out").withDefault(2)
-      ).map { case (reconnectJitter, reconnectJitterTls, reconnectBufferSize,
-                    maxMessagesInOutgoingQueue, discardMessagesWhenOutgoingQueueFull,
-                    writeQueuePushTimeout, socketWriteTimeout, socketReadTimeout,
-                    maxControlLine, maxPingsOut) =>
-        TunGroup(reconnectJitter, reconnectJitterTls, reconnectBufferSize,
-                 maxMessagesInOutgoingQueue, discardMessagesWhenOutgoingQueueFull,
-                 writeQueuePushTimeout, socketWriteTimeout, socketReadTimeout,
-                 maxControlLine, maxPingsOut)
+        Config.duration("reconnect-jitter-tls").withDefault(1.second) zip
+        Config.long("reconnect-buffer-size").withDefault(8L * 1024 * 1024) zip
+        Config.int("max-messages-in-outgoing-queue").withDefault(0) zip
+        Config.boolean("discard-messages-when-outgoing-queue-full").withDefault(false) zip
+        Config.duration("write-queue-push-timeout").withDefault(Duration.Zero) zip
+        Config.duration("socket-write-timeout").withDefault(Duration.Zero) zip
+        Config.duration("socket-read-timeout").withDefault(Duration.Zero) zip
+        Config.int("max-control-line").withDefault(0) zip
+        Config.int("max-pings-out").withDefault(2)).map {
+        case (
+              reconnectJitter,
+              reconnectJitterTls,
+              reconnectBufferSize,
+              maxMessagesInOutgoingQueue,
+              discardMessagesWhenOutgoingQueueFull,
+              writeQueuePushTimeout,
+              socketWriteTimeout,
+              socketReadTimeout,
+              maxControlLine,
+              maxPingsOut
+            ) =>
+          TunGroup(
+            reconnectJitter,
+            reconnectJitterTls,
+            reconnectBufferSize,
+            maxMessagesInOutgoingQueue,
+            discardMessagesWhenOutgoingQueueFull,
+            writeQueuePushTimeout,
+            socketWriteTimeout,
+            socketReadTimeout,
+            maxControlLine,
+            maxPingsOut
+          )
       }
 
-    (connGroupConfig zip tunGroupConfig zip authConfig zip tlsConfig).map {
-      case (conn, tun, auth, tls) =>
-        NatsConfig(
-          servers                              = conn.servers,
-          connectionName                       = conn.connectionName,
-          connectionTimeout                    = conn.connectionTimeout,
-          reconnectWait                        = conn.reconnectWait,
-          maxReconnects                        = conn.maxReconnects,
-          pingInterval                         = conn.pingInterval,
-          requestCleanupInterval               = conn.requestCleanupInterval,
-          bufferSize                           = conn.bufferSize,
-          noEcho                               = conn.noEcho,
-          utf8Support                          = conn.utf8Support,
-          inboxPrefix                          = conn.inboxPrefix,
-          auth                                 = auth,
-          tls                                  = tls,
-          reconnectJitter                      = tun.reconnectJitter,
-          reconnectJitterTls                   = tun.reconnectJitterTls,
-          reconnectBufferSize                  = tun.reconnectBufferSize,
-          maxMessagesInOutgoingQueue           = tun.maxMessagesInOutgoingQueue,
-          discardMessagesWhenOutgoingQueueFull = tun.discardMessagesWhenOutgoingQueueFull,
-          writeQueuePushTimeout                = tun.writeQueuePushTimeout,
-          socketWriteTimeout                   = tun.socketWriteTimeout,
-          socketReadTimeout                    = tun.socketReadTimeout,
-          maxControlLine                       = tun.maxControlLine,
-          maxPingsOut                          = tun.maxPingsOut,
-          drainTimeout                         = conn.drainTimeout
-        )
+    (connGroupConfig zip tunGroupConfig zip authConfig zip tlsConfig).map { case (conn, tun, auth, tls) =>
+      NatsConfig(
+        servers = conn.servers,
+        connectionName = conn.connectionName,
+        connectionTimeout = conn.connectionTimeout,
+        reconnectWait = conn.reconnectWait,
+        maxReconnects = conn.maxReconnects,
+        pingInterval = conn.pingInterval,
+        requestCleanupInterval = conn.requestCleanupInterval,
+        bufferSize = conn.bufferSize,
+        noEcho = conn.noEcho,
+        utf8Support = conn.utf8Support,
+        inboxPrefix = conn.inboxPrefix,
+        auth = auth,
+        tls = tls,
+        reconnectJitter = tun.reconnectJitter,
+        reconnectJitterTls = tun.reconnectJitterTls,
+        reconnectBufferSize = tun.reconnectBufferSize,
+        maxMessagesInOutgoingQueue = tun.maxMessagesInOutgoingQueue,
+        discardMessagesWhenOutgoingQueueFull = tun.discardMessagesWhenOutgoingQueueFull,
+        writeQueuePushTimeout = tun.writeQueuePushTimeout,
+        socketWriteTimeout = tun.socketWriteTimeout,
+        socketReadTimeout = tun.socketReadTimeout,
+        maxControlLine = tun.maxControlLine,
+        maxPingsOut = tun.maxPingsOut,
+        drainTimeout = conn.drainTimeout
+      )
     }
   }
 
@@ -366,8 +451,8 @@ object NatsConfig {
    * reading from the `nats` key namespace.
    *
    * With the default [[zio.ConfigProvider]] (env vars + system properties),
-   * keys are normalised to `UPPER_SNAKE_CASE` under the `NATS_` prefix.
-   * List values use comma as the sequence delimiter:
+   * keys are normalised to `UPPER_SNAKE_CASE` under the `NATS_` prefix. List
+   * values use comma as the sequence delimiter:
    * {{{
    *   NATS_SERVERS=nats://broker:4222
    *   NATS_AUTH_TYPE=token
@@ -381,8 +466,8 @@ object NatsConfig {
    * For HOCON loading, add `dev.zio::zio-config-typesafe` and provide
    * `Runtime.setConfigProvider(TypesafeConfigProvider.fromResourcePath())`.
    *
-   * For custom nesting use [[config]] directly — `nested` calls stack from inner
-   * to outer, so the last call becomes the outermost namespace:
+   * For custom nesting use [[config]] directly — `nested` calls stack from
+   * inner to outer, so the last call becomes the outermost namespace:
    * {{{
    *   // Config lives at myapp.nats.* (e.g. HOCON: myapp { nats { servers = [...] } })
    *   ZIO.config(NatsConfig.config.nested("nats").nested("myapp"))

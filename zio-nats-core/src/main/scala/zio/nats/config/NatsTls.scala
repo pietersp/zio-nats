@@ -7,11 +7,12 @@ import javax.net.ssl.SSLContext
 /**
  * TLS configuration for a NATS connection.
  *
- * `Disabled` and `SystemDefault` require no files and are fully text-configurable.
- * `KeyStore` covers standard TLS and mTLS via JVM keystore/truststore files and is
- * also fully text-configurable via [[zio.nats.config.NatsConfig]].
- * `Custom` accepts a pre-built [[javax.net.ssl.SSLContext]] for certificates loaded
- * at runtime (e.g. from a secrets manager).
+ * `Disabled` and `SystemDefault` require no files and are fully
+ * text-configurable. `KeyStore` covers standard TLS and mTLS via JVM
+ * keystore/truststore files and is also fully text-configurable via
+ * [[zio.nats.config.NatsConfig]]. `Custom` accepts a pre-built
+ * [[javax.net.ssl.SSLContext]] for certificates loaded at runtime (e.g. from a
+ * secrets manager).
  *
  * {{{
  *   // No TLS (default)
@@ -82,8 +83,8 @@ enum NatsTls:
 
   private[nats] def applyTo(builder: Options.Builder): Options.Builder =
     this match
-      case Disabled      => builder
-      case SystemDefault => builder.sslContext(SSLContext.getDefault)
+      case Disabled                                   => builder
+      case SystemDefault                              => builder.sslContext(SSLContext.getDefault)
       case KeyStore(ksp, kspw, tsp, tspw, alg, first) =>
         var b = builder
           .keystorePath(ksp.toString)
@@ -99,8 +100,8 @@ enum NatsTls:
    * Returns the config type key for this variant, or [[None]] for variants that
    * are not reachable from text config ([[Custom]]).
    *
-   * Exhaustive match — compile-time guard for [[NatsConfig.tlsConfig]].
-   * See [[NatsAuth.configTypeKey]] for the rationale.
+   * Exhaustive match — compile-time guard for [[NatsConfig.tlsConfig]]. See
+   * [[NatsAuth.configTypeKey]] for the rationale.
    */
   private[config] def configTypeKey: Option[String] = this match
     case Disabled                   => Some(NatsTls.Keys.disabled)
@@ -109,8 +110,9 @@ enum NatsTls:
     case Custom(_)                  => None
 
 object NatsTls:
-  /** Config type key constants for all text-configurable [[NatsTls]] variants.
-   *  Referenced in [[NatsConfig.tlsConfig]] — single source of truth.
+  /**
+   * Config type key constants for all text-configurable [[NatsTls]] variants.
+   * Referenced in [[NatsConfig.tlsConfig]] — single source of truth.
    */
   private[config] object Keys:
     val disabled      = "disabled"

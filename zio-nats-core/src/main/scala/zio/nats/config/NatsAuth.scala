@@ -12,8 +12,9 @@ import java.nio.file.Path
  * set with undefined precedence.
  *
  * `NoAuth`, `Token`, `UserPassword`, and `CredentialFile` are fully
- * text-configurable. `Custom` accepts a pre-built [[io.nats.client.AuthHandler]]
- * for dynamic credential rotation or credentials loaded at runtime.
+ * text-configurable. `Custom` accepts a pre-built
+ * [[io.nats.client.AuthHandler]] for dynamic credential rotation or credentials
+ * loaded at runtime.
  *
  * {{{
  *   // Anonymous
@@ -87,9 +88,10 @@ enum NatsAuth:
    * Returns the config type key for this variant, or [[None]] for variants that
    * are not reachable from text config ([[Custom]]).
    *
-   * This exhaustive match is the compile-time guard for [[NatsConfig.authConfig]]:
-   * adding a new [[NatsAuth]] case without updating it produces a non-exhaustive
-   * match error, signalling that [[NatsConfig.authConfig]] also needs updating.
+   * This exhaustive match is the compile-time guard for
+   * [[NatsConfig.authConfig]]: adding a new [[NatsAuth]] case without updating
+   * it produces a non-exhaustive match error, signalling that
+   * [[NatsConfig.authConfig]] also needs updating.
    */
   private[config] def configTypeKey: Option[String] = this match
     case NoAuth             => Some(NatsAuth.Keys.noAuth)
@@ -99,9 +101,10 @@ enum NatsAuth:
     case Custom(_)          => None
 
 object NatsAuth:
-  /** Config type key constants for all text-configurable [[NatsAuth]] variants.
-   *  Referenced in [[NatsConfig.authConfig]] — kept here so they are co-located
-   *  with the type they describe and form a single source of truth.
+  /**
+   * Config type key constants for all text-configurable [[NatsAuth]] variants.
+   * Referenced in [[NatsConfig.authConfig]] — kept here so they are co-located
+   * with the type they describe and form a single source of truth.
    */
   private[config] object Keys:
     val noAuth         = "no-auth"

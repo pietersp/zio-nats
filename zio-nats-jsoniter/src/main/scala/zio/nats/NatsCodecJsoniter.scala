@@ -10,9 +10,9 @@ import scala.util.Try
  * [[NatsCodec]][A].
  *
  * This is a top-level given in `package zio.nats`. In Scala 3, package-level
- * given instances are not imported by a plain wildcard `import zio.nats.*`.
- * Use `import zio.nats.{given, *}` (or `import zio.nats.given`) to bring this
- * given into scope.
+ * given instances are not imported by a plain wildcard `import zio.nats.*`. Use
+ * `import zio.nats.{given, *}` (or `import zio.nats.given`) to bring this given
+ * into scope.
  *
  * The `NotGiven[NatsCodec[A]]` guard ensures this given does not shadow
  * built-in codecs (e.g. `NatsCodec[String]`, `NatsCodec[Chunk[Byte]]`) or any
@@ -35,8 +35,9 @@ given fromJsonValueCodec[A](using jc: JsonValueCodec[A], ev: scala.util.NotGiven
  *
  * Bridges `JsonValueCodec[A]` (jsoniter-scala's codec type) to the library's
  * [[NatsCodec]] typeclass. The bridge `given fromJsonValueCodec` is the primary
- * integration point: after `import zio.nats.{given, *}`, any `JsonValueCodec[A]`
- * that is in implicit scope is automatically promoted to a `NatsCodec[A]`.
+ * integration point: after `import zio.nats.{given, *}`, any
+ * `JsonValueCodec[A]` that is in implicit scope is automatically promoted to a
+ * `NatsCodec[A]`.
  *
  * ==Typical usage==
  *
@@ -86,7 +87,8 @@ object NatsCodecJsoniter {
    *
    * Use this for an explicit one-off codec. For automatic bridging via implicit
    * resolution, ensure a `given JsonValueCodec[A]` is in scope and use
-   * `import zio.nats.{given, *}` — the `fromJsonValueCodec` given handles the rest.
+   * `import zio.nats.{given, *}` — the `fromJsonValueCodec` given handles the
+   * rest.
    *
    * @param codec
    *   A jsoniter-scala `JsonValueCodec[A]` (typically obtained via

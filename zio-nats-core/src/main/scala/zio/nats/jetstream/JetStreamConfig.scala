@@ -91,7 +91,8 @@ case class ExternalConfig(
  * @param maxBytes
  *   Maximum total bytes stored (-1 = unlimited).
  * @param maxMsgSize
- *   Maximum size of a single message in bytes (-1 = unlimited). Must fit in a 32-bit signed integer.
+ *   Maximum size of a single message in bytes (-1 = unlimited). Must fit in a
+ *   32-bit signed integer.
  * @param maxMsgs
  *   Maximum number of messages stored (-1 = unlimited).
  * @param maxMsgsPerSubject

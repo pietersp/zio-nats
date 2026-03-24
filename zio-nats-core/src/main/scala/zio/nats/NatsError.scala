@@ -109,6 +109,23 @@ object NatsError {
     initCause(cause)
   }
 
+  /**
+   * Raised when a remote NATS service handler responds with an error.
+   *
+   * This is the client-side counterpart to a service handler that fails: when a
+   * service endpoint calls `respondStandardError`, the NATS Micro protocol
+   * places the error message and code in `Nats-Service-Error` and
+   * `Nats-Service-Error-Code` response headers. [[zio.nats.Nats.request]]
+   * detects these headers and fails with this error rather than attempting to
+   * decode the (empty) response body.
+   *
+   * @param message
+   *   The error message from `Nats-Service-Error`.
+   * @param code
+   *   The numeric error code from `Nats-Service-Error-Code` (e.g. 500).
+   */
+  final case class ServiceCallFailed(message: String, code: Int) extends ServiceError
+
   // --- General fallback ---
 
   final case class GeneralError(message: String, cause: Throwable) extends NatsError { initCause(cause) }
