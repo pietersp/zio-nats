@@ -53,8 +53,8 @@ package object nats {
 
   // --- Connection config re-exports ---
   type NatsConfig = config.NatsConfig; val NatsConfig = config.NatsConfig
-  type NatsAuth   = config.NatsAuth;   val NatsAuth   = config.NatsAuth
-  type NatsTls    = config.NatsTls;    val NatsTls    = config.NatsTls
+  type NatsAuth   = config.NatsAuth; val NatsAuth     = config.NatsAuth
+  type NatsTls    = config.NatsTls; val NatsTls       = config.NatsTls
 
   // --- JetStream config re-exports ---
   type StreamConfig          = jetstream.StreamConfig; val StreamConfig     = jetstream.StreamConfig
@@ -117,6 +117,8 @@ package object nats {
   type QueueGroupPolicy      = service.QueueGroupPolicy; val QueueGroupPolicy = service.QueueGroupPolicy
   type ServiceErrorMapper[E] = service.ServiceErrorMapper[E]
   val ServiceErrorMapper = service.ServiceErrorMapper
+  type NamedEndpoint                 = service.NamedEndpoint
+  type EndpointIn[In]                = service.EndpointIn[In]
   type ServiceEndpoint[In, Err, Out] = service.ServiceEndpoint[In, Err, Out]
   val ServiceEndpoint = service.ServiceEndpoint
   type BoundEndpoint      = service.BoundEndpoint
