@@ -171,18 +171,28 @@ zio.nats
 
 ### Service Framework (Micro Protocol)
 
-`ServiceEndpoint[In, Out]` is a declarative typed descriptor for a NATS microservice endpoint. Separate the shape (`.implement` / `.implementWithRequest`) from the handler. Handlers run on the ZIO executor via `runtime.unsafe.fork` — jnats dispatcher threads are never blocked.
+Endpoints are built via an accumulating builder chain — one consistent entry point for both infallible and fallible handlers:
+
+```
+ServiceEndpoint("name")   // NamedEndpoint  — no types yet
+  .in[StockRequest]        // EndpointIn[In] — In fixed
+  .out[StockReply]         // ServiceEndpoint[In, Nothing, Out] — infallible
+  .failsWith[StockError]   // ServiceEndpoint[In, Err, Out]     — fallible (optional)
+  .handle { req => ... }   // BoundEndpoint  — handler bound
+```
+
+Configuration (`.inGroup`, `.inSubject`, `.withQueueGroup`, `.withMetadata`) is set on `NamedEndpoint` before `.in`. The descriptor (`ServiceEndpoint[In, Err, Out]`) is inert and can be shared between client and server. Handlers run on the ZIO executor via `runtime.unsafe.fork` — jnats dispatcher threads are never blocked.
 
 Key types (all re-exported from `package object nats`):
-- `ServiceEndpoint[In, Err, Out]` — typed endpoint descriptor; call `.implement` or `.implementWithRequest` to get a `BoundEndpoint`
+- `NamedEndpoint` — step 1 of the builder; holds name and non-type config
+- `EndpointIn[In]` — step 2; `In` type fixed, waiting for `.out`
+- `ServiceEndpoint[In, Err, Out]` — full typed descriptor; call `.handle` or `.handleWith` to get a `BoundEndpoint`; call `.failsWith[E]` to add a domain error type
 - `ServiceConfig` — name, version, description, metadata for a service
 - `ServiceGroup` — subject prefix group for organizing endpoints
 - `QueueGroupPolicy` — Default / Disabled / Custom queue group control
 - `ServiceErrorMapper[E]` — typeclass converting handler errors to NATS `(message, code)` pairs
 - `NatsService` — handle to a running service; provides `ping`, `info`, `stats`, `reset`
 - `ServiceDiscovery` — client for cluster-wide service discovery via `$SRV.*`
-
-**Important Scala 3 note:** Infallible handlers (`IO[Nothing, Out]`) require an explicit `[Nothing]` type parameter due to given ambiguity: `ep.implement[Nothing](value => ZIO.succeed(value))`. Handlers with a concrete error type work without annotation.
 
 Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-exporting an opaque type as a plain alias strips its opacity — so they stay in `zio.nats`.
 
@@ -222,7 +232,7 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | `zio-nats-core/src/main/scala/zio/nats/config/NatsAuth.scala` | `NatsAuth` enum: `NoAuth`, `Token`, `UserPassword`, `CredentialFile` — mutually exclusive auth methods |
 | `zio-nats-core/src/main/scala/zio/nats/config/NatsTls.scala` | `NatsTls` enum: `Disabled`, `SystemDefault`, `KeyStore` — file-based TLS/mTLS config |
 | `zio-nats-core/src/main/scala/zio/nats/package.scala` | Type aliases (`NatsIO[A]`), all sub-package re-exports |
-| `zio-nats-core/src/main/scala/zio/nats/service/ServiceEndpoint.scala` | `ServiceEndpoint[In, Out]`, `BoundEndpoint`, `BoundEndpointLive` |
+| `zio-nats-core/src/main/scala/zio/nats/service/ServiceEndpoint.scala` | `NamedEndpoint`, `EndpointIn[In]`, `ServiceEndpoint[In, Err, Out]`, `BoundEndpoint`, `BoundEndpointLive` |
 | `zio-nats-core/src/main/scala/zio/nats/service/ServiceConfig.scala` | `ServiceConfig`, `ServiceGroup`, `QueueGroupPolicy`, `ServiceErrorMapper` |
 | `zio-nats-core/src/main/scala/zio/nats/service/ServiceModels.scala` | `ServiceRequest[A]`, `PingResponse`, `InfoResponse`, `StatsResponse`, `EndpointStats`, `EndpointInfo` |
 | `zio-nats-core/src/main/scala/zio/nats/service/NatsService.scala` | `NatsService` trait + `NatsServiceLive` |

@@ -7,14 +7,22 @@ The NATS Service Framework (also called the Micro protocol) turns any set of req
 
 ## Defining endpoints
 
-A `ServiceEndpoint[In, Err, Out]` is a typed descriptor for a single endpoint - it carries the name, the expected request type, the reply type, and the error type, but contains no handler logic yet. Separating the shape from the implementation makes endpoints easy to share across modules or test in isolation.
+An endpoint is built via a short builder chain. Start with `ServiceEndpoint(name)`, fix the request type with `.in[In]`, fix the reply type with `.out[Out]`, and optionally declare a domain error type with `.failsWith[Err]`. Each step changes the Scala type, so the compiler enforces the full contract before you ever write handler logic:
 
-`ServiceEndpoint.apply` is the two-type-parameter form for infallible handlers (handlers that cannot fail). Use `ServiceEndpoint#withError` to introduce a concrete error type when your handler can fail:
+```
+ServiceEndpoint("name")   // NamedEndpoint  - no types yet
+  .in[StockRequest]        // EndpointIn     - In fixed
+  .out[StockReply]         // ServiceEndpoint[StockRequest, Nothing, StockReply]
+  .failsWith[StockError]   // ServiceEndpoint[StockRequest, StockError, StockReply]
+```
+
+The resulting `ServiceEndpoint[In, Err, Out]` is an inert descriptor - it carries the name, codecs, and error type, but no handler logic. This makes it easy to share the same descriptor between the server (which binds a handler) and the client (which uses it with `Nats#requestService`).
+
+A concrete infallible endpoint looks like this:
 
 ```scala mdoc:compile-only
 import zio.*
 import zio.nats.*
-import zio.nats.jetstream.*
 import zio.blocks.schema.Schema
 import zio.blocks.schema.json.JsonFormat
 
@@ -27,12 +35,14 @@ object StockReply   { given Schema[StockReply]   = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
-val stockEndpoint = ServiceEndpoint[StockRequest, StockReply]("stock-check")
+val stockEndpoint = ServiceEndpoint("stock-check")
+  .in[StockRequest]
+  .out[StockReply]
 ```
 
 ### Implementing a handler
 
-`ServiceEndpoint#implement` binds a handler function `In => IO[Err, Out]` to the endpoint and returns a `BoundEndpoint` ready for registration. Use `ServiceEndpoint#implementWithRequest` when you need the request subject or headers alongside the decoded payload:
+`ServiceEndpoint#handle` binds a handler function `In => IO[Err, Out]` to the descriptor and returns a `BoundEndpoint` ready for registration. The handler receives only the decoded payload - the framework takes care of encoding, decoding, and error responses:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -49,14 +59,15 @@ object StockReply   { given Schema[StockReply]   = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
-val stockEndpoint = ServiceEndpoint[StockRequest, StockReply]("stock-check")
-
-val bound = stockEndpoint.implement { req =>
-  ZIO.succeed(StockReply(available = 42, reserved = 3))
-}
+val bound = ServiceEndpoint("stock-check")
+  .in[StockRequest]
+  .out[StockReply]
+  .handle { req =>
+    ZIO.succeed(StockReply(available = 42, reserved = 3))
+  }
 ```
 
-When you need the raw request envelope - to read a header, inspect the reply-to subject, or log the originating subject - use `ServiceEndpoint#implementWithRequest`:
+When you need the raw request envelope - to read a header, inspect the originating subject, or propagate a trace ID - use `ServiceEndpoint#handleWith` instead:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -73,18 +84,19 @@ object StockReply   { given Schema[StockReply]   = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
-val stockEndpoint = ServiceEndpoint[StockRequest, StockReply]("stock-check")
-
-val boundWithMeta = stockEndpoint.implementWithRequest { req =>
-  val traceId = req.headers.get("X-Trace-Id").headOption.getOrElse("none")
-  ZIO.debug(s"Handling ${req.value.itemId} trace=$traceId") *>
-    ZIO.succeed(StockReply(available = 42, reserved = 3))
-}
+val boundWithMeta = ServiceEndpoint("stock-check")
+  .in[StockRequest]
+  .out[StockReply]
+  .handleWith { req =>
+    val traceId = req.headers.get("X-Trace-Id").headOption.getOrElse("none")
+    ZIO.debug(s"Handling ${req.value.itemId} trace=$traceId") *>
+      ZIO.succeed(StockReply(available = 42, reserved = 3))
+  }
 ```
 
 ### Handling errors
 
-When your handler can fail, call `ServiceEndpoint#withError[E]` to declare the error type. A universal fallback `ServiceErrorMapper[E]` is always in scope — it sends `e.toString` with HTTP status code 500 — so no extra setup is required. Built-in mappers for `String` and `NatsError` are also provided, so plain string errors just work:
+When your handler can fail, add `.failsWith[E]` before `.handle`. The error type is now part of the descriptor - the same codec that encodes domain errors on the server decodes them on the client. A universal `ServiceErrorMapper[E]` (`e.toString`, code 500) is always in scope, so no extra setup is required for most types. Built-in mappers for `String` and `NatsError` are also provided:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -101,20 +113,19 @@ object StockReply   { given Schema[StockReply]   = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
-val stockEndpoint = ServiceEndpoint[StockRequest, StockReply]("stock-check")
-
-// String errors use the built-in ServiceErrorMapper[String]
-val fallibleEndpoint = stockEndpoint.withError[String].implement { req =>
-  if (req.itemId.isEmpty)
-    ZIO.fail("itemId must not be empty")
-  else
-    ZIO.succeed(StockReply(available = 42, reserved = 3))
-}
+val fallibleEndpoint = ServiceEndpoint("stock-check")
+  .in[StockRequest]
+  .out[StockReply]
+  .failsWith[String]
+  .handle { req =>
+    if (req.itemId.isEmpty) ZIO.fail("itemId must not be empty")
+    else ZIO.succeed(StockReply(available = 42, reserved = 3))
+  }
 ```
 
 #### Custom `ServiceErrorMapper`
 
-To control the HTTP-style status code or error message format, provide a `given ServiceErrorMapper[E]` in the same scope as the endpoint. The full form uses `with`:
+To control the HTTP-style status code or error message format, provide a `given ServiceErrorMapper[E]` in scope before building the endpoint. The full form uses `with`:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -144,7 +155,10 @@ case class StockReply(available: Int, reserved: Int)
 object StockRequest { given Schema[StockRequest] = Schema.derived }
 object StockReply   { given Schema[StockReply]   = Schema.derived }
 
-val ep = ServiceEndpoint[StockRequest, StockReply]("stock-check").withError[StockError]
+val ep = ServiceEndpoint("stock-check")
+  .in[StockRequest]
+  .out[StockReply]
+  .failsWith[StockError]
 ```
 
 Because `ServiceErrorMapper[E]` has a single abstract method, Scala 3 also accepts a lambda (SAM syntax), which is more concise:
@@ -177,18 +191,17 @@ case class StockReply(available: Int, reserved: Int)
 object StockRequest { given Schema[StockRequest] = Schema.derived }
 object StockReply   { given Schema[StockReply]   = Schema.derived }
 
-val ep = ServiceEndpoint[StockRequest, StockReply]("stock-check").withError[StockError]
+val ep = ServiceEndpoint("stock-check")
+  .in[StockRequest]
+  .out[StockReply]
+  .failsWith[StockError]
 ```
 
 Both forms produce identical behaviour. The `(message, code)` pair is sent to callers via the `Nats-Service-Error` and `Nats-Service-Error-Code` headers, following the NATS Micro protocol convention.
 
-:::tip
-For infallible handlers (`IO[Nothing, Out]`), Scala 3's given resolution requires an explicit `[Nothing]` type parameter: `ep.implement[Nothing](handler)`. Handlers with a concrete error type work without annotation.
-:::
-
 ## Starting a service
 
-`ServiceConfig` names the service and declares its version. Pass one or more `BoundEndpoint`s to `Nats#service` to register them and start the service. The returned `NatsService` handle gives access to live stats and a reset operation:
+`ServiceConfig` names the service and declares its version. Pass one or more bound endpoints to `Nats#service` to register them and start the service. The returned `NatsService` handle gives access to live stats and a reset operation:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -205,11 +218,6 @@ object StockReply   { given Schema[StockReply]   = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
-val stockEndpoint = ServiceEndpoint[StockRequest, StockReply]("stock-check")
-val bound = stockEndpoint.implement { req =>
-  ZIO.succeed(StockReply(available = 42, reserved = 3))
-}
-
 val startService: ZIO[Nats & Scope, NatsError, NatsService] =
   ZIO.serviceWithZIO[Nats] { nats =>
     nats.service(
@@ -218,14 +226,17 @@ val startService: ZIO[Nats & Scope, NatsError, NatsService] =
         version     = "1.0.0",
         description = Some("Stock level queries")
       ),
-      bound
+      ServiceEndpoint("stock-check")
+        .in[StockRequest]
+        .out[StockReply]
+        .handle { req => ZIO.succeed(StockReply(available = 42, reserved = 3)) }
     )
   }
 ```
 
-The `Scope` in the return type ties the service lifetime to the enclosing scope - when the scope closes, the service shuts down and stops accepting requests. In a long-running application, provide the scope via `ZIO.scoped` and keep it open with `ZIO.never` or another blocking effect. Requests arrive on the subject `<service-name>.<endpoint-name>` by default - in this case `inventory.stock-check`. Multiple instances started with the same config share a queue group automatically, so NATS distributes requests across them with no additional configuration.
+The `Scope` in the return type ties the service lifetime to the enclosing scope - when the scope closes, the service shuts down and stops accepting requests. Requests arrive on the subject `<service-name>.<endpoint-name>` by default - in this case `inventory.stock-check`. Multiple instances started with the same config share a queue group automatically, so NATS distributes requests across them with no additional configuration.
 
-**Grouping endpoints.** `ServiceGroup` adds a subject prefix that organises related endpoints under a common namespace. Nest groups to mirror a deeper subject hierarchy:
+**Grouping endpoints.** Call `.inGroup(name)` on a `NamedEndpoint` to prepend a subject prefix. All endpoints in the same group share a common namespace:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -246,33 +257,21 @@ object PriceReply    { given Schema[PriceReply]    = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
-val catalogGroup = ServiceGroup("catalog")
-
-val stockEndpoint = ServiceEndpoint[StockRequest, StockReply](
-  "stock",
-  group = Some(catalogGroup)
-)
-val priceEndpoint = ServiceEndpoint[PriceRequest, PriceReply](
-  "price",
-  group = Some(catalogGroup)
-)
-
-val boundStock = stockEndpoint.implement(_ => ZIO.succeed(StockReply(42, 3)))
-val boundPrice = priceEndpoint.implement(_ => ZIO.succeed(PriceReply(1299)))
-
 val startGrouped: ZIO[Nats & Scope, NatsError, NatsService] =
   ZIO.serviceWithZIO[Nats] { nats =>
     nats.service(
       ServiceConfig(name = "catalog-service", version = "1.0.0"),
-      boundStock,
-      boundPrice
+      ServiceEndpoint("stock").inGroup("catalog")
+        .in[StockRequest].out[StockReply]
+        .handle(_ => ZIO.succeed(StockReply(42, 3))),
+      ServiceEndpoint("price").inGroup("catalog")
+        .in[PriceRequest].out[PriceReply]
+        .handle(_ => ZIO.succeed(PriceReply(1299)))
     )
   }
 ```
 
-Both endpoints are now reachable under the `catalog` prefix: `catalog.stock` and `catalog.price`.
-
-We now have a running service with two typed, discoverable endpoints.
+Both endpoints are now reachable under the `catalog` prefix: `catalog.stock` and `catalog.price`. We now have a running service with two typed, discoverable endpoints.
 
 ## Calling a service
 
@@ -300,8 +299,10 @@ val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
 // Shared endpoint descriptor - the complete typed contract
-val stockEndpoint = ServiceEndpoint[StockRequest, StockReply]("stock-check")
-  .withError[StockError]
+val stockEndpoint = ServiceEndpoint("stock-check")
+  .in[StockRequest]
+  .out[StockReply]
+  .failsWith[StockError]
 
 val checkStock: ZIO[Nats, NatsError | StockError, Int] =
   ZIO.serviceWithZIO[Nats] { nats =>
@@ -341,8 +342,8 @@ object PriceError   { given Schema[PriceError]   = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
-val stockEp = ServiceEndpoint[StockRequest, StockReply]("stock").withError[StockError]
-val priceEp = ServiceEndpoint[PriceRequest, PriceReply]("price").withError[PriceError]
+val stockEp = ServiceEndpoint("stock").in[StockRequest].out[StockReply].failsWith[StockError]
+val priceEp = ServiceEndpoint("price").in[PriceRequest].out[PriceReply].failsWith[PriceError]
 
 // Error type widens to NatsError | StockError | PriceError automatically
 val checkBoth: ZIO[Nats, NatsError | StockError | PriceError, (StockReply, PriceReply)] =
@@ -352,7 +353,7 @@ val checkBoth: ZIO[Nats, NatsError | StockError | PriceError, (StockReply, Price
   }
 ```
 
-`ServiceEndpoint#withError` only requires a `NatsCodec[E]` in scope - the same codec encodes the error on the server and decodes it on the client. `NatsCodec[E]` is derived automatically from the `Schema[E]` when using `NatsCodec.fromFormat`. A `ServiceErrorMapper[E]` is resolved automatically via the universal fallback; provide a specific instance to customise the `Nats-Service-Error` header value or status code.
+`ServiceEndpoint#failsWith` only requires a `NatsCodec[E]` in scope - the same codec encodes the error on the server and decodes it on the client. `NatsCodec[E]` is derived automatically from the `Schema[E]` when using `NatsCodec.fromFormat`. A `ServiceErrorMapper[E]` is resolved automatically via the universal fallback; provide a specific instance to customise the `Nats-Service-Error` header value or status code.
 
 ### Calling infallible endpoints
 
@@ -373,7 +374,9 @@ object StockReply   { given Schema[StockReply]   = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
 
-val stockEndpoint = ServiceEndpoint[StockRequest, StockReply]("stock-check")
+val stockEndpoint = ServiceEndpoint("stock-check")
+  .in[StockRequest]
+  .out[StockReply]
 
 val checkStock: ZIO[Nats, NatsError, StockReply] =
   ZIO.serviceWithZIO[Nats] { nats =>
