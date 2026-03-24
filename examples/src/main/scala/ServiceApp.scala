@@ -18,7 +18,7 @@ import zio.nats.*
 object ServiceApp extends ZIOAppDefault {
 
   // Declare the typed endpoint shape — no handler yet.
-  val echoEndpoint = ServiceEndpoint[String, String]("echo")
+  val echoEndpoint = ServiceEndpoint("echo").in[String].out[String]
 
   val run =
     ZIO
@@ -33,7 +33,7 @@ object ServiceApp extends ZIOAppDefault {
                        version = "1.0.0",
                        description = Some("Echoes every request back to the caller")
                      ),
-                     echoEndpoint.implement(payload => ZIO.succeed(payload))
+                     echoEndpoint.handle(payload => ZIO.succeed(payload))
                    )
 
             _ <- Console.printLine(s"Service '${svc.name}' started [id=${svc.id}]")
