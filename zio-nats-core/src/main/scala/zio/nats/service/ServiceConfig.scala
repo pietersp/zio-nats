@@ -35,11 +35,22 @@ final case class ServiceConfig(
  * val v2  = ServiceGroup("v2", parent = Some(api))
  * // endpoint subject "users" becomes "api.v2.users"
  * }}}
+ *
+ * **Constraints**:
+ *   - `name` must be non-empty. An empty name produces an invalid NATS subject
+ *     segment (e.g. `".endpoint-name"`).
+ *   - Groups must not contain cycles. A group chain that loops back to itself
+ *     will cause a `StackOverflowError` when `effectiveSubject` is called.
+ *
+ * @throws IllegalArgumentException
+ *   if `name` is blank.
  */
 final case class ServiceGroup(
   name: String,
   parent: Option[ServiceGroup] = None
-)
+) {
+  require(name.nonEmpty, s"ServiceGroup name must be non-empty")
+}
 
 /**
  * Controls queue group behaviour for a service endpoint.

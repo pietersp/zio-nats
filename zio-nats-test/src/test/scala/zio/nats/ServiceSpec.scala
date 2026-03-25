@@ -238,8 +238,11 @@ object ServiceSpec extends ZIOSpecDefault {
           _ <- awaitService("stats-svc")
           _ <- nats.request[String, String](Subject("counted"), "a", 5.seconds)
           _ <- nats.request[String, String](Subject("counted"), "b", 5.seconds)
-          _ <- ZIO.sleep(200.millis)
           s <- svc.stats
+                 .repeatUntil(_.endpoints.exists(e => e.name == "counted" && e.numRequests >= 2))
+                 .timeout(5.seconds)
+                 .someOrFail(new RuntimeException("stats never reached 2 requests"))
+                 .orDie
         } yield assertTrue(
           s.endpoints.exists(e => e.name == "counted" && e.numRequests >= 2)
         )
@@ -257,9 +260,13 @@ object ServiceSpec extends ZIOSpecDefault {
                  )
           _ <- awaitService("reset-svc")
           _ <- nats.request[String, String](Subject("resetme"), "x", 5.seconds)
-          _ <- ZIO.sleep(100.millis)
+          // Wait for stats to reflect the request before resetting
+          _ <- svc.stats
+                 .repeatUntil(_.endpoints.exists(e => e.name == "resetme" && e.numRequests >= 1))
+                 .timeout(5.seconds)
+                 .someOrFail(new RuntimeException("stats never updated before reset"))
+                 .orDie
           _ <- svc.reset
-          _ <- ZIO.sleep(100.millis)
           s <- svc.stats
         } yield assertTrue(
           s.endpoints.forall(_.numRequests == 0)
@@ -445,9 +452,13 @@ object ServiceSpec extends ZIOSpecDefault {
                )
           _         <- awaitService("disc-stats-svc")
           _         <- nats.request[String, String](Subject("stat-ep"), "ping", 5.seconds)
-          _         <- ZIO.sleep(100.millis)
           discovery <- ServiceDiscovery.make(maxWait = 3.seconds)
-          responses <- discovery.stats("disc-stats-svc")
+          responses <- discovery
+                         .stats("disc-stats-svc")
+                         .repeatUntil(_.flatMap(_.endpoints).exists(_.numRequests >= 1))
+                         .timeout(5.seconds)
+                         .someOrFail(new RuntimeException("discovery stats never updated"))
+                         .orDie
         } yield assertTrue(
           responses.nonEmpty,
           responses.flatMap(_.endpoints).exists(_.numRequests >= 1)

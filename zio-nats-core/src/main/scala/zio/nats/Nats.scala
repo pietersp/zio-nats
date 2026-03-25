@@ -532,7 +532,7 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
           }
           d
         }.mapError(NatsError.fromThrowable)
-      )(d => ZIO.attempt(conn.closeDispatcher(d)).ignoreLogged)
+      )(d => ZIO.attemptBlocking(conn.closeDispatcher(d)).ignoreLogged)
     }
 
   override def flush(timeout: Duration): IO[NatsError, Unit] =

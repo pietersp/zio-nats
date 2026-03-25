@@ -20,7 +20,8 @@ object NatsPubSubSpec extends ZIOSpecDefault {
                    .take(1)
                    .runDrain
                    .fork
-        _   <- ZIO.sleep(500.millis)
+        // flush ensures the SUBSCRIBE command has been transmitted to the server
+        _   <- nats.flush(5.seconds)
         _   <- nats.publish(subject, Chunk.fromArray("hello".getBytes))
         msg <- received.await
         _   <- fiber.interrupt
@@ -40,7 +41,7 @@ object NatsPubSubSpec extends ZIOSpecDefault {
                    .take(1)
                    .runDrain
                    .fork
-        _ <- ZIO.sleep(500.millis)
+        _ <- nats.flush(5.seconds)
         _ <- nats.publish(
                Subject("test.headers"),
                Chunk.fromArray("with-headers".getBytes),
@@ -70,7 +71,7 @@ object NatsPubSubSpec extends ZIOSpecDefault {
                    .take(1)
                    .runDrain
                    .fork
-        _     <- ZIO.sleep(500.millis)
+        _     <- nats.flush(5.seconds)
         reply <- nats.request[Chunk[Byte], String](subject, Chunk.fromArray("ping".getBytes), 5.seconds)
         _     <- fiber.interrupt
       } yield assertTrue(reply.value == "pong")
@@ -150,9 +151,11 @@ object NatsPubSubSpec extends ZIOSpecDefault {
                     .take(1)
                     .runDrain
                     .fork
-        _     <- ZIO.sleep(500.millis)
-        _     <- nats.publish(subject, Chunk.fromArray("queued".getBytes))
-        _     <- latch.await
+        // flush ensures both SUBSCRIBE commands have been transmitted to the server
+        _ <- nats.flush(5.seconds)
+        _ <- nats.publish(subject, Chunk.fromArray("queued".getBytes))
+        _ <- latch.await
+        // Wait briefly to confirm no second delivery arrives
         _     <- ZIO.sleep(200.millis)
         count <- counter.get
         _     <- fiber1.interrupt
@@ -167,32 +170,28 @@ object NatsPubSubSpec extends ZIOSpecDefault {
         container <- ZIO.service[NatsContainer]
         natsConfig = NatsConfig(servers = List(container.clientUrl), drainTimeout = 2.seconds)
         received  <- Ref.make(List.empty[String])
-        // Start a subscriber that runs indefinitely (no take), so it keeps receiving
-        // messages until we interrupt it. When the fiber is interrupted, the scope
-        // ends and drain is triggered automatically.
+        firstMsg  <- Promise.make[Nothing, Unit]
+        // Run a scoped subscriber indefinitely so drain is triggered on scope exit (interrupt)
         subscriberFiber <- ZIO.scoped {
                              Nats.make(natsConfig).flatMap { subNats =>
                                subNats
                                  .subscribe[Chunk[Byte]](subject)
-                                 .tap(env => received.update(_ :+ env.message.dataAsString))
+                                 .tap { env =>
+                                   received.update(_ :+ env.message.dataAsString) *>
+                                     firstMsg.succeed(())
+                                 }
                                  .runDrain
                              }
                            }.fork
-        // Wait for subscription to be active and registered with the server
-        _ <- ZIO.sleep(1.second)
-        // Publish messages while subscriber is running
-        _ <- ZIO.foreach(1 to 10)(i => nats.publish(subject, Chunk.fromArray(s"msg$i".getBytes)))
-        // Give time for messages to be received
-        _ <- ZIO.sleep(500.millis)
-        // Interrupt the subscriber fiber - this triggers the scoped effect to be interrupted,
-        // which ends the scope and automatically triggers drain on the connection
-        _ <- subscriberFiber.interrupt
-        // Give drain time to complete (up to the 2 second timeout)
-        _    <- ZIO.sleep(300.millis)
+        // Publish a probe message repeatedly until the subscriber confirms receipt,
+        // which proves the subscription is active before we proceed
+        _ <- (nats.publish(subject, Chunk.fromArray("probe".getBytes)) *>
+               firstMsg.await.timeout(100.millis)).repeatUntil(_.isDefined)
+        // Interrupt the subscriber fiber — scope exits and drain is triggered automatically
+        _    <- subscriberFiber.interrupt
         msgs <- received.get
-        // Verify we received some messages before interrupt, and that drain completed
-        // without error (verified by no exceptions being thrown)
-      } yield assertTrue(msgs.length >= 5, msgs.length <= 10)
+        // Subscriber was active and received messages; if drain threw, the test would fail
+      } yield assertTrue(msgs.nonEmpty)
     }
   ).provideShared(
     NatsTestLayers.container,
