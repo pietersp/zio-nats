@@ -176,13 +176,15 @@ zio.nats
 Endpoints are built via an accumulating builder chain — one consistent entry point for both infallible and fallible handlers:
 
 ```
-ServiceEndpoint("name")          // NamedEndpoint  — no types yet
-  .in[StockRequest]               // EndpointIn[In] — In fixed
-  .out[StockReply]                // ServiceEndpoint[In, Nothing, Out] — infallible
-  .failsWith[StockError]          // ServiceEndpoint[In, Err, Out]     — single error (optional)
-  .failsWith[ErrA, ErrB]          // ServiceEndpoint[In, ErrA | ErrB, Out] — 2-member union
-  .failsWith[ErrA, ErrB, ErrC]    // ServiceEndpoint[In, ErrA | ErrB | ErrC, Out] — 3-member union
-  .handle { req => ... }          // BoundEndpoint  — handler bound
+ServiceEndpoint("name")                    // NamedEndpoint  — no types yet
+  .in[StockRequest]                         // EndpointIn[In] — In fixed
+  .out[StockReply]                          // ServiceEndpoint[In, Nothing, Out] — infallible
+  .failsWith[StockError]                    // ServiceEndpoint[In, Err, Out]         — single error (optional)
+  .failsWith[ErrA, ErrB]                    // ServiceEndpoint[In, ErrA | ErrB, Out] — 2-member union
+  .failsWith[ErrA, ErrB, ErrC]              // ServiceEndpoint[In, ErrA | ErrB | ErrC, Out] — 3-member union
+  .failsWith[ErrA, ErrB, ErrC, ErrD]        // 4-member union
+  .failsWith[ErrA, ErrB, ErrC, ErrD, ErrE]  // 5-member union (maximum; use sealed enum for 6+)
+  .handle { req => ... }                    // BoundEndpoint  — handler bound
 ```
 
 Configuration (`.inGroup`, `.inSubject`, `.withQueueGroup`, `.withMetadata`) is set on `NamedEndpoint` before `.in`. The descriptor (`ServiceEndpoint[In, Err, Out]`) is inert and can be shared between client and server. Handlers run on the ZIO executor via `runtime.unsafe.fork` — jnats dispatcher threads are never blocked.

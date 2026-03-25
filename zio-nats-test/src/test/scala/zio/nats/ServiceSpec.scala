@@ -10,6 +10,9 @@ object ServiceSpec extends ZIOSpecDefault {
   // Error types used by the union-error tests
   private case class NotFound(resource: String)
   private case class Forbidden(reason: String)
+  private case class ServiceUnavailable(reason: String)
+  private case class RateLimited(retryAfter: Int)
+  private case class Conflict(detail: String)
 
   private given NatsCodec[NotFound] = new NatsCodec[NotFound]:
     def encode(e: NotFound): Chunk[Byte]                              = NatsCodec.stringCodec.encode(e.resource)
@@ -20,6 +23,34 @@ object ServiceSpec extends ZIOSpecDefault {
     def encode(e: Forbidden): Chunk[Byte]                              = NatsCodec.stringCodec.encode(e.reason)
     def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, Forbidden] =
       NatsCodec.stringCodec.decode(bytes).map(Forbidden(_))
+
+  private given NatsCodec[ServiceUnavailable] = new NatsCodec[ServiceUnavailable]:
+    def encode(e: ServiceUnavailable): Chunk[Byte]                              = NatsCodec.stringCodec.encode(e.reason)
+    def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, ServiceUnavailable] =
+      NatsCodec.stringCodec.decode(bytes).map(ServiceUnavailable(_))
+
+  private given NatsCodec[RateLimited] = new NatsCodec[RateLimited]:
+    def encode(e: RateLimited): Chunk[Byte]                              = NatsCodec.stringCodec.encode(e.retryAfter.toString)
+    def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, RateLimited] =
+      NatsCodec.stringCodec
+        .decode(bytes)
+        .flatMap(s => s.toIntOption.toRight(NatsDecodeError(s"Expected int, got: $s")).map(RateLimited(_)))
+
+  private given NatsCodec[Conflict] = new NatsCodec[Conflict]:
+    def encode(e: Conflict): Chunk[Byte]                              = NatsCodec.stringCodec.encode(e.detail)
+    def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, Conflict] =
+      NatsCodec.stringCodec.decode(bytes).map(Conflict(_))
+
+  /**
+   * Readiness probe: blocks until the named service responds to a ping or 2 s
+   * elapses. Replaces `ZIO.sleep` for service startup synchronization.
+   */
+  private def awaitService(name: String): ZIO[Nats, Nothing, Unit] =
+    ServiceDiscovery
+      .make(maxWait = 2.seconds, maxResults = 1)
+      .flatMap(_.ping(name))
+      .orDie
+      .unit
 
   def spec: Spec[Any, Throwable] = suite("Service Framework")(
     test("service starts and is discoverable via ping") {
@@ -49,7 +80,7 @@ object ServiceSpec extends ZIOSpecDefault {
           nats  <- ZIO.service[Nats]
           ep     = ServiceEndpoint("echo").in[String].out[String]
           _     <- nats.service(ServiceConfig("echo-svc", "1.0.0"), ep.handle(ZIO.succeed(_)))
-          _     <- ZIO.sleep(200.millis)
+          _     <- awaitService("echo-svc")
           reply <- nats.request[String, String](Subject("echo"), "hello", 5.seconds)
         } yield assertTrue(reply.value == "hello")
       }
@@ -66,7 +97,7 @@ object ServiceSpec extends ZIOSpecDefault {
                  greet.handle(name => ZIO.succeed(s"Hello, $name")),
                  shout.handle(name => ZIO.succeed(name.toUpperCase))
                )
-          _  <- ZIO.sleep(200.millis)
+          _  <- awaitService("multi-svc")
           r1 <- nats.request[String, String](Subject("greet"), "world", 5.seconds)
           r2 <- nats.request[String, String](Subject("shout"), "world", 5.seconds)
         } yield assertTrue(r1.value == "Hello, world", r2.value == "WORLD")
@@ -84,7 +115,7 @@ object ServiceSpec extends ZIOSpecDefault {
                  asc.handle(s => ZIO.succeed(s.split(",").sorted.mkString(","))),
                  desc.handle(s => ZIO.succeed(s.split(",").sorted.reverse.mkString(",")))
                )
-          _  <- ZIO.sleep(200.millis)
+          _  <- awaitService("sort-svc")
           r1 <- nats.request[String, String](Subject("sort.ascending"), "c,a,b", 5.seconds)
           r2 <- nats.request[String, String](Subject("sort.descending"), "c,a,b", 5.seconds)
         } yield assertTrue(r1.value == "a,b,c", r2.value == "c,b,a")
@@ -100,7 +131,7 @@ object ServiceSpec extends ZIOSpecDefault {
                  ServiceConfig("typed-ok-svc", "1.0.0"),
                  ep.handle(s => ZIO.succeed(s.toUpperCase))
                )
-          _      <- ZIO.sleep(200.millis)
+          _      <- awaitService("typed-ok-svc")
           result <- nats
                       .requestService(ep, "hello", 5.seconds)
                       .mapError(e => new RuntimeException(e.toString))
@@ -117,7 +148,7 @@ object ServiceSpec extends ZIOSpecDefault {
                  ServiceConfig("typed-fail-svc", "1.0.0"),
                  ep.handle(_ => ZIO.fail("intentional error"))
                )
-          _      <- ZIO.sleep(200.millis)
+          _      <- awaitService("typed-fail-svc")
           result <- nats.requestService(ep, "x", 5.seconds).either
         } yield assertTrue(result == Left("intentional error"))
       }
@@ -132,7 +163,7 @@ object ServiceSpec extends ZIOSpecDefault {
                  ServiceConfig("raw-fail-svc", "1.0.0"),
                  ep.handle(_ => ZIO.fail("intentional error"))
                )
-          _ <- ZIO.sleep(200.millis)
+          _ <- awaitService("raw-fail-svc")
           // Untyped caller: still gets ServiceCallFailed, not the decoded error
           result <- nats.request[String, String](Subject("raw-fail"), "x", 5.seconds).either
         } yield assertTrue(result match {
@@ -151,7 +182,7 @@ object ServiceSpec extends ZIOSpecDefault {
                  ServiceConfig("ops-svc", "1.0.0"),
                  ep.handle(s => ZIO.succeed(s"pong:$s"))
                )
-          _      <- ZIO.sleep(200.millis)
+          _      <- awaitService("ops-svc")
           result <- nats
                       .requestService(ep, "test", 5.seconds)
                       .mapError(e => new RuntimeException(e.toString))
@@ -168,7 +199,7 @@ object ServiceSpec extends ZIOSpecDefault {
                  ServiceConfig("clock-svc", "1.0.0"),
                  ep.handle(_ => Clock.instant.map(_.toString))
                )
-          _     <- ZIO.sleep(200.millis)
+          _     <- awaitService("clock-svc")
           reply <- nats.request[String, String](Subject("timestamp"), "now", 5.seconds)
         } yield assertTrue(reply.value.nonEmpty)
       }
@@ -186,7 +217,7 @@ object ServiceSpec extends ZIOSpecDefault {
                    ZIO.succeed(s"subj=${req.subject.value} trace=$traceId payload=${req.value}")
                  }
                )
-          _     <- ZIO.sleep(200.millis)
+          _     <- awaitService("inspect-svc")
           reply <- nats.request[String, String](Subject("inspect"), "test", 5.seconds)
         } yield assertTrue(
           reply.value.contains("subj=inspect"),
@@ -204,7 +235,7 @@ object ServiceSpec extends ZIOSpecDefault {
                    ServiceConfig("stats-svc", "1.0.0"),
                    ep.handle(ZIO.succeed(_))
                  )
-          _ <- ZIO.sleep(200.millis)
+          _ <- awaitService("stats-svc")
           _ <- nats.request[String, String](Subject("counted"), "a", 5.seconds)
           _ <- nats.request[String, String](Subject("counted"), "b", 5.seconds)
           _ <- ZIO.sleep(200.millis)
@@ -224,7 +255,7 @@ object ServiceSpec extends ZIOSpecDefault {
                    ServiceConfig("reset-svc", "1.0.0"),
                    ep.handle(ZIO.succeed(_))
                  )
-          _ <- ZIO.sleep(200.millis)
+          _ <- awaitService("reset-svc")
           _ <- nats.request[String, String](Subject("resetme"), "x", 5.seconds)
           _ <- ZIO.sleep(100.millis)
           _ <- svc.reset
@@ -262,7 +293,7 @@ object ServiceSpec extends ZIOSpecDefault {
                  ep1.handle(ZIO.succeed(_)),
                  ep2.handle(ZIO.succeed(_))
                )
-          _         <- ZIO.sleep(200.millis)
+          // discovery.info blocks for maxWait — no explicit readiness probe needed
           discovery <- ServiceDiscovery.make(maxWait = 3.seconds)
           responses <- discovery.info("info-svc")
         } yield assertTrue(
@@ -273,23 +304,23 @@ object ServiceSpec extends ZIOSpecDefault {
       }
     },
 
-    test("requestService routes union error type to the correct member codec") {
+    test("requestService routes 2-member union error to the correct member codec") {
       ZIO.scoped {
         for {
           nats <- ZIO.service[Nats]
-          ep    = ServiceEndpoint("union-err")
+          ep    = ServiceEndpoint("union2-err")
                  .in[String]
                  .out[String]
                  .failsWith[NotFound, Forbidden]
           _ <- nats.service(
-                 ServiceConfig("union-err-svc", "1.0.0"),
+                 ServiceConfig("union2-err-svc", "1.0.0"),
                  ep.handle {
                    case "notfound"  => ZIO.fail(NotFound("item-42"))
                    case "forbidden" => ZIO.fail(Forbidden("access denied"))
                    case s           => ZIO.succeed(s"ok:$s")
                  }
                )
-          _  <- ZIO.sleep(200.millis)
+          _  <- awaitService("union2-err-svc")
           r1 <- nats.requestService(ep, "notfound", 5.seconds).either
           r2 <- nats.requestService(ep, "forbidden", 5.seconds).either
           r3 <- nats.requestService(ep, "hello", 5.seconds).either
@@ -297,6 +328,108 @@ object ServiceSpec extends ZIOSpecDefault {
           r1 == Left(NotFound("item-42")),
           r2 == Left(Forbidden("access denied")),
           r3 == Right("ok:hello")
+        )
+      }
+    },
+
+    test("requestService routes 3-member union error to the correct member codec") {
+      ZIO.scoped {
+        for {
+          nats <- ZIO.service[Nats]
+          ep    = ServiceEndpoint("union3-err")
+                 .in[String]
+                 .out[String]
+                 .failsWith[NotFound, Forbidden, ServiceUnavailable]
+          _ <- nats.service(
+                 ServiceConfig("union3-err-svc", "1.0.0"),
+                 ep.handle {
+                   case "notfound"    => ZIO.fail(NotFound("item-42"))
+                   case "forbidden"   => ZIO.fail(Forbidden("access denied"))
+                   case "unavailable" => ZIO.fail(ServiceUnavailable("down for maintenance"))
+                   case s             => ZIO.succeed(s"ok:$s")
+                 }
+               )
+          _  <- awaitService("union3-err-svc")
+          r1 <- nats.requestService(ep, "notfound", 5.seconds).either
+          r2 <- nats.requestService(ep, "forbidden", 5.seconds).either
+          r3 <- nats.requestService(ep, "unavailable", 5.seconds).either
+          r4 <- nats.requestService(ep, "hello", 5.seconds).either
+        } yield assertTrue(
+          r1 == Left(NotFound("item-42")),
+          r2 == Left(Forbidden("access denied")),
+          r3 == Left(ServiceUnavailable("down for maintenance")),
+          r4 == Right("ok:hello")
+        )
+      }
+    },
+
+    test("requestService routes 4-member union error to the correct member codec") {
+      ZIO.scoped {
+        for {
+          nats <- ZIO.service[Nats]
+          ep    = ServiceEndpoint("union4-err")
+                 .in[String]
+                 .out[String]
+                 .failsWith[NotFound, Forbidden, ServiceUnavailable, RateLimited]
+          _ <- nats.service(
+                 ServiceConfig("union4-err-svc", "1.0.0"),
+                 ep.handle {
+                   case "notfound"    => ZIO.fail(NotFound("item-42"))
+                   case "forbidden"   => ZIO.fail(Forbidden("access denied"))
+                   case "unavailable" => ZIO.fail(ServiceUnavailable("down for maintenance"))
+                   case "ratelimited" => ZIO.fail(RateLimited(60))
+                   case s             => ZIO.succeed(s"ok:$s")
+                 }
+               )
+          _  <- awaitService("union4-err-svc")
+          r1 <- nats.requestService(ep, "notfound", 5.seconds).either
+          r2 <- nats.requestService(ep, "forbidden", 5.seconds).either
+          r3 <- nats.requestService(ep, "unavailable", 5.seconds).either
+          r4 <- nats.requestService(ep, "ratelimited", 5.seconds).either
+          r5 <- nats.requestService(ep, "hello", 5.seconds).either
+        } yield assertTrue(
+          r1 == Left(NotFound("item-42")),
+          r2 == Left(Forbidden("access denied")),
+          r3 == Left(ServiceUnavailable("down for maintenance")),
+          r4 == Left(RateLimited(60)),
+          r5 == Right("ok:hello")
+        )
+      }
+    },
+
+    test("requestService routes 5-member union error to the correct member codec") {
+      ZIO.scoped {
+        for {
+          nats <- ZIO.service[Nats]
+          ep    = ServiceEndpoint("union5-err")
+                 .in[String]
+                 .out[String]
+                 .failsWith[NotFound, Forbidden, ServiceUnavailable, RateLimited, Conflict]
+          _ <- nats.service(
+                 ServiceConfig("union5-err-svc", "1.0.0"),
+                 ep.handle {
+                   case "notfound"    => ZIO.fail(NotFound("item-42"))
+                   case "forbidden"   => ZIO.fail(Forbidden("access denied"))
+                   case "unavailable" => ZIO.fail(ServiceUnavailable("down for maintenance"))
+                   case "ratelimited" => ZIO.fail(RateLimited(60))
+                   case "conflict"    => ZIO.fail(Conflict("duplicate key"))
+                   case s             => ZIO.succeed(s"ok:$s")
+                 }
+               )
+          _  <- awaitService("union5-err-svc")
+          r1 <- nats.requestService(ep, "notfound", 5.seconds).either
+          r2 <- nats.requestService(ep, "forbidden", 5.seconds).either
+          r3 <- nats.requestService(ep, "unavailable", 5.seconds).either
+          r4 <- nats.requestService(ep, "ratelimited", 5.seconds).either
+          r5 <- nats.requestService(ep, "conflict", 5.seconds).either
+          r6 <- nats.requestService(ep, "hello", 5.seconds).either
+        } yield assertTrue(
+          r1 == Left(NotFound("item-42")),
+          r2 == Left(Forbidden("access denied")),
+          r3 == Left(ServiceUnavailable("down for maintenance")),
+          r4 == Left(RateLimited(60)),
+          r5 == Left(Conflict("duplicate key")),
+          r6 == Right("ok:hello")
         )
       }
     },
@@ -310,7 +443,7 @@ object ServiceSpec extends ZIOSpecDefault {
                  ServiceConfig("disc-stats-svc", "1.0.0"),
                  ep.handle(ZIO.succeed(_))
                )
-          _         <- ZIO.sleep(200.millis)
+          _         <- awaitService("disc-stats-svc")
           _         <- nats.request[String, String](Subject("stat-ep"), "ping", 5.seconds)
           _         <- ZIO.sleep(100.millis)
           discovery <- ServiceDiscovery.make(maxWait = 3.seconds)

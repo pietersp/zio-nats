@@ -478,7 +478,12 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
                       .getOrElse("")
                     ZIO
                       .fromEither(endpoint.errCodec.decode(msg.payload, typeTag))
-                      .mapError(_ => NatsError.ServiceCallFailed(errHeader, code))
+                      .mapError(e =>
+                        NatsError.ServiceCallFailed(
+                          s"$errHeader (typed error decode failed: ${e.message})",
+                          code
+                        )
+                      )
                       .flatMap(err => ZIO.fail(err))
                   else
                     // Infrastructure error — empty body

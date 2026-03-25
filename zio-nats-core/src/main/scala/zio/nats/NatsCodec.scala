@@ -84,13 +84,21 @@ private[nats] sealed trait ErrorCodecPart[E]:
   /**
    * The JVM runtime class for `E`.
    *
-   * Used by [[TypedErrorCodec.union2]] and [[TypedErrorCodec.union3]] to
-   * dispatch encoding at runtime via [[Class#isInstance]], since generic type
-   * parameters are erased on the JVM and pattern matching on them (`case a: A
-   * @unchecked`)
-   *   always succeeds regardless of the actual type.
+   * Used by [[TypedErrorCodec.union2]] and similar combinators to dispatch
+   * encoding at runtime, since generic type parameters are erased on the JVM
+   * and pattern matching on them (`case a: A @unchecked`) always succeeds
+   * regardless of the actual type.
    */
   private[nats] def runtimeClass: Class[?]
+
+  /**
+   * Returns `true` if `e` is an instance of `E` at runtime.
+   *
+   * Convenience wrapper around [[runtimeClass]]`.isInstance` used by all union
+   * codec and mapper dispatch paths.
+   */
+  private[nats] def matches(e: Any): Boolean = runtimeClass.isInstance(e)
+
   private[nats] def encode(e: E): Chunk[Byte]
   private[nats] def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, E]
 
@@ -208,10 +216,8 @@ private[nats] object TypedErrorCodec:
           pa.tag -> (b => pa.decode(b).map(a => a: A | B)),
           pb.tag -> (b => pb.decode(b).map(v => v: A | B))
         )
-      // Use isInstance for runtime dispatch: generic type params are erased on
-      // the JVM so `case a: A @unchecked` would always match the first case.
       def encode(e: A | B): (Chunk[Byte], String) =
-        if pa.runtimeClass.isInstance(e) then (pa.encode(e.asInstanceOf[A]), pa.tag)
+        if pa.matches(e) then (pa.encode(e.asInstanceOf[A]), pa.tag)
         else (pb.encode(e.asInstanceOf[B]), pb.tag)
       def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, A | B] =
         tagRoutes
@@ -237,13 +243,78 @@ private[nats] object TypedErrorCodec:
           pb.tag -> (b => pb.decode(b).map(v => v: A | B | C)),
           pc.tag -> (b => pc.decode(b).map(v => v: A | B | C))
         )
-      // Use isInstance for runtime dispatch: generic type params are erased on
-      // the JVM so `case a: A @unchecked` would always match the first case.
       def encode(e: A | B | C): (Chunk[Byte], String) =
-        if pa.runtimeClass.isInstance(e) then (pa.encode(e.asInstanceOf[A]), pa.tag)
-        else if pb.runtimeClass.isInstance(e) then (pb.encode(e.asInstanceOf[B]), pb.tag)
+        if pa.matches(e) then (pa.encode(e.asInstanceOf[A]), pa.tag)
+        else if pb.matches(e) then (pb.encode(e.asInstanceOf[B]), pb.tag)
         else (pc.encode(e.asInstanceOf[C]), pc.tag)
       def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, A | B | C] =
+        tagRoutes
+          .get(typeTag)
+          .map(_(bytes))
+          .getOrElse(Left(NatsDecodeError(s"Unknown error type discriminator: '$typeTag'")))
+
+  /**
+   * Explicit factory for a 4-member union codec.
+   *
+   * Called internally by [[zio.nats.service.ServiceEndpoint.failsWith]] when
+   * four type parameters are supplied.
+   */
+  private[nats] def union4[A, B, C, D](
+    pa: ErrorCodecPart[A],
+    pb: ErrorCodecPart[B],
+    pc: ErrorCodecPart[C],
+    pd: ErrorCodecPart[D]
+  ): TypedErrorCodec[A | B | C | D] =
+    new TypedErrorCodec[A | B | C | D]:
+      private[nats] val tagRoutes: Map[String, Chunk[Byte] => Either[NatsDecodeError, A | B | C | D]] =
+        Map(
+          pa.tag -> (b => pa.decode(b).map(a => a: A | B | C | D)),
+          pb.tag -> (b => pb.decode(b).map(v => v: A | B | C | D)),
+          pc.tag -> (b => pc.decode(b).map(v => v: A | B | C | D)),
+          pd.tag -> (b => pd.decode(b).map(v => v: A | B | C | D))
+        )
+      def encode(e: A | B | C | D): (Chunk[Byte], String) =
+        if pa.matches(e) then (pa.encode(e.asInstanceOf[A]), pa.tag)
+        else if pb.matches(e) then (pb.encode(e.asInstanceOf[B]), pb.tag)
+        else if pc.matches(e) then (pc.encode(e.asInstanceOf[C]), pc.tag)
+        else (pd.encode(e.asInstanceOf[D]), pd.tag)
+      def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, A | B | C | D] =
+        tagRoutes
+          .get(typeTag)
+          .map(_(bytes))
+          .getOrElse(Left(NatsDecodeError(s"Unknown error type discriminator: '$typeTag'")))
+
+  /**
+   * Explicit factory for a 5-member union codec.
+   *
+   * Called internally by [[zio.nats.service.ServiceEndpoint.failsWith]] when
+   * five type parameters are supplied. For more than five error types, model
+   * them as a sealed enum and use the single-type `failsWith[E]` overload
+   * instead.
+   */
+  private[nats] def union5[A, B, C, D, E](
+    pa: ErrorCodecPart[A],
+    pb: ErrorCodecPart[B],
+    pc: ErrorCodecPart[C],
+    pd: ErrorCodecPart[D],
+    pe: ErrorCodecPart[E]
+  ): TypedErrorCodec[A | B | C | D | E] =
+    new TypedErrorCodec[A | B | C | D | E]:
+      private[nats] val tagRoutes: Map[String, Chunk[Byte] => Either[NatsDecodeError, A | B | C | D | E]] =
+        Map(
+          pa.tag -> (b => pa.decode(b).map(a => a: A | B | C | D | E)),
+          pb.tag -> (b => pb.decode(b).map(v => v: A | B | C | D | E)),
+          pc.tag -> (b => pc.decode(b).map(v => v: A | B | C | D | E)),
+          pd.tag -> (b => pd.decode(b).map(v => v: A | B | C | D | E)),
+          pe.tag -> (b => pe.decode(b).map(v => v: A | B | C | D | E))
+        )
+      def encode(e: A | B | C | D | E): (Chunk[Byte], String) =
+        if pa.matches(e) then (pa.encode(e.asInstanceOf[A]), pa.tag)
+        else if pb.matches(e) then (pb.encode(e.asInstanceOf[B]), pb.tag)
+        else if pc.matches(e) then (pc.encode(e.asInstanceOf[C]), pc.tag)
+        else if pd.matches(e) then (pd.encode(e.asInstanceOf[D]), pd.tag)
+        else (pe.encode(e.asInstanceOf[E]), pe.tag)
+      def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, A | B | C | D | E] =
         tagRoutes
           .get(typeTag)
           .map(_(bytes))

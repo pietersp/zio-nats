@@ -10,11 +10,11 @@ The NATS Service Framework (also called the Micro protocol) turns any set of req
 An endpoint is built via a short builder chain. Start with `ServiceEndpoint(name)`, fix the request type with `.in[In]`, fix the reply type with `.out[Out]`, and optionally declare a domain error type with `.failsWith[Err]`. Each step changes the Scala type, so the compiler enforces the full contract before you ever write handler logic:
 
 ```
-ServiceEndpoint("name")   // NamedEndpoint  - no types yet
-  .in[StockRequest]        // EndpointIn     - In fixed
-  .out[StockReply]         // ServiceEndpoint[StockRequest, Nothing, StockReply]
-  .failsWith[StockError]   // ServiceEndpoint[StockRequest, StockError, StockReply]
-  // or: .failsWith[A, B] / .failsWith[A, B, C] for union error types
+ServiceEndpoint("name")          // NamedEndpoint  - no types yet
+  .in[StockRequest]               // EndpointIn     - In fixed
+  .out[StockReply]                // ServiceEndpoint[StockRequest, Nothing, StockReply]
+  .failsWith[StockError]          // ServiceEndpoint[StockRequest, StockError, StockReply]
+  // or: .failsWith[A, B] / .failsWith[A, B, C] / .failsWith[A, B, C, D] / .failsWith[A, B, C, D, E]
 ```
 
 The resulting `ServiceEndpoint[In, Err, Out]` is an inert descriptor - it carries the name, codecs, and error type, but no handler logic. This makes it easy to share the same descriptor between the server (which binds a handler) and the client (which uses it with `Nats#requestService`).
@@ -202,7 +202,7 @@ Both forms produce identical behaviour. The `(message, code)` pair is sent to ca
 
 #### Union error types
 
-When a handler can fail with more than one distinct error type, pass two or three type parameters to `ServiceEndpoint#failsWith`. The framework encodes the fully-qualified class name of the concrete error as a `Nats-Service-Error-Type` header on each reply, and the client dispatches decoding to the matching member codec using that tag:
+When a handler can fail with more than one distinct error type, pass two to five type parameters to `ServiceEndpoint#failsWith`. The framework encodes the fully-qualified class name of the concrete error as a `Nats-Service-Error-Type` header on each reply, and the client dispatches decoding to the matching member codec using that tag:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -261,7 +261,7 @@ val placeOrder: ZIO[Nats, NatsError | ValidationError | PaymentError, OrderReply
   }
 ```
 
-For three error members, pass three type parameters to `ServiceEndpoint#failsWith`:
+For three, four, or five error members, pass the corresponding number of type parameters:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -274,12 +274,63 @@ case class OrderReply(orderId: String)
 case class ValidationError(field: String, reason: String)
 case class PaymentError(code: Int)
 case class InventoryError(shortage: Int)
+case class AuthError(reason: String)
+case class RateLimitError(retryAfterSeconds: Int)
 
 object OrderRequest    { given Schema[OrderRequest]    = Schema.derived }
 object OrderReply      { given Schema[OrderReply]      = Schema.derived }
 object ValidationError { given Schema[ValidationError] = Schema.derived }
 object PaymentError    { given Schema[PaymentError]    = Schema.derived }
 object InventoryError  { given Schema[InventoryError]  = Schema.derived }
+object AuthError       { given Schema[AuthError]       = Schema.derived }
+object RateLimitError  { given Schema[RateLimitError]  = Schema.derived }
+
+val codecs = NatsCodec.fromFormat(JsonFormat)
+import codecs.derived
+
+// Three members
+val ep3 = ServiceEndpoint("order")
+  .in[OrderRequest].out[OrderReply]
+  .failsWith[ValidationError, PaymentError, InventoryError]
+
+// Five members (maximum supported arity)
+val ep5 = ServiceEndpoint("order-full")
+  .in[OrderRequest].out[OrderReply]
+  .failsWith[ValidationError, PaymentError, InventoryError, AuthError, RateLimitError]
+```
+
+`failsWith` supports up to five error types. If your handler can fail with more than five distinct types, the idiomatic approach is to model them as a sealed enum and use the single-type `failsWith[E]` overload:
+
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.blocks.schema.Schema
+import zio.blocks.schema.json.JsonFormat
+
+enum OrderError:
+  case ValidationError(field: String, reason: String)
+  case PaymentError(code: Int)
+  case InventoryError(shortage: Int)
+  case AuthError(reason: String)
+  case RateLimitError(retryAfterSeconds: Int)
+  case ConflictError(id: String)
+
+object OrderError { given Schema[OrderError] = Schema.derived }
+
+given ServiceErrorMapper[OrderError] = {
+  case OrderError.ValidationError(_, _)     => ("Validation failed", 400)
+  case OrderError.PaymentError(_)           => ("Payment declined", 402)
+  case OrderError.InventoryError(_)         => ("Insufficient stock", 409)
+  case OrderError.AuthError(_)              => ("Unauthorized", 401)
+  case OrderError.RateLimitError(_)         => ("Too many requests", 429)
+  case OrderError.ConflictError(_)          => ("Conflict", 409)
+}
+
+case class OrderRequest(itemId: String, qty: Int)
+case class OrderReply(orderId: String)
+
+object OrderRequest { given Schema[OrderRequest] = Schema.derived }
+object OrderReply   { given Schema[OrderReply]   = Schema.derived }
 
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
@@ -287,10 +338,12 @@ import codecs.derived
 val orderEndpoint = ServiceEndpoint("order")
   .in[OrderRequest]
   .out[OrderReply]
-  .failsWith[ValidationError, PaymentError, InventoryError]
+  .failsWith[OrderError]
 ```
 
-Each member's `ServiceErrorMapper` is resolved independently, so you can provide a custom status code for one type and rely on the universal fallback for others. Scala 3 union types also compose silently across multiple `Nats#requestService` calls — if you call two union-typed endpoints in the same comprehension, the error channels widen into a single union type with no manual merging.
+A single `NatsCodec[OrderError]` covers all cases and a single `ServiceErrorMapper` pattern-matches to emit fine-grained status codes.
+
+Each member's `ServiceErrorMapper` is resolved independently for union overloads, so you can provide a custom status code for one type and rely on the universal fallback for others. Scala 3 union types also compose silently across multiple `Nats#requestService` calls — if you call two union-typed endpoints in the same comprehension, the error channels widen into a single union type with no manual merging.
 
 ## Starting a service
 

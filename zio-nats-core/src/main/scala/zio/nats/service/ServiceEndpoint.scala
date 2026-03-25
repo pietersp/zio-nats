@@ -255,8 +255,13 @@ final class ServiceEndpoint[In, Err, Out](
    * [[ServiceErrorMapper]] instance to customise the `Nats-Service-Error`
    * header value or HTTP-style status code.
    *
-   * For union error types use the two-parameter overload [[failsWith[A,B]*]] or
-   * the three-parameter overload [[failsWith[A,B,C]*]].
+   * For union error types use the two- to five-parameter overloads:
+   * [[failsWith[A,B]*]], [[failsWith[A,B,C]*]], [[failsWith[A,B,C,D]*]], or
+   * [[failsWith[A,B,C,D,E]*]]. For more than five distinct error types, model
+   * them as a sealed enum and use this single-type overload — a single
+   * `NatsCodec` derived from the shared schema handles all cases, and a single
+   * `ServiceErrorMapper` can pattern-match on the cases to emit fine-grained
+   * status codes.
    *
    * {{{
    * val ep = ServiceEndpoint("lookup").in[UserQuery].out[UserResponse].failsWith[UserError]
@@ -296,13 +301,11 @@ final class ServiceEndpoint[In, Err, Out](
     ma: ServiceErrorMapper[A],
     mb: ServiceErrorMapper[B]
   ): ServiceEndpoint[In, A | B, Out] =
-    val pa                                 = summon[ErrorCodecPart[A]]
-    val pb                                 = summon[ErrorCodecPart[B]]
-    val unionCodec: TypedErrorCodec[A | B] = TypedErrorCodec.union2(pa, pb)
-    // Use isInstance for runtime dispatch: generic type params are erased on
-    // the JVM so `case a: A @unchecked` would always match the first case.
+    val pa                                     = summon[ErrorCodecPart[A]]
+    val pb                                     = summon[ErrorCodecPart[B]]
+    val unionCodec: TypedErrorCodec[A | B]     = TypedErrorCodec.union2(pa, pb)
     val unionMapper: ServiceErrorMapper[A | B] = e =>
-      if pa.runtimeClass.isInstance(e) then ma.toErrorResponse(e.asInstanceOf[A])
+      if pa.matches(e) then ma.toErrorResponse(e.asInstanceOf[A])
       else mb.toErrorResponse(e.asInstanceOf[B])
     new ServiceEndpoint[In, A | B, Out](name, subject, queueGroup, group, metadata)(using
       inCodec,
@@ -333,10 +336,98 @@ final class ServiceEndpoint[In, Err, Out](
     val pc                                         = summon[ErrorCodecPart[C]]
     val unionCodec: TypedErrorCodec[A | B | C]     = TypedErrorCodec.union3(pa, pb, pc)
     val unionMapper: ServiceErrorMapper[A | B | C] = e =>
-      if pa.runtimeClass.isInstance(e) then ma.toErrorResponse(e.asInstanceOf[A])
-      else if pb.runtimeClass.isInstance(e) then mb.toErrorResponse(e.asInstanceOf[B])
+      if pa.matches(e) then ma.toErrorResponse(e.asInstanceOf[A])
+      else if pb.matches(e) then mb.toErrorResponse(e.asInstanceOf[B])
       else mc.toErrorResponse(e.asInstanceOf[C])
     new ServiceEndpoint[In, A | B | C, Out](name, subject, queueGroup, group, metadata)(using
+      inCodec,
+      outCodec,
+      unionMapper,
+      unionCodec
+    )
+
+  /**
+   * Return a copy of this endpoint descriptor with a 4-member union error type
+   * `A | B | C | D`.
+   *
+   * Behaves identically to [[failsWith[A,B]*]] but for four error members.
+   *
+   * {{{
+   * val ep = ServiceEndpoint("order")
+   *   .in[OrderRequest].out[OrderReply]
+   *   .failsWith[ValidationError, PaymentError, InventoryError, AuthError]
+   * }}}
+   */
+  def failsWith[
+    A: NatsCodec: ClassTag,
+    B: NatsCodec: ClassTag,
+    C: NatsCodec: ClassTag,
+    D: NatsCodec: ClassTag
+  ](using
+    ma: ServiceErrorMapper[A],
+    mb: ServiceErrorMapper[B],
+    mc: ServiceErrorMapper[C],
+    md: ServiceErrorMapper[D]
+  ): ServiceEndpoint[In, A | B | C | D, Out] =
+    val pa                                             = summon[ErrorCodecPart[A]]
+    val pb                                             = summon[ErrorCodecPart[B]]
+    val pc                                             = summon[ErrorCodecPart[C]]
+    val pd                                             = summon[ErrorCodecPart[D]]
+    val unionCodec: TypedErrorCodec[A | B | C | D]     = TypedErrorCodec.union4(pa, pb, pc, pd)
+    val unionMapper: ServiceErrorMapper[A | B | C | D] = e =>
+      if pa.matches(e) then ma.toErrorResponse(e.asInstanceOf[A])
+      else if pb.matches(e) then mb.toErrorResponse(e.asInstanceOf[B])
+      else if pc.matches(e) then mc.toErrorResponse(e.asInstanceOf[C])
+      else md.toErrorResponse(e.asInstanceOf[D])
+    new ServiceEndpoint[In, A | B | C | D, Out](name, subject, queueGroup, group, metadata)(using
+      inCodec,
+      outCodec,
+      unionMapper,
+      unionCodec
+    )
+
+  /**
+   * Return a copy of this endpoint descriptor with a 5-member union error type
+   * `A | B | C | D | E`.
+   *
+   * Behaves identically to [[failsWith[A,B]*]] but for five error members. This
+   * is the maximum supported arity for union error types. For more than five
+   * distinct error types, model them as a sealed enum and use the single-type
+   * [[failsWith[E]*]] overload — a single `NatsCodec` covers all cases and a
+   * `ServiceErrorMapper` can pattern-match for fine-grained codes.
+   *
+   * {{{
+   * val ep = ServiceEndpoint("order")
+   *   .in[OrderRequest].out[OrderReply]
+   *   .failsWith[ValidationError, PaymentError, InventoryError, AuthError, RateLimited]
+   * }}}
+   */
+  def failsWith[
+    A: NatsCodec: ClassTag,
+    B: NatsCodec: ClassTag,
+    C: NatsCodec: ClassTag,
+    D: NatsCodec: ClassTag,
+    E: NatsCodec: ClassTag
+  ](using
+    ma: ServiceErrorMapper[A],
+    mb: ServiceErrorMapper[B],
+    mc: ServiceErrorMapper[C],
+    md: ServiceErrorMapper[D],
+    me: ServiceErrorMapper[E]
+  ): ServiceEndpoint[In, A | B | C | D | E, Out] =
+    val pa                                                 = summon[ErrorCodecPart[A]]
+    val pb                                                 = summon[ErrorCodecPart[B]]
+    val pc                                                 = summon[ErrorCodecPart[C]]
+    val pd                                                 = summon[ErrorCodecPart[D]]
+    val pe                                                 = summon[ErrorCodecPart[E]]
+    val unionCodec: TypedErrorCodec[A | B | C | D | E]     = TypedErrorCodec.union5(pa, pb, pc, pd, pe)
+    val unionMapper: ServiceErrorMapper[A | B | C | D | E] = e =>
+      if pa.matches(e) then ma.toErrorResponse(e.asInstanceOf[A])
+      else if pb.matches(e) then mb.toErrorResponse(e.asInstanceOf[B])
+      else if pc.matches(e) then mc.toErrorResponse(e.asInstanceOf[C])
+      else if pd.matches(e) then md.toErrorResponse(e.asInstanceOf[D])
+      else me.toErrorResponse(e.asInstanceOf[E])
+    new ServiceEndpoint[In, A | B | C | D | E, Out](name, subject, queueGroup, group, metadata)(using
       inCodec,
       outCodec,
       unionMapper,
