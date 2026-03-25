@@ -8,7 +8,8 @@ import io.nats.service.{
   ServiceMessageHandler
 }
 import zio._
-import zio.nats.{ErrorCodecOrNothing, Headers, NatsCodec, NatsMessage, Subject}
+import zio.nats.{TypedErrorCodec, ErrorCodecPart, Headers, NatsCodec, NatsMessage, Subject}
+import scala.reflect.ClassTag
 
 import scala.jdk.CollectionConverters._
 
@@ -111,7 +112,7 @@ final class EndpointIn[In](
       inCodec,
       summon[NatsCodec[Out]],
       summon[ServiceErrorMapper[Nothing]],
-      summon[ErrorCodecOrNothing[Nothing]]
+      summon[TypedErrorCodec[Nothing]]
     )
 }
 
@@ -171,7 +172,7 @@ final class ServiceEndpoint[In, Err, Out](
   val inCodec: NatsCodec[In],
   val outCodec: NatsCodec[Out],
   val errorMapper: ServiceErrorMapper[Err],
-  val errCodec: ErrorCodecOrNothing[Err]
+  val errCodec: TypedErrorCodec[Err]
 ) {
 
   /**
@@ -243,26 +244,103 @@ final class ServiceEndpoint[In, Err, Out](
     g.parent.fold(g.name)(p => groupPrefix(p) + "." + g.name)
 
   /**
-   * Return a copy of this endpoint descriptor with the error type refined to
-   * `E`. Requires a `NatsCodec[E]` in implicit scope for typed error body
-   * encoding and decoding.
+   * Return a copy of this endpoint descriptor with the error type set to `E`.
+   *
+   * Requires `NatsCodec[E]` in implicit scope — `TypedErrorCodec[E]` is then
+   * derived automatically from `NatsCodec[E]` and the `ClassTag[E]` that is
+   * always available for concrete types.
    *
    * A `ServiceErrorMapper[E]` is resolved automatically via the universal
    * fallback (uses `e.toString` with code 500). Provide a specific
    * [[ServiceErrorMapper]] instance to customise the `Nats-Service-Error`
    * header value or HTTP-style status code.
    *
+   * For union error types use the two-parameter overload [[failsWith[A,B]*]] or
+   * the three-parameter overload [[failsWith[A,B,C]*]].
+   *
    * {{{
    * val ep = ServiceEndpoint("lookup").in[UserQuery].out[UserResponse].failsWith[UserError]
-   * val bound = ep.handle(q => UserRepo.find(q))
    * }}}
    */
-  def failsWith[E: NatsCodec: ServiceErrorMapper]: ServiceEndpoint[In, E, Out] =
+  def failsWith[E: TypedErrorCodec: ServiceErrorMapper]: ServiceEndpoint[In, E, Out] =
     new ServiceEndpoint[In, E, Out](name, subject, queueGroup, group, metadata)(using
       inCodec,
       outCodec,
       summon[ServiceErrorMapper[E]],
-      summon[ErrorCodecOrNothing[E]]
+      summon[TypedErrorCodec[E]]
+    )
+
+  /**
+   * Return a copy of this endpoint descriptor with a 2-member union error type
+   * `A | B`.
+   *
+   * Both `A` and `B` must have `NatsCodec` instances in scope — the same
+   * requirement as [[failsWith[E]*]] for a single type. `ClassTag` is always
+   * available for concrete types and requires no explicit instance.
+   *
+   * The server sets a `Nats-Service-Error-Type` header to the FQDN of the
+   * concrete runtime error class; the client dispatches decoding to the correct
+   * member codec using that tag.
+   *
+   * `ServiceErrorMapper[A | B]` is composed from individual mapper instances
+   * (both default to `e.toString` / code 500 if no explicit instance is
+   * provided).
+   *
+   * {{{
+   * val ep = ServiceEndpoint("order")
+   *   .in[OrderRequest].out[OrderReply]
+   *   .failsWith[ValidationError, PaymentError]
+   * }}}
+   */
+  def failsWith[A: NatsCodec: ClassTag, B: NatsCodec: ClassTag](using
+    ma: ServiceErrorMapper[A],
+    mb: ServiceErrorMapper[B]
+  ): ServiceEndpoint[In, A | B, Out] =
+    val pa                                 = summon[ErrorCodecPart[A]]
+    val pb                                 = summon[ErrorCodecPart[B]]
+    val unionCodec: TypedErrorCodec[A | B] = TypedErrorCodec.union2(pa, pb)
+    // Use isInstance for runtime dispatch: generic type params are erased on
+    // the JVM so `case a: A @unchecked` would always match the first case.
+    val unionMapper: ServiceErrorMapper[A | B] = e =>
+      if pa.runtimeClass.isInstance(e) then ma.toErrorResponse(e.asInstanceOf[A])
+      else mb.toErrorResponse(e.asInstanceOf[B])
+    new ServiceEndpoint[In, A | B, Out](name, subject, queueGroup, group, metadata)(using
+      inCodec,
+      outCodec,
+      unionMapper,
+      unionCodec
+    )
+
+  /**
+   * Return a copy of this endpoint descriptor with a 3-member union error type
+   * `A | B | C`.
+   *
+   * Behaves identically to [[failsWith[A,B]*]] but for three error members.
+   *
+   * {{{
+   * val ep = ServiceEndpoint("order")
+   *   .in[OrderRequest].out[OrderReply]
+   *   .failsWith[ValidationError, PaymentError, InventoryError]
+   * }}}
+   */
+  def failsWith[A: NatsCodec: ClassTag, B: NatsCodec: ClassTag, C: NatsCodec: ClassTag](using
+    ma: ServiceErrorMapper[A],
+    mb: ServiceErrorMapper[B],
+    mc: ServiceErrorMapper[C]
+  ): ServiceEndpoint[In, A | B | C, Out] =
+    val pa                                         = summon[ErrorCodecPart[A]]
+    val pb                                         = summon[ErrorCodecPart[B]]
+    val pc                                         = summon[ErrorCodecPart[C]]
+    val unionCodec: TypedErrorCodec[A | B | C]     = TypedErrorCodec.union3(pa, pb, pc)
+    val unionMapper: ServiceErrorMapper[A | B | C] = e =>
+      if pa.runtimeClass.isInstance(e) then ma.toErrorResponse(e.asInstanceOf[A])
+      else if pb.runtimeClass.isInstance(e) then mb.toErrorResponse(e.asInstanceOf[B])
+      else mc.toErrorResponse(e.asInstanceOf[C])
+    new ServiceEndpoint[In, A | B | C, Out](name, subject, queueGroup, group, metadata)(using
+      inCodec,
+      outCodec,
+      unionMapper,
+      unionCodec
     )
 }
 
@@ -371,15 +449,16 @@ private[nats] class BoundEndpointLive[In, Err, Out](
           program.catchAll {
             case Left(err) =>
               // Domain error: encode typed body + set NATS Micro error headers
-              val encoded           = errCodec.encode(err)
-              val (errMsg, errCode) = errorMapper.toErrorResponse(err)
+              val (encoded, typeTag) = errCodec.encode(err)
+              val (errMsg, errCode)  = errorMapper.toErrorResponse(err)
               ZIO.attempt {
                 val replyMsg = NatsMessage.toJava(
                   subject = jMsg.getReplyTo,
                   data = encoded,
                   headers = Headers(
                     "Nats-Service-Error"      -> errMsg,
-                    "Nats-Service-Error-Code" -> errCode.toString
+                    "Nats-Service-Error-Code" -> errCode.toString,
+                    "Nats-Service-Error-Type" -> typeTag
                   )
                 )
                 conn.publish(replyMsg)

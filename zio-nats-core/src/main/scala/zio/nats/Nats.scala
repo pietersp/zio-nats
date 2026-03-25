@@ -155,32 +155,45 @@ trait Nats {
    *     (empty body with `Nats-Service-Error` header).
    *   - Fails with [[NatsError.Timeout]] if no reply arrives within `timeout`.
    *
+   * `Err` may be a union type (e.g. `ValidationError | PaymentError`). The
+   * server sets a `Nats-Service-Error-Type` header to the FQDN of the concrete
+   * error class, and this method uses that header to dispatch decoding to the
+   * correct member codec — built at compile time from the endpoint descriptor.
+   *
    * Because the error channel is `NatsError | Err`, Scala 3 union types widen
    * automatically when composing multiple `requestService` calls:
    *
    * {{{
-   * // IO[StockError | PriceError | NatsError, (StockReply, PriceReply)]
-   * nats.requestService(stockEp, stockReq, 5.seconds)
-   *   .zipPar(nats.requestService(priceEp, priceReq, 5.seconds))
+   * // IO[OrderError | PaymentError | InventoryError | NatsError, (OrderReply, Stock)]
+   * nats.requestService(orderEp, orderReq, 5.seconds)
+   *   .zipPar(nats.requestService(inventoryEp, inventoryReq, 5.seconds))
    * }}}
    *
    * The [[service.ServiceEndpoint]] descriptor is the authority on the subject,
    * input/output types, and codecs — it stays pure data and is not modified.
    *
-   * ==Example==
+   * ==Example: single error type==
    * {{{
-   * val ep = ServiceEndpoint[StockRequest, StockReply]("check")
-   *            .withError[StockError]
+   * val ep = ServiceEndpoint("lookup").in[UserQuery].out[UserResponse].failsWith[UserError]
    *
-   * val available: IO[StockError | NatsError, Int] =
-   *   nats.requestService(ep, StockRequest("item-1"), 5.seconds)
-   *     .map(_.available)
+   * val user: IO[UserError | NatsError, UserResponse] =
+   *   nats.requestService(ep, UserQuery("alice"), 5.seconds)
+   * }}}
+   *
+   * ==Example: union error type==
+   * {{{
+   * val ep = ServiceEndpoint("place-order")
+   *   .in[OrderRequest].out[OrderReply]
+   *   .failsWith[ValidationError | PaymentError]
+   *
+   * val order: IO[ValidationError | PaymentError | NatsError, OrderReply] =
+   *   nats.requestService(ep, OrderRequest(...), 5.seconds)
    * }}}
    *
    * For infallible endpoints (`Err = Nothing`) use [[request]] directly with
    * `endpoint.effectiveSubject`.
    */
-  def requestService[In, Err: NatsCodec, Out](
+  def requestService[In, Err, Out](
     endpoint: ServiceEndpointDescriptor[In, Err, Out],
     input: In,
     timeout: Duration
@@ -425,7 +438,7 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
     endpoint: ServiceEndpointDescriptor[In, Err, Out],
     input: In,
     timeout: Duration
-  )(using errCodec: NatsCodec[Err]): IO[NatsError | Err, Out] =
+  ): IO[NatsError | Err, Out] =
     ZIO
       .attempt(endpoint.inCodec.encode(input))
       .mapError(e =>
@@ -457,9 +470,14 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
                     .flatMap(_.toIntOption)
                     .getOrElse(500)
                   if (msg.payload.nonEmpty)
-                    // Typed domain error — decode body as Err, fail in error channel
+                    // Typed domain error — read the type discriminator header and
+                    // route to the correct member codec (supports union error types)
+                    val typeTag = msg.headers
+                      .get("Nats-Service-Error-Type")
+                      .headOption
+                      .getOrElse("")
                     ZIO
-                      .fromEither(errCodec.decode(msg.payload))
+                      .fromEither(endpoint.errCodec.decode(msg.payload, typeTag))
                       .mapError(_ => NatsError.ServiceCallFailed(errHeader, code))
                       .flatMap(err => ZIO.fail(err))
                   else

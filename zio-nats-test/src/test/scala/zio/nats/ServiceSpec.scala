@@ -7,6 +7,20 @@ import zio.test.TestAspect.*
 
 object ServiceSpec extends ZIOSpecDefault {
 
+  // Error types used by the union-error tests
+  private case class NotFound(resource: String)
+  private case class Forbidden(reason: String)
+
+  private given NatsCodec[NotFound] = new NatsCodec[NotFound]:
+    def encode(e: NotFound): Chunk[Byte]                              = NatsCodec.stringCodec.encode(e.resource)
+    def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, NotFound] =
+      NatsCodec.stringCodec.decode(bytes).map(NotFound(_))
+
+  private given NatsCodec[Forbidden] = new NatsCodec[Forbidden]:
+    def encode(e: Forbidden): Chunk[Byte]                              = NatsCodec.stringCodec.encode(e.reason)
+    def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, Forbidden] =
+      NatsCodec.stringCodec.decode(bytes).map(Forbidden(_))
+
   def spec: Spec[Any, Throwable] = suite("Service Framework")(
     test("service starts and is discoverable via ping") {
       ZIO.scoped {
@@ -255,6 +269,34 @@ object ServiceSpec extends ZIOSpecDefault {
           responses.nonEmpty,
           responses.head.description.contains("test service"),
           responses.head.endpoints.map(_.name).toSet.intersect(Set("ep-a", "ep-b")).nonEmpty
+        )
+      }
+    },
+
+    test("requestService routes union error type to the correct member codec") {
+      ZIO.scoped {
+        for {
+          nats <- ZIO.service[Nats]
+          ep    = ServiceEndpoint("union-err")
+                 .in[String]
+                 .out[String]
+                 .failsWith[NotFound, Forbidden]
+          _ <- nats.service(
+                 ServiceConfig("union-err-svc", "1.0.0"),
+                 ep.handle {
+                   case "notfound"  => ZIO.fail(NotFound("item-42"))
+                   case "forbidden" => ZIO.fail(Forbidden("access denied"))
+                   case s           => ZIO.succeed(s"ok:$s")
+                 }
+               )
+          _  <- ZIO.sleep(200.millis)
+          r1 <- nats.requestService(ep, "notfound", 5.seconds).either
+          r2 <- nats.requestService(ep, "forbidden", 5.seconds).either
+          r3 <- nats.requestService(ep, "hello", 5.seconds).either
+        } yield assertTrue(
+          r1 == Left(NotFound("item-42")),
+          r2 == Left(Forbidden("access denied")),
+          r3 == Right("ok:hello")
         )
       }
     },
