@@ -131,13 +131,12 @@ os.getStream("gpt-small.bin")
 Define typed request-reply endpoints and let NATS handle routing, load balancing, and service discovery - no service mesh, no sidecar:
 
 ```scala
-val prices = ServiceEndpoint[String, Nothing, Double]("prices")
+val prices = ServiceEndpoint("prices").in[String].out[Double]
 
-val bound = prices.implement[Nothing](itemId =>
-  ZIO.succeed(pricingEngine.lookup(itemId))
+nats.service(
+  ServiceConfig("pricing", "1.0.0"),
+  prices.handle(itemId => ZIO.succeed(pricingEngine.lookup(itemId)))
 )
-
-nats.service(ServiceConfig(name = "pricing", version = "1.0.0"), bound)
 
 // On the client side - call any instance by name, NATS picks one
 nats.request[String, Double](Subject("prices"), "item-42", 5.seconds)
