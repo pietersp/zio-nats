@@ -25,19 +25,16 @@
   # Services
   # ---------------------------------------------------------------------------
 
-  services.nats = {
-    enable = true;
-    jetstream.enable = true;
-  };
+  # services.nats = {
+  #   enable = true;
+  #   jetstream.enable = true;
+  # };
 
   # ---------------------------------------------------------------------------
   # Scripts
   # ---------------------------------------------------------------------------
 
   scripts = {
-    # Run the full integration test suite (requires Docker for testcontainers)
-    test.exec = "sbt zioNatsTest/test";
-
     # Format all sources (main, test, and sbt files)
     format.exec = "sbt scalafmtAll";
 
@@ -69,14 +66,13 @@
     echo "zio-nats dev environment"
     echo ""
     echo "Scripts:"
-    echo "  test          run integration tests  (requires Docker)"
     echo "  format        format all sources"
     echo "  check         verify formatting + compile (no tests)"
     echo "  run-examples  run example programs   (requires NATS service)"
     echo ""
     echo "Services:"
-    echo "  devenv up [-d] nats    start NATS + JetStream on :4222"
-    echo "  devenv processes down  stop running services"
+    # echo "  devenv up [-d] nats    start NATS + JetStream on :4222"
+    # echo "  devenv processes down  stop running services"
     echo ""
     echo "Other tools:  nats  scala-cli  bloop"
   '';
