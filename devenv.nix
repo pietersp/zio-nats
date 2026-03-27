@@ -1,14 +1,21 @@
 { pkgs, lib, config, inputs, ... }:
 
+let
+  pkgs-unstable = import inputs.nixpkgs-unstable {
+    system = pkgs.stdenv.system;
+    config.allowUnfree = true;
+  };
+in
+
 {
   cachix.enable = true;
 
   packages = [
     pkgs.bloop
-    pkgs.claude-code
+    pkgs-unstable.claude-code
     pkgs.git
     pkgs.natscli
-    pkgs.opencode
+    pkgs-unstable.opencode
     pkgs.scala-cli
   ];
 
