@@ -4,6 +4,7 @@
   cachix.enable = true;
 
   packages = [
+    pkgs.bloop
     pkgs.claude-code
     pkgs.git
     pkgs.natscli

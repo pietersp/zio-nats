@@ -15,7 +15,8 @@ inThisBuild(
     scalaVersion       := scala3,
     crossScalaVersions := Seq(scala3),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    scalacOptions ++= Seq("-deprecation", "-feature"),
+    scalacOptions ++= Seq("-deprecation", "-feature", "-Xsemanticdb"),
+    semanticdbEnabled := true,
     developers := List(
       Developer("pietersp", "Pieter", "", url("https://github.com/pietersp"))
     ),
