@@ -116,9 +116,12 @@ import zio.*
 import zio.nats.*
 
 // Endpoint shared between server and client
-val ep = ServiceEndpoint[String, String]("do-thing").withError[String]
+val ep = ServiceEndpoint("do-thing")
+  .in[String]
+  .out[String]
+  .failsWith[String]
 
-// IO[String | NatsError, String] - catchSome by type
+// IO[NatsError | String, String] - catchSome by type
 val result: IO[NatsError, Option[String]] =
   nats.requestService(ep, "input", 5.seconds)
     .map(Some(_))
