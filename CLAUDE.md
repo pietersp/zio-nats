@@ -12,7 +12,9 @@ When making any code changes, keep documentation in sync:
 
 ## Build & Dev Commands
 
-sbt is managed via Coursier; invoke it as:
+**On macOS/Linux** (devenv): `sbt` is available directly in the devenv shell.
+
+**On Windows**: sbt is managed via Coursier; invoke it as:
 ```
 /c/Users/pieter/AppData/Local/Coursier/data/bin/sbt.bat <command>
 ```
