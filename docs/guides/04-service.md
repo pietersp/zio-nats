@@ -97,7 +97,7 @@ val boundWithMeta = ServiceEndpoint("stock-check")
 
 ### Handling errors
 
-When your handler can fail, add `.failsWith[E]` before `.handle`. The error type is now part of the descriptor - the same codec that encodes domain errors on the server decodes them on the client. A universal `ServiceErrorMapper[E]` (`e.toString`, code 500) is always in scope, so no extra setup is required for most types. Built-in mappers for `String` and `NatsError` are also provided:
+When your handler can fail, add `ServiceEndpoint#failsWith[E]` before `ServiceEndpoint#handle`. The error type is now part of the descriptor - the same codec that encodes domain errors on the server decodes them on the client. A universal `ServiceErrorMapper[E]` (`e.toString`, code 500) is always in scope, so no extra setup is required for most types. Built-in mappers for `String` and `NatsError` are also provided:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -299,7 +299,7 @@ val ep5 = ServiceEndpoint("order-full")
   .failsWith[ValidationError, PaymentError, InventoryError, AuthError, RateLimitError]
 ```
 
-`failsWith` supports up to five error types. If your handler can fail with more than five distinct types, the idiomatic approach is to model them as a sealed enum and use the single-type `failsWith[E]` overload:
+`ServiceEndpoint#failsWith` supports up to five error types. If your handler can fail with more than five distinct types, the idiomatic approach is to model them as a sealed enum and use the single-type `failsWith[E]` overload:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -382,7 +382,7 @@ val startService: ZIO[Nats & Scope, NatsError, NatsService] =
 
 The `Scope` in the return type ties the service lifetime to the enclosing scope - when the scope closes, the service shuts down and stops accepting requests. Requests arrive on the subject `<service-name>.<endpoint-name>` by default - in this case `inventory.stock-check`. Multiple instances started with the same config share a queue group automatically, so NATS distributes requests across them with no additional configuration.
 
-**Grouping endpoints.** Call `.inGroup(name)` on a `NamedEndpoint` to prepend a subject prefix. All endpoints in the same group share a common namespace:
+**Grouping endpoints.** Call `NamedEndpoint#inGroup` to prepend a subject prefix. All endpoints in the same group share a common namespace:
 
 ```scala mdoc:compile-only
 import zio.*
