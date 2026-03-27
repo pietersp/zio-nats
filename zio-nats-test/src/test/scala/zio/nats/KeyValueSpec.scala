@@ -165,6 +165,30 @@ object KeyValueSpec extends ZIOSpecDefault {
       )
     },
 
+    test("watch emits KvEvent.Purge when a key is purged") {
+      for {
+        kvm      <- ZIO.service[KeyValueManagement]
+        _        <- kvm.create(KeyValueConfig(name = "kv-watch-purge", storageType = StorageType.Memory))
+        kv       <- KeyValue.bucket("kv-watch-purge")
+        _        <- kv.put("p", "v1")
+        received <- Promise.make[Nothing, KvEvent[String]]
+        fiber    <- kv
+                   .watch[String](List("p"), KeyValueWatchOptions(updatesOnly = true))
+                   .tap(e => received.succeed(e))
+                   .take(1)
+                   .runDrain
+                   .fork
+        _     <- ZIO.sleep(300.millis)
+        _     <- kv.purge("p")
+        event <- received.await
+        _     <- fiber.interrupt
+        _     <- kvm.delete("kv-watch-purge")
+      } yield assertTrue(
+        event match { case KvEvent.Purge(_) => true; case _ => false },
+        event.key == "p"
+      )
+    },
+
     test("watch fromRevision replays from a specific point") {
       for {
         kvm <- ZIO.service[KeyValueManagement]
@@ -279,13 +303,15 @@ object KeyValueSpec extends ZIOSpecDefault {
 
     test("purge with expectedRevision guards against concurrent writes") {
       for {
-        kvm <- ZIO.service[KeyValueManagement]
-        _   <- kvm.create(KeyValueConfig(name = "kv-purge-rev", storageType = StorageType.Memory))
-        kv  <- KeyValue.bucket("kv-purge-rev")
-        rev <- kv.put("p", "v1")
-        ok  <- kv.purge("p", Some(rev)).either
-        _   <- kvm.delete("kv-purge-rev")
-      } yield assertTrue(ok.isRight)
+        kvm  <- ZIO.service[KeyValueManagement]
+        _    <- kvm.create(KeyValueConfig(name = "kv-purge-rev", storageType = StorageType.Memory))
+        kv   <- KeyValue.bucket("kv-purge-rev")
+        rev  <- kv.put("p", "v1")
+        ok   <- kv.purge("p", Some(rev)).either // correct revision → succeeds
+        _    <- kv.put("p", "v2")               // bumps the revision
+        fail <- kv.purge("p", Some(rev)).either // stale revision → fails
+        _    <- kvm.delete("kv-purge-rev")
+      } yield assertTrue(ok.isRight, fail.isLeft)
     },
 
     test("consumeKeys streams all keys") {
@@ -358,11 +384,12 @@ object KeyValueSpec extends ZIOSpecDefault {
                  limitMarkerTtl = Some(10.seconds)
                )
              )
-        kv <- KeyValue.bucket("kv-purge-mtl")
-        _  <- kv.put("p", "v1")
-        ok <- kv.purge("p", None, Some(2.seconds)).either
-        _  <- kvm.delete("kv-purge-mtl")
-      } yield assertTrue(ok.isRight)
+        kv  <- KeyValue.bucket("kv-purge-mtl")
+        _   <- kv.put("p", "v1")
+        ok  <- kv.purge("p", None, Some(2.seconds)).either
+        got <- kv.get[String]("p")
+        _   <- kvm.delete("kv-purge-mtl")
+      } yield assertTrue(ok.isRight, got.isEmpty)
     },
 
     test("purge with both expectedRevision and markerTtl removes key history") {
@@ -379,8 +406,9 @@ object KeyValueSpec extends ZIOSpecDefault {
         kv  <- KeyValue.bucket("kv-purge-both")
         rev <- kv.put("p", "v1")
         ok  <- kv.purge("p", Some(rev), Some(2.seconds)).either
+        got <- kv.get[String]("p")
         _   <- kvm.delete("kv-purge-both")
-      } yield assertTrue(ok.isRight)
+      } yield assertTrue(ok.isRight, got.isEmpty)
     },
 
     test("kv.getStatus returns bucket status with correct name") {
@@ -395,13 +423,12 @@ object KeyValueSpec extends ZIOSpecDefault {
 
     test("KeyValueManagement.update changes bucket configuration") {
       for {
-        kvm <- ZIO.service[KeyValueManagement]
-        _   <- kvm.create(KeyValueConfig(name = "kv-update-cfg", storageType = StorageType.Memory, maxHistoryPerKey = 1))
-        ok  <- kvm
-                .update(KeyValueConfig(name = "kv-update-cfg", storageType = StorageType.Memory, maxHistoryPerKey = 5))
-                .either
-        _ <- kvm.delete("kv-update-cfg")
-      } yield assertTrue(ok.isRight)
+        kvm    <- ZIO.service[KeyValueManagement]
+        _      <- kvm.create(KeyValueConfig(name = "kv-update-cfg", storageType = StorageType.Memory, maxHistoryPerKey = 1))
+        _      <- kvm.update(KeyValueConfig(name = "kv-update-cfg", storageType = StorageType.Memory, maxHistoryPerKey = 5))
+        status <- kvm.getStatus("kv-update-cfg")
+        _      <- kvm.delete("kv-update-cfg")
+      } yield assertTrue(status.maxHistoryPerKey == 5L)
     },
 
     test("KeyValueManagement.getBucketNames returns list containing created bucket") {

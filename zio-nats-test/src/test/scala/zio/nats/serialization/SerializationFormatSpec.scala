@@ -30,14 +30,6 @@ object SerializationFormatSpec extends ZIOSpecDefault {
       val garbled = zio.Chunk.fromArray("not-valid-json{{".getBytes)
       val result  = NatsCodec[Person].decode(garbled)
       assertTrue(result.isLeft)
-    },
-
-    test("makeFor builds a codec that roundtrips (internal API)") {
-      val person  = Person("Bob", 25)
-      val codec   = NatsSerializer.makeFor[Person](JsonFormat)
-      val encoded = codec.encode(person)
-      val decoded = codec.decode(encoded)
-      assertTrue(decoded == Right(person))
     }
   )
 }

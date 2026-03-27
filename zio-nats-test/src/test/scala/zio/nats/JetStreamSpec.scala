@@ -240,7 +240,7 @@ object JetStreamSpec extends ZIOSpecDefault {
                     )
                   )
           _ <- jsm.deleteStream("adv-stream")
-        } yield assertTrue(info.name == "adv-stream")
+        } yield assertTrue(info.name == "adv-stream", info.subjects == List("adv.>"))
       },
 
       test("ConsumerConfig advanced fields are accepted by the server") {
@@ -264,7 +264,38 @@ object JetStreamSpec extends ZIOSpecDefault {
                       )
                   )
           _ <- jsm.deleteStream("cons-adv-stream")
-        } yield assertTrue(info.name == "adv-consumer")
+        } yield assertTrue(info.name == "adv-consumer", info.streamName == "cons-adv-stream")
+      }
+    ),
+
+    suite("Stream mirroring")(
+      test("mirror stream receives messages published to the source") {
+        for {
+          jsm <- ZIO.service[JetStreamManagement]
+          js  <- ZIO.service[JetStream]
+          _   <- jsm.addStream(
+                 StreamConfig("mirror-source", subjects = List("msrc.>"), storageType = StorageType.Memory)
+               )
+          _ <- js.publish(Subject("msrc.1"), "a")
+          _ <- js.publish(Subject("msrc.2"), "b")
+          _ <- js.publish(Subject("msrc.3"), "c")
+          _ <- jsm.addStream(
+                 StreamConfig(
+                   "mirror-target",
+                   storageType = StorageType.Memory,
+                   mirror = Some(MirrorConfig("mirror-source"))
+                 )
+               )
+          oc   <- js.orderedConsumer("mirror-target", OrderedConsumerConfig())
+          msgs <- oc
+                    .fetch[String](FetchOptions(maxMessages = 3, expiresIn = 5.seconds))
+                    .runCollect
+          _ <- jsm.deleteStream("mirror-target")
+          _ <- jsm.deleteStream("mirror-source")
+        } yield assertTrue(
+          msgs.size == 3,
+          msgs.map(_.value).toList == List("a", "b", "c")
+        )
       }
     ),
 

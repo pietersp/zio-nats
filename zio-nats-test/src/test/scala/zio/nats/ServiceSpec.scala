@@ -441,6 +441,12 @@ object ServiceSpec extends ZIOSpecDefault {
       }
     },
 
+    test("ServiceErrorMapper[NatsError] uses e.message not e.toString") {
+      val mapper      = summon[ServiceErrorMapper[NatsError]]
+      val (msg, code) = mapper.toErrorResponse(NatsError.Timeout("db-unavailable"))
+      assertTrue(msg == "db-unavailable", code == 500)
+    },
+
     test("discovery stats returns per-endpoint stats") {
       ZIO.scoped {
         for {
