@@ -11,7 +11,7 @@ Messages are delivered at-most-once. If no subscriber is listening when a messag
 
 ### Fire-and-forget
 
-The simplest publish takes a subject and a payload. The type of the payload selects the `NatsCodec` automatically:
+The simplest `Nats#publish` call takes a subject and a payload. The type of the payload selects the `NatsCodec` automatically:
 
 ```scala mdoc:silent
 import zio.*
@@ -40,7 +40,7 @@ import zio.nats.*
 val traceHeaders = Headers("X-Trace-Id" -> "req-abc123", "X-Source" -> "checkout")
 ```
 
-`.get` returns all values for a key as a `Chunk[String]`. `.add` appends to existing values rather than replacing them:
+`Headers#get` returns all values for a key as a `Chunk[String]`. `Headers#add` appends to existing values rather than replacing them:
 
 ```scala mdoc
 traceHeaders.get("X-Trace-Id")
