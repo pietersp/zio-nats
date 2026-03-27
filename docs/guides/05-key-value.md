@@ -52,7 +52,7 @@ val readWrite: ZIO[Nats, NatsError, Unit] =
   } yield ()
 ```
 
-`delete` places a tombstone marker on a key and preserves all previous history. Subsequent `get` calls return `None`, but the history remains accessible via `history`. `purge` removes all history including the tombstone, permanently erasing the key from the bucket:
+`KeyValue#delete` places a tombstone marker on a key and preserves all previous history. Subsequent `KeyValue#get` calls return `None`, but the history remains accessible via `KeyValue#history`. `KeyValue#purge` removes all history including the tombstone, permanently erasing the key from the bucket:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -70,7 +70,7 @@ val deleteAndPurge: ZIO[Nats, NatsError, Unit] =
 
 ## Optimistic concurrency
 
-`create` writes a value only if the key does not currently exist - it fails if the key is already present or has a tombstone from a previous `delete`. `update` writes only if the stored revision matches `expectedRevision`, failing if another writer modified the key between your `get` and your `update`.
+`KeyValue#create` writes a value only if the key does not currently exist - it fails if the key is already present or has a tombstone from a previous `KeyValue#delete`. `KeyValue#update` writes only if the stored revision matches `expectedRevision`, failing if another writer modified the key between your `KeyValue#get` and your `KeyValue#update`.
 
 These two operations together give you compare-and-swap semantics over NATS - useful for distributed locking, idempotent initialisation, or any shared-state update that must not silently overwrite a concurrent write:
 
@@ -96,7 +96,7 @@ val cas: ZIO[Nats, NatsError, Unit] =
 
 ## Revisions and history
 
-Every `put`, `create`, and `update` increments the revision counter for that key. `get` accepts an optional `revision` parameter to read any retained past value by its exact revision number. `history` returns all retained revisions in chronological order, up to the `maxHistoryPerKey` limit set when the bucket was created:
+Every `KeyValue#put`, `KeyValue#create`, and `KeyValue#update` increments the revision counter for that key. `KeyValue#get` accepts an optional `revision` parameter to read any retained past value by its exact revision number. `KeyValue#history` returns all retained revisions in chronological order, up to the `maxHistoryPerKey` limit set when the bucket was created:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -116,7 +116,7 @@ val revisions: ZIO[Nats, NatsError, Unit] =
 
 ## Listing keys
 
-`keys` loads all current key names into a `List[String]` in one shot. Pass a filter list using NATS wildcard syntax (`*` for one token, `>` for one-or-more trailing tokens) to scope the result to a subset of keys. For large buckets, prefer `consumeKeys` - it returns a `ZStream[Any, NatsError, String]` and emits keys incrementally without loading the full set into memory:
+`KeyValue#keys` loads all current key names into a `List[String]` in one shot. Pass a filter list using NATS wildcard syntax (`*` for one token, `>` for one-or-more trailing tokens) to scope the result to a subset of keys. For large buckets, prefer `KeyValue#consumeKeys` - it returns a `ZStream[Any, NatsError, String]` and emits keys incrementally without loading the full set into memory:
 
 ```scala mdoc:compile-only
 import zio.*
