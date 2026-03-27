@@ -13,8 +13,8 @@ slug: /
 - **Key-Value** - a reactive store for shared state and configuration, backed by JetStream. Watch any key for changes as a stream, making it a natural fit for feature flags, distributed config, or coordinating state across services.
 - **Object Store** - distribute large binary objects across your NATS cluster without standing up S3 or a separate file store. A natural fit for ML models, compiled assets, or config bundles that need to be available to all your services.
 - **Service framework** - NATS has a built-in microservice protocol (Micro) that gives you request-reply endpoints with automatic service discovery, health checks, and stats; no service mesh, no sidecar, no extra infrastructure
-- Type-safe serialization - batteries-included zio-blocks integration for domain types, with jsoniter-scala and play-json also supported; easy to bring your own
-- Ergonomic by design - no raw jnats types, no callbacks, no adapters, simple imports; the API feels like it was written for ZIO from the ground up
+- **Type-safe serialization** - batteries-included zio-blocks integration for domain types, with jsoniter-scala and play-json also supported; easy to bring your own
+- **Ergonomic by design** - no raw jnats types, no callbacks, no adapters, simple imports; the API feels like it was written for ZIO from the ground up
 
 
 ## A taste of the API
