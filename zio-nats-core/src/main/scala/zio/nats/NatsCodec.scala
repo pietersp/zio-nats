@@ -163,6 +163,22 @@ private[nats] sealed trait TypedErrorCodec[E]:
 private[nats] object TypedErrorCodec:
 
   /**
+   * Shared decode dispatch used by all union codec implementations.
+   *
+   * Looks up `typeTag` in `routes` and applies the found decoder to `bytes`.
+   * Returns a [[NatsDecodeError]] if the tag is not found in the routing table.
+   */
+  private def decodeFromRoutes[E](
+    routes: Map[String, Chunk[Byte] => Either[NatsDecodeError, E]],
+    bytes: Chunk[Byte],
+    typeTag: String
+  ): Either[NatsDecodeError, E] =
+    routes
+      .get(typeTag)
+      .map(_(bytes))
+      .getOrElse(Left(NatsDecodeError(s"Unknown error type discriminator: '$typeTag'")))
+
+  /**
    * Safe instance for infallible endpoints (`Err = Nothing`).
    *
    * Both methods are statically unreachable: a handler typed `IO[Nothing, Out]`
@@ -220,10 +236,7 @@ private[nats] object TypedErrorCodec:
         if pa.matches(e) then (pa.encode(e.asInstanceOf[A]), pa.tag)
         else (pb.encode(e.asInstanceOf[B]), pb.tag)
       def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, A | B] =
-        tagRoutes
-          .get(typeTag)
-          .map(_(bytes))
-          .getOrElse(Left(NatsDecodeError(s"Unknown error type discriminator: '$typeTag'")))
+        decodeFromRoutes(tagRoutes, bytes, typeTag)
 
   /**
    * Explicit factory for a 3-member union codec.
@@ -248,10 +261,7 @@ private[nats] object TypedErrorCodec:
         else if pb.matches(e) then (pb.encode(e.asInstanceOf[B]), pb.tag)
         else (pc.encode(e.asInstanceOf[C]), pc.tag)
       def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, A | B | C] =
-        tagRoutes
-          .get(typeTag)
-          .map(_(bytes))
-          .getOrElse(Left(NatsDecodeError(s"Unknown error type discriminator: '$typeTag'")))
+        decodeFromRoutes(tagRoutes, bytes, typeTag)
 
   /**
    * Explicit factory for a 4-member union codec.
@@ -279,10 +289,7 @@ private[nats] object TypedErrorCodec:
         else if pc.matches(e) then (pc.encode(e.asInstanceOf[C]), pc.tag)
         else (pd.encode(e.asInstanceOf[D]), pd.tag)
       def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, A | B | C | D] =
-        tagRoutes
-          .get(typeTag)
-          .map(_(bytes))
-          .getOrElse(Left(NatsDecodeError(s"Unknown error type discriminator: '$typeTag'")))
+        decodeFromRoutes(tagRoutes, bytes, typeTag)
 
   /**
    * Explicit factory for a 5-member union codec.
@@ -315,7 +322,4 @@ private[nats] object TypedErrorCodec:
         else if pd.matches(e) then (pd.encode(e.asInstanceOf[D]), pd.tag)
         else (pe.encode(e.asInstanceOf[E]), pe.tag)
       def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, A | B | C | D | E] =
-        tagRoutes
-          .get(typeTag)
-          .map(_(bytes))
-          .getOrElse(Left(NatsDecodeError(s"Unknown error type discriminator: '$typeTag'")))
+        decodeFromRoutes(tagRoutes, bytes, typeTag)

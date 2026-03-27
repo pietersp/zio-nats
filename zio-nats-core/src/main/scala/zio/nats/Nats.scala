@@ -368,6 +368,7 @@ object Nats {
 // Private live implementation
 // ---------------------------------------------------------------------------
 
+/** jnats-backed implementation of [[Nats]]. */
 private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) extends Nats {
 
   override def publish[A: NatsCodec](
@@ -418,15 +419,9 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
               // Nats-Service-Error / Nats-Service-Error-Code headers. Decoding
               // an empty body would silently succeed (e.g. "" for String), so
               // we must intercept this at the protocol level.
-              msg.headers.get("Nats-Service-Error").headOption match {
-                case Some(errMsg) =>
-                  val code = msg.headers
-                    .get("Nats-Service-Error-Code")
-                    .headOption
-                    .flatMap(_.toIntOption)
-                    .getOrElse(500)
-                  ZIO.fail(NatsError.ServiceCallFailed(errMsg, code))
-                case None =>
+              extractServiceError(msg) match {
+                case Some((errMsg, code)) => ZIO.fail(NatsError.ServiceCallFailed(errMsg, code))
+                case None                 =>
                   ZIO
                     .fromEither(msg.decode[B])
                     .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
@@ -462,38 +457,7 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
               )
             case Some(jMsg) =>
               val msg = NatsMessage.fromJava(jMsg)
-              msg.headers.get("Nats-Service-Error").headOption match {
-                case Some(errHeader) =>
-                  val code = msg.headers
-                    .get("Nats-Service-Error-Code")
-                    .headOption
-                    .flatMap(_.toIntOption)
-                    .getOrElse(500)
-                  if (msg.payload.nonEmpty)
-                    // Typed domain error — read the type discriminator header and
-                    // route to the correct member codec (supports union error types)
-                    val typeTag = msg.headers
-                      .get("Nats-Service-Error-Type")
-                      .headOption
-                      .getOrElse("")
-                    ZIO
-                      .fromEither(endpoint.errCodec.decode(msg.payload, typeTag))
-                      .mapError(e =>
-                        NatsError.ServiceCallFailed(
-                          s"$errHeader (typed error decode failed: ${e.message})",
-                          code
-                        )
-                      )
-                      .flatMap(err => ZIO.fail(err))
-                  else
-                    // Infrastructure error — empty body
-                    ZIO.fail(NatsError.ServiceCallFailed(errHeader, code))
-                case None =>
-                  // Success — decode body as Out
-                  ZIO
-                    .fromEither(endpoint.outCodec.decode(msg.payload))
-                    .mapError(e => NatsError.DecodingError(e.message, e))
-              }
+              decodeServiceReply(msg, endpoint.errCodec, endpoint.outCodec)
           }
       }
 
@@ -507,6 +471,49 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
     ZIO
       .fromEither(msg.decode[A])
       .mapBoth(e => NatsError.DecodingError(e.message, e), Envelope(_, msg))
+
+  /**
+   * Extract NATS Micro error headers if present; returns `None` for success
+   * replies.
+   */
+  private def extractServiceError(msg: NatsMessage): Option[(String, Int)] =
+    msg.headers.get("Nats-Service-Error").headOption.map { errMsg =>
+      val code = msg.headers.get("Nats-Service-Error-Code").headOption.flatMap(_.toIntOption).getOrElse(500)
+      (errMsg, code)
+    }
+
+  /**
+   * Decode a reply from a typed service call.
+   *
+   * On a service error header with a non-empty body, decodes the domain error
+   * via `errCodec` and fails the effect. On an empty body, fails with an
+   * infrastructure [[NatsError.ServiceCallFailed]]. On no error header, decodes
+   * the success body via `outCodec`.
+   */
+  private def decodeServiceReply[Err, Out](
+    msg: NatsMessage,
+    errCodec: TypedErrorCodec[Err],
+    outCodec: NatsCodec[Out]
+  ): IO[NatsError | Err, Out] =
+    extractServiceError(msg) match {
+      case Some((errHeader, code)) =>
+        if (msg.payload.nonEmpty)
+          // Typed domain error — read the type discriminator header and
+          // route to the correct member codec (supports union error types)
+          val typeTag = msg.headers.get("Nats-Service-Error-Type").headOption.getOrElse("")
+          ZIO
+            .fromEither(errCodec.decode(msg.payload, typeTag))
+            .mapError(e => NatsError.ServiceCallFailed(s"$errHeader (typed error decode failed: ${e.message})", code))
+            .flatMap(err => ZIO.fail(err))
+        else
+          // Infrastructure error — empty body
+          ZIO.fail(NatsError.ServiceCallFailed(errHeader, code))
+      case None =>
+        // Success — decode body as Out
+        ZIO
+          .fromEither(outCodec.decode(msg.payload))
+          .mapError(e => NatsError.DecodingError(e.message, e))
+    }
 
   /**
    * Internal: Dispatcher → ZStream pattern.

@@ -4,8 +4,6 @@ import io.nats.client.{Message => JMessage}
 import zio._
 import zio.nats.{NatsCodec, NatsDecodeError, NatsError, NatsMessage, Subject, Headers}
 
-import scala.jdk.CollectionConverters._
-
 /**
  * A NATS message from a JetStream consumer, augmented with acknowledgment
  * operations.
@@ -100,23 +98,12 @@ final class JetStreamMessage(
 object JetStreamMessage {
 
   /** Convert a jnats [[JMessage]] to a [[JetStreamMessage]]. */
-  private[nats] def fromJava(msg: JMessage): JetStreamMessage = {
-    val hdrs: Headers =
-      if (msg.hasHeaders && msg.getHeaders != null) {
-        val m = msg.getHeaders
-          .keySet()
-          .asScala
-          .map(key => key -> Chunk.fromIterable(msg.getHeaders.get(key).asScala))
-          .toMap
-        Headers(m)
-      } else Headers.empty
-
+  private[nats] def fromJava(msg: JMessage): JetStreamMessage =
     new JetStreamMessage(
       subject = Subject(msg.getSubject),
       replyTo = Option(msg.getReplyTo).map(Subject(_)),
-      headers = hdrs,
+      headers = if msg.hasHeaders then Headers.fromJava(msg.getHeaders) else Headers.empty,
       payload = Chunk.fromArray(Option(msg.getData).getOrElse(Array.emptyByteArray)),
       underlying = msg
     )
-  }
 }

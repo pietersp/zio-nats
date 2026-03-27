@@ -115,50 +115,36 @@ object ServiceDiscovery {
 // ServiceDiscoveryLive — private implementation
 // ---------------------------------------------------------------------------
 
+/** jnats-backed implementation of [[ServiceDiscovery]]. */
 private[nats] final class ServiceDiscoveryLive(discovery: JDiscovery) extends ServiceDiscovery {
 
+  private def discover[T](block: => T): IO[NatsError, T] =
+    ZIO.attemptBlocking(block).mapError(NatsError.fromThrowable)
+
   def ping(): IO[NatsError, List[PingResponse]] =
-    ZIO
-      .attemptBlocking(discovery.ping().asScala.toList.map(PingResponse.fromJava))
-      .mapError(NatsError.fromThrowable)
+    discover(discovery.ping().asScala.toList.map(PingResponse.fromJava))
 
   def ping(serviceName: String): IO[NatsError, List[PingResponse]] =
-    ZIO
-      .attemptBlocking(discovery.ping(serviceName).asScala.toList.map(PingResponse.fromJava))
-      .mapError(NatsError.fromThrowable)
+    discover(discovery.ping(serviceName).asScala.toList.map(PingResponse.fromJava))
 
   def ping(serviceName: String, serviceId: String): IO[NatsError, Option[PingResponse]] =
-    ZIO
-      .attemptBlocking(Option(discovery.ping(serviceName, serviceId)).map(PingResponse.fromJava))
-      .mapError(NatsError.fromThrowable)
+    discover(Option(discovery.ping(serviceName, serviceId)).map(PingResponse.fromJava))
 
   def info(): IO[NatsError, List[InfoResponse]] =
-    ZIO
-      .attemptBlocking(discovery.info().asScala.toList.map(InfoResponse.fromJava))
-      .mapError(NatsError.fromThrowable)
+    discover(discovery.info().asScala.toList.map(InfoResponse.fromJava))
 
   def info(serviceName: String): IO[NatsError, List[InfoResponse]] =
-    ZIO
-      .attemptBlocking(discovery.info(serviceName).asScala.toList.map(InfoResponse.fromJava))
-      .mapError(NatsError.fromThrowable)
+    discover(discovery.info(serviceName).asScala.toList.map(InfoResponse.fromJava))
 
   def info(serviceName: String, serviceId: String): IO[NatsError, Option[InfoResponse]] =
-    ZIO
-      .attemptBlocking(Option(discovery.info(serviceName, serviceId)).map(InfoResponse.fromJava))
-      .mapError(NatsError.fromThrowable)
+    discover(Option(discovery.info(serviceName, serviceId)).map(InfoResponse.fromJava))
 
   def stats(): IO[NatsError, List[StatsResponse]] =
-    ZIO
-      .attemptBlocking(discovery.stats().asScala.toList.map(StatsResponse.fromJava))
-      .mapError(NatsError.fromThrowable)
+    discover(discovery.stats().asScala.toList.map(StatsResponse.fromJava))
 
   def stats(serviceName: String): IO[NatsError, List[StatsResponse]] =
-    ZIO
-      .attemptBlocking(discovery.stats(serviceName).asScala.toList.map(StatsResponse.fromJava))
-      .mapError(NatsError.fromThrowable)
+    discover(discovery.stats(serviceName).asScala.toList.map(StatsResponse.fromJava))
 
   def stats(serviceName: String, serviceId: String): IO[NatsError, Option[StatsResponse]] =
-    ZIO
-      .attemptBlocking(Option(discovery.stats(serviceName, serviceId)).map(StatsResponse.fromJava))
-      .mapError(NatsError.fromThrowable)
+    discover(Option(discovery.stats(serviceName, serviceId)).map(StatsResponse.fromJava))
 }

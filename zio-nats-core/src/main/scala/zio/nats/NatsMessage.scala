@@ -51,24 +51,13 @@ final case class NatsMessage(
 object NatsMessage {
 
   /** Build a pure [[NatsMessage]] from a jnats [[JMessage]]. */
-  private[nats] def fromJava(msg: JMessage): NatsMessage = {
-    val hdrs: Headers =
-      if (msg.hasHeaders && msg.getHeaders != null) {
-        val m = msg.getHeaders
-          .keySet()
-          .asScala
-          .map(key => key -> Chunk.fromIterable(msg.getHeaders.get(key).asScala))
-          .toMap
-        Headers(m)
-      } else Headers.empty
-
+  private[nats] def fromJava(msg: JMessage): NatsMessage =
     NatsMessage(
       subject = Subject(msg.getSubject),
       replyTo = Option(msg.getReplyTo).map(Subject(_)),
-      headers = hdrs,
+      headers = if msg.hasHeaders then Headers.fromJava(msg.getHeaders) else Headers.empty,
       payload = Chunk.fromArray(Option(msg.getData).getOrElse(Array.emptyByteArray))
     )
-  }
 
   /**
    * Build a jnats [[JMessage]] suitable for publishing.

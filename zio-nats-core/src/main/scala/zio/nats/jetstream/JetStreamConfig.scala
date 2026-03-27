@@ -188,25 +188,26 @@ object StreamConfig {
     if (config.isSealed) builder.seal()
     if (config.firstSequence > 0) builder.firstSequence(config.firstSequence)
 
-    config.mirror.foreach { mirror =>
-      val mirrorBuilder = Mirror.builder().name(mirror.name)
-      mirror.filterSubject.foreach(s => mirrorBuilder.filterSubject(s))
-      mirror.external.foreach { ext =>
-        mirrorBuilder.external(External.builder().api(ext.api).deliver(ext.deliver).build())
-      }
-      builder.mirror(mirrorBuilder.build())
-    }
-
-    config.sources.foreach { source =>
-      val sourceBuilder = Source.builder().name(source.name)
-      source.filterSubject.foreach(s => sourceBuilder.filterSubject(s))
-      source.external.foreach { ext =>
-        sourceBuilder.external(External.builder().api(ext.api).deliver(ext.deliver).build())
-      }
-      builder.addSource(sourceBuilder.build())
-    }
+    config.mirror.foreach(m => builder.mirror(buildMirror(m)))
+    config.sources.foreach(s => builder.addSource(buildSource(s)))
 
     builder.build()
+  }
+
+  /** Build a jnats [[Mirror]] from a [[MirrorConfig]]. */
+  private[nats] def buildMirror(m: MirrorConfig): Mirror = {
+    val mb = Mirror.builder().name(m.name)
+    m.filterSubject.foreach(s => mb.filterSubject(s))
+    m.external.foreach(ext => mb.external(External.builder().api(ext.api).deliver(ext.deliver).build()))
+    mb.build()
+  }
+
+  /** Build a jnats [[Source]] from a [[SourceConfig]]. */
+  private[nats] def buildSource(s: SourceConfig): Source = {
+    val sb = Source.builder().name(s.name)
+    s.filterSubject.foreach(f => sb.filterSubject(f))
+    s.external.foreach(ext => sb.external(External.builder().api(ext.api).deliver(ext.deliver).build()))
+    sb.build()
   }
 }
 

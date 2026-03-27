@@ -244,6 +244,23 @@ final class ServiceEndpoint[In, Err, Out](
     g.parent.fold(g.name)(p => groupPrefix(p) + "." + g.name)
 
   /**
+   * Build a [[ServiceErrorMapper]] by trying each `parts` entry in order and
+   * dispatching to the corresponding mapper when a match is found.
+   *
+   * Used internally by all multi-parameter `failsWith` overloads to avoid
+   * duplicating the if-chain dispatch logic.
+   */
+  private def firstMatchMapper[E](
+    parts: Seq[ErrorCodecPart[?]],
+    mappers: Seq[ServiceErrorMapper[?]]
+  ): ServiceErrorMapper[E] = e =>
+    parts
+      .zip(mappers)
+      .find((part, _) => part.matches(e))
+      .map((_, mapper) => mapper.asInstanceOf[ServiceErrorMapper[Any]].toErrorResponse(e))
+      .getOrElse(("Unknown error type", 500))
+
+  /**
    * Return a copy of this endpoint descriptor with the error type set to `E`.
    *
    * Requires `NatsCodec[E]` in implicit scope — `TypedErrorCodec[E]` is then
@@ -304,9 +321,7 @@ final class ServiceEndpoint[In, Err, Out](
     val pa                                     = summon[ErrorCodecPart[A]]
     val pb                                     = summon[ErrorCodecPart[B]]
     val unionCodec: TypedErrorCodec[A | B]     = TypedErrorCodec.union2(pa, pb)
-    val unionMapper: ServiceErrorMapper[A | B] = e =>
-      if pa.matches(e) then ma.toErrorResponse(e.asInstanceOf[A])
-      else mb.toErrorResponse(e.asInstanceOf[B])
+    val unionMapper: ServiceErrorMapper[A | B] = firstMatchMapper(Seq(pa, pb), Seq(ma, mb))
     new ServiceEndpoint[In, A | B, Out](name, subject, queueGroup, group, metadata)(using
       inCodec,
       outCodec,
@@ -335,10 +350,7 @@ final class ServiceEndpoint[In, Err, Out](
     val pb                                         = summon[ErrorCodecPart[B]]
     val pc                                         = summon[ErrorCodecPart[C]]
     val unionCodec: TypedErrorCodec[A | B | C]     = TypedErrorCodec.union3(pa, pb, pc)
-    val unionMapper: ServiceErrorMapper[A | B | C] = e =>
-      if pa.matches(e) then ma.toErrorResponse(e.asInstanceOf[A])
-      else if pb.matches(e) then mb.toErrorResponse(e.asInstanceOf[B])
-      else mc.toErrorResponse(e.asInstanceOf[C])
+    val unionMapper: ServiceErrorMapper[A | B | C] = firstMatchMapper(Seq(pa, pb, pc), Seq(ma, mb, mc))
     new ServiceEndpoint[In, A | B | C, Out](name, subject, queueGroup, group, metadata)(using
       inCodec,
       outCodec,
@@ -374,11 +386,7 @@ final class ServiceEndpoint[In, Err, Out](
     val pc                                             = summon[ErrorCodecPart[C]]
     val pd                                             = summon[ErrorCodecPart[D]]
     val unionCodec: TypedErrorCodec[A | B | C | D]     = TypedErrorCodec.union4(pa, pb, pc, pd)
-    val unionMapper: ServiceErrorMapper[A | B | C | D] = e =>
-      if pa.matches(e) then ma.toErrorResponse(e.asInstanceOf[A])
-      else if pb.matches(e) then mb.toErrorResponse(e.asInstanceOf[B])
-      else if pc.matches(e) then mc.toErrorResponse(e.asInstanceOf[C])
-      else md.toErrorResponse(e.asInstanceOf[D])
+    val unionMapper: ServiceErrorMapper[A | B | C | D] = firstMatchMapper(Seq(pa, pb, pc, pd), Seq(ma, mb, mc, md))
     new ServiceEndpoint[In, A | B | C | D, Out](name, subject, queueGroup, group, metadata)(using
       inCodec,
       outCodec,
@@ -421,12 +429,8 @@ final class ServiceEndpoint[In, Err, Out](
     val pd                                                 = summon[ErrorCodecPart[D]]
     val pe                                                 = summon[ErrorCodecPart[E]]
     val unionCodec: TypedErrorCodec[A | B | C | D | E]     = TypedErrorCodec.union5(pa, pb, pc, pd, pe)
-    val unionMapper: ServiceErrorMapper[A | B | C | D | E] = e =>
-      if pa.matches(e) then ma.toErrorResponse(e.asInstanceOf[A])
-      else if pb.matches(e) then mb.toErrorResponse(e.asInstanceOf[B])
-      else if pc.matches(e) then mc.toErrorResponse(e.asInstanceOf[C])
-      else if pd.matches(e) then md.toErrorResponse(e.asInstanceOf[D])
-      else me.toErrorResponse(e.asInstanceOf[E])
+    val unionMapper: ServiceErrorMapper[A | B | C | D | E] =
+      firstMatchMapper(Seq(pa, pb, pc, pd, pe), Seq(ma, mb, mc, md, me))
     new ServiceEndpoint[In, A | B | C | D | E, Out](name, subject, queueGroup, group, metadata)(using
       inCodec,
       outCodec,
@@ -496,19 +500,25 @@ trait BoundEndpoint {
 // BoundEndpointLive — private implementation
 // ---------------------------------------------------------------------------
 
+/** jnats-backed implementation of [[BoundEndpoint]]. */
 private[nats] class BoundEndpointLive[In, Err, Out](
   val name: String,
   endpoint: ServiceEndpoint[In, Err, Out],
   handler: ServiceRequest[In] => IO[Err, Out]
 ) extends BoundEndpoint {
 
-  private[nats] def buildJava(conn: JConnection, runtime: Runtime[Any]): JServiceEndpoint = {
+  /**
+   * Build the jnats [[ServiceMessageHandler]] that decodes requests, runs the
+   * user handler, and encodes replies — isolated from the builder wiring in
+   * [[buildJava]].
+   */
+  private def makeHandler(conn: JConnection, runtime: Runtime[Any]): ServiceMessageHandler = {
     val inCodec     = endpoint.inCodec
     val outCodec    = endpoint.outCodec
     val errorMapper = endpoint.errorMapper
     val errCodec    = endpoint.errCodec
 
-    val jHandler: ServiceMessageHandler = { (jMsg: JServiceMessage) =>
+    { (jMsg: JServiceMessage) =>
       Unsafe.unsafe { implicit unsafe =>
         runtime.unsafe.fork {
           // Error channel: Left = typed domain error, Right = infrastructure (message, code)
@@ -522,7 +532,7 @@ private[nats] class BoundEndpointLive[In, Err, Out](
             req = ServiceRequest(
                     value = in,
                     subject = Subject(jMsg.getSubject),
-                    headers = headersFromJava(jMsg)
+                    headers = Headers.fromJava(jMsg.getHeaders)
                   )
 
             // Run the user handler — preserve the typed Err in the Left channel
@@ -562,11 +572,13 @@ private[nats] class BoundEndpointLive[In, Err, Out](
         }
       }
     }
+  }
 
+  private[nats] def buildJava(conn: JConnection, runtime: Runtime[Any]): JServiceEndpoint = {
     val b = JServiceEndpoint
       .builder()
       .endpointName(endpoint.name)
-      .handler(jHandler)
+      .handler(makeHandler(conn, runtime))
 
     endpoint.subject.foreach(b.endpointSubject)
 
@@ -604,22 +616,4 @@ private[nats] class BoundEndpointLive[In, Err, Out](
         jParent
     }
 
-  /**
-   * Convert a jnats ServiceMessage's headers to [[Headers]].
-   *
-   * Uses the same pattern as [[zio.nats.NatsMessage.fromJava]].
-   */
-  private def headersFromJava(jMsg: JServiceMessage): Headers = {
-    import scala.jdk.CollectionConverters._
-    val jh = jMsg.getHeaders
-    if (jh == null) Headers.empty
-    else {
-      val m = jh
-        .keySet()
-        .asScala
-        .map(key => key -> Chunk.fromIterable(jh.get(key).asScala))
-        .toMap
-      Headers(m)
-    }
-  }
 }

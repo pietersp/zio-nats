@@ -1,9 +1,9 @@
 package zio.nats.kv
 
-import io.nats.client.api.{External, Mirror, Republish, Source, KeyValueConfiguration as JKeyValueConfiguration}
+import io.nats.client.api.{Republish, KeyValueConfiguration as JKeyValueConfiguration}
 import zio.Duration
 import zio.nats.StorageType
-import zio.nats.jetstream.{ExternalConfig, MirrorConfig, SourceConfig}
+import zio.nats.jetstream.{ExternalConfig, MirrorConfig, SourceConfig, StreamConfig}
 
 import scala.jdk.CollectionConverters.*
 
@@ -99,23 +99,8 @@ object KeyValueConfig {
     config.ttl.foreach(d => builder.ttl(java.time.Duration.ofMillis(d.toMillis)))
     config.limitMarkerTtl.foreach(d => builder.limitMarker(java.time.Duration.ofMillis(d.toMillis)))
 
-    config.mirror.foreach { m =>
-      val mb = Mirror.builder().name(m.name)
-      m.filterSubject.foreach(s => mb.filterSubject(s))
-      m.external.foreach { ext =>
-        mb.external(External.builder().api(ext.api).deliver(ext.deliver).build())
-      }
-      builder.mirror(mb.build())
-    }
-
-    config.sources.foreach { s =>
-      val sb = Source.builder().name(s.name)
-      s.filterSubject.foreach(f => sb.filterSubject(f))
-      s.external.foreach { ext =>
-        sb.external(External.builder().api(ext.api).deliver(ext.deliver).build())
-      }
-      builder.sources(sb.build())
-    }
+    config.mirror.foreach(m => builder.mirror(StreamConfig.buildMirror(m)))
+    config.sources.foreach(s => builder.sources(StreamConfig.buildSource(s)))
 
     config.republish.foreach { r =>
       builder.republish(

@@ -110,8 +110,15 @@ private[nats] object ConsumerDecode {
     stream: ZStream[Any, NatsError, JetStreamMessage]
   ): ZStream[Any, NatsError, JsEnvelope[A]] =
     stream.mapZIO(decodeMsg[A])
+
+  def decodeNext[A: NatsCodec](opt: Option[JetStreamMessage]): IO[NatsError, Option[JsEnvelope[A]]] =
+    opt match {
+      case None      => ZIO.none
+      case Some(msg) => decodeMsg[A](msg).map(Some(_))
+    }
 }
 
+/** jnats-backed implementation of [[OrderedConsumer]]. */
 private[nats] final class OrderedConsumerLive(
   val streamName: String,
   ctx: JOrderedConsumerContext
@@ -129,15 +136,13 @@ private[nats] final class OrderedConsumerLive(
     ConsumerDecode.decodeStream(JetStreamConsumer.iterate(ctx, Some(options.toJava), pollTimeout))
 
   def next[A: NatsCodec](timeout: Duration): IO[NatsError, Option[JsEnvelope[A]]] =
-    JetStreamConsumer.next(ctx, timeout).flatMap {
-      case None      => ZIO.none
-      case Some(msg) => ConsumerDecode.decodeMsg[A](msg).map(Some(_))
-    }
+    JetStreamConsumer.next(ctx, timeout).flatMap(ConsumerDecode.decodeNext[A])
 
   def unpin(group: String): IO[NatsError, Boolean] =
     ZIO.attemptBlocking(ctx.unpin(group)).mapError(NatsError.fromThrowable)
 }
 
+/** jnats-backed implementation of [[Consumer]]. */
 private[nats] final class ConsumerLive(
   val streamName: String,
   val consumerName: String,
@@ -154,10 +159,7 @@ private[nats] final class ConsumerLive(
     ConsumerDecode.decodeStream(JetStreamConsumer.iterate(ctx, Some(options.toJava), pollTimeout))
 
   def next[A: NatsCodec](timeout: Duration): IO[NatsError, Option[JsEnvelope[A]]] =
-    JetStreamConsumer.next(ctx, timeout).flatMap {
-      case None      => ZIO.none
-      case Some(msg) => ConsumerDecode.decodeMsg[A](msg).map(Some(_))
-    }
+    JetStreamConsumer.next(ctx, timeout).flatMap(ConsumerDecode.decodeNext[A])
 
   def unpin(group: String): IO[NatsError, Boolean] =
     ZIO.attemptBlocking(ctx.unpin(group)).mapError(NatsError.fromThrowable)

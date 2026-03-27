@@ -3,6 +3,8 @@ package zio.nats
 import io.nats.client.{Connection => JConnection}
 import zio.Chunk
 
+import scala.jdk.CollectionConverters._
+
 /**
  * An opaque type alias for NATS subject strings.
  *
@@ -107,6 +109,19 @@ object Headers {
    */
   def fromMap(map: Map[String, List[String]]): Headers =
     Headers(map.view.mapValues(Chunk.fromIterable(_)).toMap)
+
+  /**
+   * Convert jnats [[io.nats.client.impl.Headers]] to [[Headers]].
+   *
+   * Returns [[empty]] if `jh` is `null` (jnats returns `null` when no headers
+   * are present).
+   */
+  private[nats] def fromJava(jh: io.nats.client.impl.Headers): Headers =
+    if (jh == null) empty
+    else {
+      val m = jh.keySet().asScala.map(key => key -> Chunk.fromIterable(jh.get(key).asScala)).toMap
+      Headers(m)
+    }
 }
 
 // ---------------------------------------------------------------------------
