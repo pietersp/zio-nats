@@ -1,7 +1,7 @@
 { pkgs, lib, config, inputs, ... }:
 
 {
-  cachix.enable = false;
+  cachix.enable = true;
 
   packages = [
     pkgs.claude-code

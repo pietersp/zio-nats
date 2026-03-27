@@ -28,3 +28,6 @@ devenv.local.yaml
 
 # pre-commit
 .pre-commit-config.yaml
+
+# MCP config (nix symlink, local only)
+.mcp.json
