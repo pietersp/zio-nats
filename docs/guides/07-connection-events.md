@@ -3,7 +3,7 @@ id: connection-events
 title: Connection Events
 ---
 
-`Nats.lifecycleEvents` is a `ZStream[Any, Nothing, NatsEvent]` that fires whenever the underlying TCP connection changes state - connecting, disconnecting, reconnecting, and closing. The stream never fails; exceptions from the client internals are wrapped in `NatsEvent.ExceptionOccurred` rather than surfacing as stream errors. Multiple concurrent subscribers are supported and each receives a full independent copy of the event stream.
+`Nats#lifecycleEvents` is a `ZStream[Any, Nothing, NatsEvent]` that fires whenever the underlying TCP connection changes state - connecting, disconnecting, reconnecting, and closing. The stream never fails; exceptions from the client internals are wrapped in `NatsEvent.ExceptionOccurred` rather than surfacing as stream errors. Multiple concurrent subscribers are supported and each receives a full independent copy of the event stream.
 
 ## Listening to events
 
@@ -101,7 +101,7 @@ val utilities: ZIO[Nats, NatsError, Unit] =
   }
 ```
 
-`nats.flush(timeout)` waits until all buffered outgoing messages have been written to the server. Call it before a planned shutdown to avoid losing in-flight publishes.
+`Nats#flush` waits until all buffered outgoing messages have been written to the server. Call it before a planned shutdown to avoid losing in-flight publishes.
 
 ## Next steps
 
