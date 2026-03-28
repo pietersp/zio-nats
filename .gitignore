@@ -6,11 +6,11 @@ target/
 *.class
 *.log
 
-# Claude Code — ignore personal settings; skills are project-specific and committed
+# Claude Code — ignore personal settings; project skill sources live in .skillshare/
 .claude/settings.json
 .claude/settings.local.json
 
-# Agent skills (personal, not project-specific)
+# Generated target skill mirrors from skillshare sync -p
 .agents/skills/
 .claude/skills/
 .opencode/skills/
