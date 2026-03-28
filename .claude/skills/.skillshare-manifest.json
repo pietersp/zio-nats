@@ -1,7 +1,16 @@
 {
   "managed": {
+    "docs-check-compliance": "symlink",
+    "docs-enrich-section": "symlink",
+    "docs-find-documentation-gaps": "symlink",
+    "docs-how-to-guide": "symlink",
+    "docs-integrate": "symlink",
+    "docs-mdoc-conventions": "symlink",
+    "docs-research": "symlink",
+    "docs-verify-compliance": "symlink",
+    "docs-writing-style": "symlink",
     "jetbrains-ide": "symlink",
     "scala-metals": "symlink"
   },
-  "updated_at": "2026-03-28T17:20:17.3013355+02:00"
+  "updated_at": "2026-03-28T17:59:03.4683713+02:00"
 }
