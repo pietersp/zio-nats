@@ -1,3 +1,8 @@
+---
+name: docs-verify-compliance
+description: Verify that documentation changes satisfy the repo's required documentation checks.
+---
+
 # Verify Documentation Compliance
 
 Runs a full compliance check on a documentation file: writing style, mdoc conventions, and compilation.

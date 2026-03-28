@@ -1,3 +1,8 @@
+---
+name: docs-find-documentation-gaps
+description: Find missing or weak documentation coverage by comparing docs against the source code.
+---
+
 # Documentation Gap Analysis
 
 Scans the zio-nats public API and identifies areas that lack documentation coverage. Produces a structured report for prioritisation.

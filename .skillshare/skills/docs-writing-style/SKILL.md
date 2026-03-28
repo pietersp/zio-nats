@@ -1,3 +1,8 @@
+---
+name: docs-writing-style
+description: Apply the zio-nats documentation voice, prose rules, and formatting style consistently.
+---
+
 # zio-nats Documentation Writing Style
 
 ## Tone

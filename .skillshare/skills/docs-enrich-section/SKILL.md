@@ -1,3 +1,8 @@
+---
+name: docs-enrich-section
+description: Expand a thin documentation section with concrete, source-backed guidance and examples.
+---
+
 # Enrich a Documentation Section with Motivation and Use-Cases
 
 ## Overview

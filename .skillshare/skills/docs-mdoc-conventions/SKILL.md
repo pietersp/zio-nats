@@ -1,3 +1,8 @@
+---
+name: docs-mdoc-conventions
+description: Apply zio-nats mdoc conventions so documentation examples compile and render correctly.
+---
+
 # zio-nats Documentation Conventions
 
 ## Source vs Output

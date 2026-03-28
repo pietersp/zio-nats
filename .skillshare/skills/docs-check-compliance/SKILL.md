@@ -1,3 +1,8 @@
+---
+name: docs-check-compliance
+description: Check a zio-nats documentation page against the project documentation standards.
+---
+
 # Documentation Compliance Audit Workflow
 
 This workflow systematically audits documentation files against a rule skill and fixes every violation found.

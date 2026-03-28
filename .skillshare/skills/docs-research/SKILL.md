@@ -1,3 +1,8 @@
+---
+name: docs-research
+description: Research zio-nats source code systematically before writing or updating documentation.
+---
+
 # Source Code Research for Documentation
 
 This procedure guides systematic investigation of a topic before writing documentation. Complete all phases before writing a word of prose.

@@ -1,3 +1,8 @@
+---
+name: docs-how-to-guide
+description: Write task-oriented how-to guides for zio-nats using the repo's documentation conventions.
+---
+
 # How-To Guide Writing for zio-nats
 
 How-to guides are **goal-oriented**: the reader arrives with a specific task in mind and leaves having accomplished it. They assume familiarity with ZIO and NATS basics. Focus on the task — not on teaching concepts from scratch.
