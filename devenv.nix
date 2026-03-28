@@ -12,10 +12,8 @@ in
 
   packages = [
     pkgs.bloop
-    pkgs-unstable.claude-code
     pkgs.git
     pkgs.natscli
-    pkgs-unstable.opencode
     pkgs.scala-cli
   ];
 
