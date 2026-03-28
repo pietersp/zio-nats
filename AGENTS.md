@@ -14,6 +14,16 @@ When making any code changes, keep documentation in sync:
 - **`CLAUDE.md`**: Update the Architecture, Key Files, or Project Layout sections if the structure or behaviour changes.
 - **`README.md`** (if present): Reflect any public API additions, removals, or behavioural changes.
 
+## Output Paths
+
+| Artifact | Location |
+|---|---|
+| Design specs | `agent-docs/design-docs/` |
+| Execution plans (active) | `agent-docs/exec-plans/active/` |
+
+**IMPORTANT: Design specs MUST be saved to `agent-docs/design-docs/`, NOT `docs/superpowers/specs/`. Execution plans MUST be saved to `agent-docs/exec-plans/active/`, NOT `docs/superpowers/plans/`.**
+**`docs` MUST only contain documenation for the end user of this library**
+
 ## Build & Dev Commands
 
 **On macOS/Linux** (devenv): `sbt` is available directly in the devenv shell.
