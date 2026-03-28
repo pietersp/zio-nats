@@ -21,7 +21,7 @@ object NatsPubSubSpec extends ZIOSpecDefault {
                    .runDrain
                    .fork
         // flush ensures the SUBSCRIBE command has been transmitted to the server
-        _   <- ZIO.sleep(10.millis)
+        _   <- ZIO.sleep(100.millis)
         _   <- nats.flush(5.seconds)
         _   <- nats.publish(subject, Chunk.fromArray("hello".getBytes))
         msg <- received.await
