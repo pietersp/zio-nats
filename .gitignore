@@ -11,9 +11,9 @@ target/
 .claude/settings.local.json
 
 # Agent skills (personal, not project-specific)
-# .agents/skills/
-# .claude/skills/
-# .opencode/skills/
+.agents/skills/
+.claude/skills/
+.opencode/skills/
 
 # Environment variables
 .env
