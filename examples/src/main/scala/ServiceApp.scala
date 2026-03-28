@@ -49,10 +49,12 @@ object ServiceApp extends ZIOAppDefault {
   // ---------------------------------------------------------------------------
 
   // Infallible echo endpoint — no domain error type.
-  val echoEndpoint = ServiceEndpoint("echo").in[String].out[String]
+  val echoEndpoint: ServiceEndpoint[String, Nothing, String] = ServiceEndpoint("echo").in[String].out[String]
 
   // Fallible lookup endpoint — two distinct error types form a union.
-  val lookupEndpoint = ServiceEndpoint("lookup")
+  val lookupEndpoint: ServiceEndpoint[LookupRequest, NotFound | ValidationError, LookupReply] = ServiceEndpoint(
+    "lookup"
+  )
     .in[LookupRequest]
     .out[LookupReply]
     .failsWith[NotFound, ValidationError]
@@ -63,7 +65,7 @@ object ServiceApp extends ZIOAppDefault {
     "u2" -> LookupReply("Bob", "bob@example.com")
   )
 
-  val run =
+  val run: ZIO[Any, Exception, Unit] =
     ZIO
       .serviceWithZIO[Nats] { nats =>
         ZIO.scoped {

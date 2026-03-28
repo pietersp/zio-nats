@@ -101,7 +101,7 @@ object KeyValueSpec extends ZIOSpecDefault {
                     KeyValueConfig(name = "kv-ttl-bucket", storageType = StorageType.Memory, ttl = Some(10.seconds))
                   )
         _ <- kvm.delete("kv-ttl-bucket")
-      } yield assertTrue(status.ttl.exists(_ == 10.seconds))
+      } yield assertTrue(status.ttl.contains(10.seconds))
     },
 
     test("create with per-entry TTL stores the entry") {

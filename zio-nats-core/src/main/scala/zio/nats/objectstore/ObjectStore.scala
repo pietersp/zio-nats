@@ -355,6 +355,6 @@ private[nats] final class ObjectStoreManagementLive(osm: JObjectStoreManagement)
 
   override def getStatuses: IO[NatsError, List[ObjectStoreBucketStatus]] =
     ZIO
-      .attemptBlocking(osm.getStatuses().asScala.toList)
+      .attemptBlocking(osm.getStatuses.asScala.toList)
       .mapBoth(NatsError.fromThrowable, _.map(ObjectStoreBucketStatus.fromJava))
 }

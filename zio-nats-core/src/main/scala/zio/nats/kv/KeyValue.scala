@@ -481,6 +481,6 @@ private[nats] final class KeyValueManagementLive(kvm: JKeyValueManagement) exten
 
   override def getStatuses: IO[NatsError, List[KeyValueBucketStatus]] =
     ZIO
-      .attemptBlocking(kvm.getStatuses().asScala.toList)
+      .attemptBlocking(kvm.getStatuses.asScala.toList)
       .mapBoth(NatsError.fromThrowable, _.map(KeyValueBucketStatus.fromJava))
 }

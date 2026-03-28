@@ -41,8 +41,7 @@ object NatsConfigSpec extends ZIOSpecDefault {
       },
       test("invalid server URL fails at load time with a helpful error") {
         loadConfig(Map("nats.servers" -> "not-a-url")).exit.map { result =>
-          assertTrue(result.isFailure) &&
-          assertTrue(result.causeOption.exists(_.squash.getMessage.contains("not-a-url")))
+          assertTrue(result.isFailure, result.causeOption.exists(_.squash.getMessage.contains("not-a-url")))
         }
       }
     ),
@@ -53,7 +52,7 @@ object NatsConfigSpec extends ZIOSpecDefault {
       },
       test("present sets the name") {
         loadConfig(Map("nats.connection-name" -> "myapp")).map { cfg =>
-          assertTrue(cfg.connectionName == Some("myapp"))
+          assertTrue(cfg.connectionName.contains("myapp"))
         }
       }
     ),
@@ -125,14 +124,12 @@ object NatsConfigSpec extends ZIOSpecDefault {
       },
       test("unrecognised auth.type fails with a helpful error") {
         loadConfig(Map("nats.auth.type" -> "tokne")).exit.map { result =>
-          assertTrue(result.isFailure) &&
-          assertTrue(result.causeOption.exists(_.squash.getMessage.contains("tokne")))
+          assertTrue(result.isFailure, result.causeOption.exists(_.squash.getMessage.contains("tokne")))
         }
       },
       test("missing required sub-field fails with a helpful error") {
         loadConfig(Map("nats.auth.type" -> "token" /* auth.value missing */ )).exit.map { result =>
-          assertTrue(result.isFailure) &&
-          assertTrue(result.causeOption.exists(_.squash.getMessage.contains("auth.value")))
+          assertTrue(result.isFailure, result.causeOption.exists(_.squash.getMessage.contains("auth.value")))
         }
       }
     ),
@@ -195,14 +192,12 @@ object NatsConfigSpec extends ZIOSpecDefault {
       },
       test("unrecognised tls.type fails with a helpful error") {
         loadConfig(Map("nats.tls.type" -> "system_default")).exit.map { result =>
-          assertTrue(result.isFailure) &&
-          assertTrue(result.causeOption.exists(_.squash.getMessage.contains("system_default")))
+          assertTrue(result.isFailure, result.causeOption.exists(_.squash.getMessage.contains("system_default")))
         }
       },
       test("missing required key-store fields fails with a helpful error") {
         loadConfig(Map("nats.tls.type" -> "key-store" /* both paths missing */ )).exit.map { result =>
-          assertTrue(result.isFailure) &&
-          assertTrue(result.causeOption.exists(_.squash.getMessage.contains("key-store-path")))
+          assertTrue(result.isFailure, result.causeOption.exists(_.squash.getMessage.contains("key-store-path")))
         }
       }
     )

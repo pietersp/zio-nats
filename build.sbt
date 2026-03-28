@@ -5,7 +5,7 @@ val zioBlocksVersion      = "0.0.31"
 val jnatsVersion          = "2.25.2"
 val testcontainersVersion = "0.44.1"
 val jsoniterScalaVersion  = "2.38.9"
-val playJsonVersion       = "3.0.4"
+val playJsonVersion       = "3.0.6"
 
 inThisBuild(
   List(
@@ -17,7 +17,7 @@ inThisBuild(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     scalacOptions ++= Seq("-deprecation", "-feature"),
     semanticdbEnabled := true,
-    developers := List(
+    developers        := List(
       Developer("pietersp", "Pieter", "", url("https://github.com/pietersp"))
     ),
     scmInfo := Some(

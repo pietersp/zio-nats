@@ -59,7 +59,7 @@ package object nats {
   // --- JetStream config re-exports ---
   type StreamConfig          = jetstream.StreamConfig; val StreamConfig     = jetstream.StreamConfig
   type ConsumerConfig        = jetstream.ConsumerConfig; val ConsumerConfig = jetstream.ConsumerConfig
-  type OrderedConsumerConfig = jetstream.OrderedConsumerConfig;
+  type OrderedConsumerConfig = jetstream.OrderedConsumerConfig
   val OrderedConsumerConfig = jetstream.OrderedConsumerConfig
   type MirrorConfig   = jetstream.MirrorConfig; val MirrorConfig     = jetstream.MirrorConfig
   type SourceConfig   = jetstream.SourceConfig; val SourceConfig     = jetstream.SourceConfig
@@ -101,14 +101,14 @@ package object nats {
 
   // ---- Object Store re-exports (users don't need zio.nats.objectstore._) ----
   type ObjectStore           = objectstore.ObjectStore; val ObjectStore = objectstore.ObjectStore
-  type ObjectStoreManagement = objectstore.ObjectStoreManagement;
+  type ObjectStoreManagement = objectstore.ObjectStoreManagement
   val ObjectStoreManagement = objectstore.ObjectStoreManagement
   type ObjectData[A]           = objectstore.ObjectData[A]; val ObjectData    = objectstore.ObjectData
   type ObjectSummary           = objectstore.ObjectSummary; val ObjectSummary = objectstore.ObjectSummary
   type ObjectMeta              = objectstore.ObjectMeta; val ObjectMeta       = objectstore.ObjectMeta
-  type ObjectStoreBucketStatus = objectstore.ObjectStoreBucketStatus;
+  type ObjectStoreBucketStatus = objectstore.ObjectStoreBucketStatus
   val ObjectStoreBucketStatus = objectstore.ObjectStoreBucketStatus
-  type ObjectStoreWatchOptions = objectstore.ObjectStoreWatchOptions;
+  type ObjectStoreWatchOptions = objectstore.ObjectStoreWatchOptions
   val ObjectStoreWatchOptions = objectstore.ObjectStoreWatchOptions
 
   // ---- Service framework re-exports (users don't need zio.nats.service._) ----
