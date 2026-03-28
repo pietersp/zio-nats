@@ -7,14 +7,14 @@ The NATS Service Framework (also called the Micro protocol) turns any set of req
 
 ## Defining endpoints
 
-An endpoint is built via a short builder chain. Start with `ServiceEndpoint(name)`, fix the request type with `.in[In]`, fix the reply type with `.out[Out]`, and optionally declare a domain error type with `.failsWith[Err]`. Each step changes the Scala type, so the compiler enforces the full contract before you ever write handler logic:
+An endpoint is built via a short builder chain. Start with `ServiceEndpoint(name)`, fix the request type with `.in[In]`, fix the reply type with `.out[Out]`, and optionally declare domain error types with one or more `.failsWith[Err]` calls. Each step changes the Scala type, so the compiler enforces the full contract before you ever write handler logic:
 
 ```
 ServiceEndpoint("name")          // NamedEndpoint  - no types yet
   .in[StockRequest]               // EndpointIn     - In fixed
   .out[StockReply]                // ServiceEndpoint[StockRequest, Nothing, StockReply]
   .failsWith[StockError]          // ServiceEndpoint[StockRequest, StockError, StockReply]
-  // or: .failsWith[A, B] / .failsWith[A, B, C] / .failsWith[A, B, C, D] / .failsWith[A, B, C, D, E]
+  .failsWith[ValidationError]     // ServiceEndpoint[StockRequest, StockError | ValidationError, StockReply]
 ```
 
 The resulting `ServiceEndpoint[In, Err, Out]` is an inert descriptor - it carries the name, codecs, and error type, but no handler logic. This makes it easy to share the same descriptor between the server (which binds a handler) and the client (which uses it with `Nats#requestService`).
@@ -226,7 +226,8 @@ import codecs.derived
 val orderEndpoint = ServiceEndpoint("order")
   .in[OrderRequest]
   .out[OrderReply]
-  .failsWith[ValidationError, PaymentError]
+  .failsWith[ValidationError]
+  .failsWith[PaymentError]
 ```
 
 The resulting descriptor has type `ServiceEndpoint[OrderRequest, ValidationError | PaymentError, OrderReply]`. On the client side, `Nats#requestService` returns `IO[NatsError | ValidationError | PaymentError, OrderReply]` — each member is decoded with its own codec and surfaces directly in the ZIO error channel:
@@ -253,7 +254,8 @@ import codecs.derived
 val orderEndpoint = ServiceEndpoint("order")
   .in[OrderRequest]
   .out[OrderReply]
-  .failsWith[ValidationError, PaymentError]
+  .failsWith[ValidationError]
+  .failsWith[PaymentError]
 
 val placeOrder: ZIO[Nats, NatsError | ValidationError | PaymentError, OrderReply] =
   ZIO.serviceWithZIO[Nats] { nats =>
@@ -261,7 +263,7 @@ val placeOrder: ZIO[Nats, NatsError | ValidationError | PaymentError, OrderReply
   }
 ```
 
-For three, four, or five error members, pass the corresponding number of type parameters:
+Chain `failsWith` calls to accumulate as many error members as you need:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -276,6 +278,7 @@ case class PaymentError(code: Int)
 case class InventoryError(shortage: Int)
 case class AuthError(reason: String)
 case class RateLimitError(retryAfterSeconds: Int)
+case class ConflictError(id: String)
 
 object OrderRequest    { given Schema[OrderRequest]    = Schema.derived }
 object OrderReply      { given Schema[OrderReply]      = Schema.derived }
@@ -284,6 +287,7 @@ object PaymentError    { given Schema[PaymentError]    = Schema.derived }
 object InventoryError  { given Schema[InventoryError]  = Schema.derived }
 object AuthError       { given Schema[AuthError]       = Schema.derived }
 object RateLimitError  { given Schema[RateLimitError]  = Schema.derived }
+object ConflictError   { given Schema[ConflictError]   = Schema.derived }
 
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived
@@ -291,15 +295,24 @@ import codecs.derived
 // Three members
 val ep3 = ServiceEndpoint("order")
   .in[OrderRequest].out[OrderReply]
-  .failsWith[ValidationError, PaymentError, InventoryError]
+  .failsWith[ValidationError]
+  .failsWith[PaymentError]
+  .failsWith[InventoryError]
 
-// Five members (maximum supported arity)
-val ep5 = ServiceEndpoint("order-full")
+// Any number of members via chaining
+val ep6 = ServiceEndpoint("order-full")
   .in[OrderRequest].out[OrderReply]
-  .failsWith[ValidationError, PaymentError, InventoryError, AuthError, RateLimitError]
+  .failsWith[ValidationError]
+  .failsWith[PaymentError]
+  .failsWith[InventoryError]
+  .failsWith[AuthError]
+  .failsWith[RateLimitError]
+  .failsWith[ConflictError]
 ```
 
-`ServiceEndpoint#failsWith` supports up to five error types. If your handler can fail with more than five distinct types, the idiomatic approach is to model them as a sealed enum and use the single-type `failsWith[E]` overload:
+`ServiceEndpoint#failsWith` accumulates each chained error type into the endpoint error channel, so you can keep adding members as needed. Repeating the same error type is also allowed.
+
+If you prefer a single domain error type shared across your service boundary, you can still model the errors as a sealed enum and use the single-type `failsWith[E]` overload:
 
 ```scala mdoc:compile-only
 import zio.*

@@ -57,7 +57,8 @@ object ServiceApp extends ZIOAppDefault {
   )
     .in[LookupRequest]
     .out[LookupReply]
-    .failsWith[NotFound, ValidationError]
+    .failsWith[NotFound]
+    .failsWith[ValidationError]
 
   // Simulated in-memory user store.
   private val users = Map(

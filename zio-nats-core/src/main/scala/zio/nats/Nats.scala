@@ -184,7 +184,8 @@ trait Nats {
    * {{{
    * val ep = ServiceEndpoint("place-order")
    *   .in[OrderRequest].out[OrderReply]
-   *   .failsWith[ValidationError | PaymentError]
+   *   .failsWith[ValidationError]
+   *   .failsWith[PaymentError]
    *
    * val order: IO[ValidationError | PaymentError | NatsError, OrderReply] =
    *   nats.requestService(ep, OrderRequest(...), 5.seconds)

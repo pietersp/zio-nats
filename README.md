@@ -142,6 +142,22 @@ nats.service(
 nats.request[String, Double](Subject("prices"), "item-42", 5.seconds)
 ```
 
+Typed domain errors accumulate through chained `failsWith` calls, so endpoints can expose as many distinct error variants as they need:
+
+```scala
+case class NotFound(id: String)
+case class ValidationError(message: String)
+
+val lookup = ServiceEndpoint("lookup-user")
+  .in[String]
+  .out[String]
+  .failsWith[NotFound]
+  .failsWith[ValidationError]
+
+val reply: ZIO[Nats, NatsError | NotFound | ValidationError, String] =
+  ZIO.serviceWithZIO[Nats](_.requestService(lookup, "user-42", 5.seconds))
+```
+
 ### Integration tests with a real server
 
 ```scala

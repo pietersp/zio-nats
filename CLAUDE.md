@@ -82,7 +82,7 @@ NatsConfig ──► Nats.live ──► JetStream.live
 
 `Nats.request` is the untyped fallback: it detects `Nats-Service-Error` / `Nats-Service-Error-Code` headers and fails with `NatsError.ServiceCallFailed(message, code)` regardless of body content. Use it when the endpoint descriptor is not available or for infallible endpoints (via `endpoint.effectiveSubject`).
 
-**Union error types** are supported via multi-type `failsWith` overloads. The server sets a `Nats-Service-Error-Type` header to the FQDN of the concrete runtime error class; the client dispatches decoding to the correct member codec using that tag. The dispatch table (`tagRoutes`) is built at compile time from `ErrorCodecPart` instances (one per member) and looked up in O(1) at runtime.
+**Union error types** are supported via chained `failsWith[E]` calls. Each call widens the endpoint error channel by composing the existing `TypedErrorCodec` / `ServiceErrorMapper` with one more `ErrorCodecPart[E]`. The server sets a `Nats-Service-Error-Type` header to the FQDN of the concrete runtime error class; the client dispatches decoding to the correct member codec using that tag. The dispatch table (`tagRoutes`) is built once per endpoint descriptor and looked up in O(1) at runtime.
 
 Connection lifecycle events are exposed via `Nats.lifecycleEvents: ZStream[Nats, Nothing, NatsEvent]`. The event infrastructure (queue, hub, listeners) is set up internally in `Nats.make` before `connect()` is called.
 
@@ -181,11 +181,9 @@ Endpoints are built via an accumulating builder chain — one consistent entry p
 ServiceEndpoint("name")                    // NamedEndpoint  — no types yet
   .in[StockRequest]                         // EndpointIn[In] — In fixed
   .out[StockReply]                          // ServiceEndpoint[In, Nothing, Out] — infallible
-  .failsWith[StockError]                    // ServiceEndpoint[In, Err, Out]         — single error (optional)
-  .failsWith[ErrA, ErrB]                    // ServiceEndpoint[In, ErrA | ErrB, Out] — 2-member union
-  .failsWith[ErrA, ErrB, ErrC]              // ServiceEndpoint[In, ErrA | ErrB | ErrC, Out] — 3-member union
-  .failsWith[ErrA, ErrB, ErrC, ErrD]        // 4-member union
-  .failsWith[ErrA, ErrB, ErrC, ErrD, ErrE]  // 5-member union (maximum; use sealed enum for 6+)
+  .failsWith[StockError]                    // ServiceEndpoint[In, StockError, Out] — single error (optional)
+  .failsWith[ValidationError]               // ServiceEndpoint[In, StockError | ValidationError, Out]
+  .failsWith[RateLimited]                   // ServiceEndpoint[In, StockError | ValidationError | RateLimited, Out]
   .handle { req => ... }                    // BoundEndpoint  — handler bound
 ```
 
@@ -194,7 +192,7 @@ Configuration (`.inGroup`, `.inSubject`, `.withQueueGroup`, `.withMetadata`) is 
 Key types (all re-exported from `package object nats`):
 - `NamedEndpoint` — step 1 of the builder; holds name and non-type config
 - `EndpointIn[In]` — step 2; `In` type fixed, waiting for `.out`
-- `ServiceEndpoint[In, Err, Out]` — full typed descriptor; call `.handle` or `.handleWith` to get a `BoundEndpoint`; call `.failsWith[E]`, `.failsWith[A, B]`, or `.failsWith[A, B, C]` to add a single or union domain error type
+- `ServiceEndpoint[In, Err, Out]` — full typed descriptor; call `.handle` or `.handleWith` to get a `BoundEndpoint`; call `.failsWith[E]` repeatedly to accumulate domain error types into the error channel
 - `ServiceConfig` — name, version, description, metadata for a service
 - `ServiceGroup` — subject prefix group for organizing endpoints
 - `QueueGroupPolicy` — Default / Disabled / Custom queue group control
@@ -211,7 +209,7 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | File | Contents |
 |------|----------|
 | `zio-nats-core/src/main/scala/zio/nats/Nats.scala` | Core pub/sub service + `NatsLive`; `live` and `customized` ZLayer constructors; `lifecycleEvents` stream |
-| `zio-nats-core/src/main/scala/zio/nats/NatsCodec.scala` | Serialization typeclass; built-in `bytesCodec` and `stringCodec` only (no zio-blocks); `ErrorCodecPart[E]` (per-member, single concrete type only) and `TypedErrorCodec[E]` (wraps single or union via `union2`/`union3`) for service domain-error encoding |
+| `zio-nats-core/src/main/scala/zio/nats/NatsCodec.scala` | Serialization typeclass; built-in `bytesCodec` and `stringCodec` only (no zio-blocks); `ErrorCodecPart[E]` (per-member, single concrete type only) and `TypedErrorCodec[E]` (single or incrementally widened union codec for service domain-error encoding) |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocks.scala` | `NatsCodecZioBlocks.Builder` — derives `NatsCodec[A]` from a zio-blocks `Format` + `Schema`; caches in `ConcurrentHashMap` |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocksExtensions.scala` | Extension methods `NatsCodec.fromFormat` and `NatsCodec.derived` (available via `import zio.nats.*`) |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/serialization/NatsSerializer.scala` | `CompiledCodec[A]` sealed trait, `makeFor[A](format)` factory (eager, can throw), `BinaryCompiledCodec` / `TextCompiledCodec` impls |

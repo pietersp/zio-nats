@@ -41,6 +41,12 @@ object ServiceSpec extends ZIOSpecDefault {
     def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, Conflict] =
       NatsCodec.stringCodec.decode(bytes).map(Conflict(_))
 
+  private given NatsCodec[IllegalArgumentException] = new NatsCodec[IllegalArgumentException]:
+    def encode(e: IllegalArgumentException): Chunk[Byte] =
+      NatsCodec.stringCodec.encode(e.getMessage)
+    def decode(bytes: Chunk[Byte]): Either[NatsDecodeError, IllegalArgumentException] =
+      NatsCodec.stringCodec.decode(bytes).map(IllegalArgumentException(_))
+
   /**
    * Readiness probe: blocks until the named service responds to a ping or 2 s
    * elapses. Replaces `ZIO.sleep` for service startup synchronization.
@@ -311,14 +317,15 @@ object ServiceSpec extends ZIOSpecDefault {
       }
     },
 
-    test("requestService routes 2-member union error to the correct member codec") {
+    test("requestService routes chained union errors to the correct member codec") {
       ZIO.scoped {
         for {
           nats <- ZIO.service[Nats]
           ep    = ServiceEndpoint("union2-err")
                  .in[String]
                  .out[String]
-                 .failsWith[NotFound, Forbidden]
+                 .failsWith[NotFound]
+                 .failsWith[Forbidden]
           _ <- nats.service(
                  ServiceConfig("union2-err-svc", "1.0.0"),
                  ep.handle {
@@ -339,104 +346,76 @@ object ServiceSpec extends ZIOSpecDefault {
       }
     },
 
-    test("requestService routes 3-member union error to the correct member codec") {
+    test("requestService routes more than five chained union errors to the correct member codec") {
       ZIO.scoped {
         for {
           nats <- ZIO.service[Nats]
-          ep    = ServiceEndpoint("union3-err")
+          ep    = ServiceEndpoint("union6-err")
                  .in[String]
                  .out[String]
-                 .failsWith[NotFound, Forbidden, ServiceUnavailable]
+                 .failsWith[NotFound]
+                 .failsWith[Forbidden]
+                 .failsWith[ServiceUnavailable]
+                 .failsWith[RateLimited]
+                 .failsWith[Conflict]
+                 .failsWith[IllegalArgumentException]
           _ <- nats.service(
-                 ServiceConfig("union3-err-svc", "1.0.0"),
-                 ep.handle {
-                   case "notfound"    => ZIO.fail(NotFound("item-42"))
-                   case "forbidden"   => ZIO.fail(Forbidden("access denied"))
-                   case "unavailable" => ZIO.fail(ServiceUnavailable("down for maintenance"))
-                   case s             => ZIO.succeed(s"ok:$s")
-                 }
-               )
-          _  <- awaitService("union3-err-svc")
-          r1 <- nats.requestService(ep, "notfound", 5.seconds).either
-          r2 <- nats.requestService(ep, "forbidden", 5.seconds).either
-          r3 <- nats.requestService(ep, "unavailable", 5.seconds).either
-          r4 <- nats.requestService(ep, "hello", 5.seconds).either
-        } yield assertTrue(
-          r1 == Left(NotFound("item-42")),
-          r2 == Left(Forbidden("access denied")),
-          r3 == Left(ServiceUnavailable("down for maintenance")),
-          r4 == Right("ok:hello")
-        )
-      }
-    },
-
-    test("requestService routes 4-member union error to the correct member codec") {
-      ZIO.scoped {
-        for {
-          nats <- ZIO.service[Nats]
-          ep    = ServiceEndpoint("union4-err")
-                 .in[String]
-                 .out[String]
-                 .failsWith[NotFound, Forbidden, ServiceUnavailable, RateLimited]
-          _ <- nats.service(
-                 ServiceConfig("union4-err-svc", "1.0.0"),
-                 ep.handle {
-                   case "notfound"    => ZIO.fail(NotFound("item-42"))
-                   case "forbidden"   => ZIO.fail(Forbidden("access denied"))
-                   case "unavailable" => ZIO.fail(ServiceUnavailable("down for maintenance"))
-                   case "ratelimited" => ZIO.fail(RateLimited(60))
-                   case s             => ZIO.succeed(s"ok:$s")
-                 }
-               )
-          _  <- awaitService("union4-err-svc")
-          r1 <- nats.requestService(ep, "notfound", 5.seconds).either
-          r2 <- nats.requestService(ep, "forbidden", 5.seconds).either
-          r3 <- nats.requestService(ep, "unavailable", 5.seconds).either
-          r4 <- nats.requestService(ep, "ratelimited", 5.seconds).either
-          r5 <- nats.requestService(ep, "hello", 5.seconds).either
-        } yield assertTrue(
-          r1 == Left(NotFound("item-42")),
-          r2 == Left(Forbidden("access denied")),
-          r3 == Left(ServiceUnavailable("down for maintenance")),
-          r4 == Left(RateLimited(60)),
-          r5 == Right("ok:hello")
-        )
-      }
-    },
-
-    test("requestService routes 5-member union error to the correct member codec") {
-      ZIO.scoped {
-        for {
-          nats <- ZIO.service[Nats]
-          ep    = ServiceEndpoint("union5-err")
-                 .in[String]
-                 .out[String]
-                 .failsWith[NotFound, Forbidden, ServiceUnavailable, RateLimited, Conflict]
-          _ <- nats.service(
-                 ServiceConfig("union5-err-svc", "1.0.0"),
+                 ServiceConfig("union6-err-svc", "1.0.0"),
                  ep.handle {
                    case "notfound"    => ZIO.fail(NotFound("item-42"))
                    case "forbidden"   => ZIO.fail(Forbidden("access denied"))
                    case "unavailable" => ZIO.fail(ServiceUnavailable("down for maintenance"))
                    case "ratelimited" => ZIO.fail(RateLimited(60))
                    case "conflict"    => ZIO.fail(Conflict("duplicate key"))
+                   case "illegal"     => ZIO.fail(IllegalArgumentException("bad input"))
                    case s             => ZIO.succeed(s"ok:$s")
                  }
                )
-          _  <- awaitService("union5-err-svc")
+          _  <- awaitService("union6-err-svc")
           r1 <- nats.requestService(ep, "notfound", 5.seconds).either
           r2 <- nats.requestService(ep, "forbidden", 5.seconds).either
           r3 <- nats.requestService(ep, "unavailable", 5.seconds).either
           r4 <- nats.requestService(ep, "ratelimited", 5.seconds).either
           r5 <- nats.requestService(ep, "conflict", 5.seconds).either
-          r6 <- nats.requestService(ep, "hello", 5.seconds).either
+          r6 <- nats.requestService(ep, "illegal", 5.seconds).either
+          r7 <- nats.requestService(ep, "hello", 5.seconds).either
         } yield assertTrue(
           r1 == Left(NotFound("item-42")),
           r2 == Left(Forbidden("access denied")),
           r3 == Left(ServiceUnavailable("down for maintenance")),
           r4 == Left(RateLimited(60)),
           r5 == Left(Conflict("duplicate key")),
-          r6 == Right("ok:hello")
+          r6.left.exists {
+            case e: IllegalArgumentException => e.getMessage == "bad input"
+            case _                           => false
+          },
+          r7 == Right("ok:hello")
+        )
+      }
+    },
+
+    test("requestService allows repeated chained failsWith calls for the same error type") {
+      ZIO.scoped {
+        for {
+          nats <- ZIO.service[Nats]
+          ep    = ServiceEndpoint("repeat-err")
+                 .in[String]
+                 .out[String]
+                 .failsWith[NotFound]
+                 .failsWith[NotFound]
+          _ <- nats.service(
+                 ServiceConfig("repeat-err-svc", "1.0.0"),
+                 ep.handle {
+                   case "notfound" => ZIO.fail(NotFound("item-42"))
+                   case s          => ZIO.succeed(s"ok:$s")
+                 }
+               )
+          _  <- awaitService("repeat-err-svc")
+          r1 <- nats.requestService(ep, "notfound", 5.seconds).either
+          r2 <- nats.requestService(ep, "hello", 5.seconds).either
+        } yield assertTrue(
+          r1 == Left(NotFound("item-42")),
+          r2 == Right("ok:hello")
         )
       }
     },

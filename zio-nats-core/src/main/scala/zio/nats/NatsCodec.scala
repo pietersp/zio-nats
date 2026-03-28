@@ -71,10 +71,7 @@ object NatsCodec {
  * Internal typeclass representing the codec for a single concrete error type.
  *
  * Intentionally has no instance for `Nothing` (requires `NatsCodec[E]`, which
- * has no `Nothing` instance). This absence is load-bearing: it prevents the
- * [[TypedErrorCodec.forUnion]] combinator from resolving `TypedErrorCodec[E]`
- * for a concrete `E` via the degenerate path `forUnion[E, Nothing]` (which
- * would require `ErrorCodecPart[Nothing]` and fails cleanly).
+ * has no `Nothing` instance).
  *
  * Users never interact with this typeclass directly.
  */
@@ -84,10 +81,9 @@ private[nats] sealed trait ErrorCodecPart[E]:
   /**
    * The JVM runtime class for `E`.
    *
-   * Used by [[TypedErrorCodec.union2]] and similar combinators to dispatch
-   * encoding at runtime, since generic type parameters are erased on the JVM
-   * and pattern matching on them (`case a: A @unchecked`) always succeeds
-   * regardless of the actual type.
+   * Used by [[TypedErrorCodec.append]] to dispatch encoding at runtime, since
+   * generic type parameters are erased on the JVM and pattern matching on them
+   * (`case a: A @unchecked`) always succeeds regardless of the actual type.
    */
   private[nats] def runtimeClass: Class[?]
 
@@ -131,14 +127,14 @@ private[nats] object ErrorCodecPart:
  * concrete error class. The client reads this header and dispatches to the
  * correct codec via [[tagRoutes]].
  *
- * Three instances are derived automatically — users never interact with this
- * typeclass directly:
+ * Three instance shapes are derived automatically — users never interact with
+ * this typeclass directly:
  *   - `Nothing` — trivial infallible instance
  *   - Single `E: ErrorCodecPart` (i.e. `E: NatsCodec: ClassTag`) — tags by
- *     class FQDN; resolved from [[LowPriorityTypedErrorCodecs]]
- *   - Union `A | B` — resolved from [[TypedErrorCodec.forUnion]]; the right
- *     member uses [[ErrorCodecPart]] (not `TypedErrorCodec`) to prevent
- *     implicit divergence via the degenerate `forUnion[E, Nothing]` path
+ *     class FQDN; resolved from this companion
+ *   - Chained union `Err | E` — built explicitly by
+ *     [[zio.nats.service.ServiceEndpoint.failsWith]] via
+ *     [[TypedErrorCodec.append]]
  */
 private[nats] sealed trait TypedErrorCodec[E]:
   /**
@@ -196,15 +192,15 @@ private[nats] object TypedErrorCodec:
    *
    * `ClassTag` is in implicit scope automatically for all concrete types. There
    * is intentionally no instance for union types — union codecs are built
-   * explicitly via [[union2]] or [[union3]] and captured in the
+   * explicitly via [[append]] and captured in the
    * [[zio.nats.service.ServiceEndpoint]] descriptor at the call site of
    * `failsWith`.
    *
    * Note: Scala 3 does not reliably decompose union types during implicit
    * search (i.e., a `given [A, B]: TypedErrorCodec[A | B]` would not be found
-   * for `TypedErrorCodec[X | Y]`). The explicit `union2`/`union3` factory
-   * methods on [[zio.nats.service.ServiceEndpoint]] are therefore the supported
-   * API for union error types.
+   * for `TypedErrorCodec[X | Y]`). [[zio.nats.service.ServiceEndpoint]]
+   * therefore captures and widens the codec explicitly at each chained
+   * `failsWith` call.
    */
   given fromPart[E](using p: ErrorCodecPart[E]): TypedErrorCodec[E] with
     private[nats] val tagRoutes: Map[String, Chunk[Byte] => Either[NatsDecodeError, E]] =
@@ -219,107 +215,20 @@ private[nats] object TypedErrorCodec:
         .getOrElse(Left(NatsDecodeError(s"Unknown error type discriminator: '$typeTag'")))
 
   /**
-   * Explicit factory for a 2-member union codec.
+   * Append one concrete error member `E` to an existing typed error codec.
    *
-   * Called internally by [[zio.nats.service.ServiceEndpoint.failsWith]] when
-   * two type parameters are supplied. `tagRoutes` is built once at construction
-   * and dispatch is O(1).
+   * The new member is checked first during encoding so repeated chained
+   * `failsWith[E]` calls remain well-defined. Decoding stays O(1) via the
+   * merged `tagRoutes` table.
    */
-  private[nats] def union2[A, B](pa: ErrorCodecPart[A], pb: ErrorCodecPart[B]): TypedErrorCodec[A | B] =
-    new TypedErrorCodec[A | B]:
-      private[nats] val tagRoutes: Map[String, Chunk[Byte] => Either[NatsDecodeError, A | B]] =
-        Map(
-          pa.tag -> (b => pa.decode(b).map(a => a: A | B)),
-          pb.tag -> (b => pb.decode(b).map(v => v: A | B))
-        )
-      def encode(e: A | B): (Chunk[Byte], String) =
-        if pa.matches(e) then (pa.encode(e.asInstanceOf[A]), pa.tag)
-        else (pb.encode(e.asInstanceOf[B]), pb.tag)
-      def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, A | B] =
-        decodeFromRoutes(tagRoutes, bytes, typeTag)
+  private[nats] def append[Err, E](base: TypedErrorCodec[Err], part: ErrorCodecPart[E]): TypedErrorCodec[Err | E] =
+    new TypedErrorCodec[Err | E]:
+      private[nats] val tagRoutes: Map[String, Chunk[Byte] => Either[NatsDecodeError, Err | E]] =
+        base.tagRoutes ++ Map(part.tag -> ((b: Chunk[Byte]) => part.decode(b).map(e => e: Err | E)))
 
-  /**
-   * Explicit factory for a 3-member union codec.
-   *
-   * Called internally by [[zio.nats.service.ServiceEndpoint.failsWith]] when
-   * three type parameters are supplied.
-   */
-  private[nats] def union3[A, B, C](
-    pa: ErrorCodecPart[A],
-    pb: ErrorCodecPart[B],
-    pc: ErrorCodecPart[C]
-  ): TypedErrorCodec[A | B | C] =
-    new TypedErrorCodec[A | B | C]:
-      private[nats] val tagRoutes: Map[String, Chunk[Byte] => Either[NatsDecodeError, A | B | C]] =
-        Map(
-          pa.tag -> (b => pa.decode(b).map(a => a: A | B | C)),
-          pb.tag -> (b => pb.decode(b).map(v => v: A | B | C)),
-          pc.tag -> (b => pc.decode(b).map(v => v: A | B | C))
-        )
-      def encode(e: A | B | C): (Chunk[Byte], String) =
-        if pa.matches(e) then (pa.encode(e.asInstanceOf[A]), pa.tag)
-        else if pb.matches(e) then (pb.encode(e.asInstanceOf[B]), pb.tag)
-        else (pc.encode(e.asInstanceOf[C]), pc.tag)
-      def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, A | B | C] =
-        decodeFromRoutes(tagRoutes, bytes, typeTag)
+      def encode(e: Err | E): (Chunk[Byte], String) =
+        if part.matches(e) then (part.encode(e.asInstanceOf[E]), part.tag)
+        else base.encode(e.asInstanceOf[Err])
 
-  /**
-   * Explicit factory for a 4-member union codec.
-   *
-   * Called internally by [[zio.nats.service.ServiceEndpoint.failsWith]] when
-   * four type parameters are supplied.
-   */
-  private[nats] def union4[A, B, C, D](
-    pa: ErrorCodecPart[A],
-    pb: ErrorCodecPart[B],
-    pc: ErrorCodecPart[C],
-    pd: ErrorCodecPart[D]
-  ): TypedErrorCodec[A | B | C | D] =
-    new TypedErrorCodec[A | B | C | D]:
-      private[nats] val tagRoutes: Map[String, Chunk[Byte] => Either[NatsDecodeError, A | B | C | D]] =
-        Map(
-          pa.tag -> (b => pa.decode(b).map(a => a: A | B | C | D)),
-          pb.tag -> (b => pb.decode(b).map(v => v: A | B | C | D)),
-          pc.tag -> (b => pc.decode(b).map(v => v: A | B | C | D)),
-          pd.tag -> (b => pd.decode(b).map(v => v: A | B | C | D))
-        )
-      def encode(e: A | B | C | D): (Chunk[Byte], String) =
-        if pa.matches(e) then (pa.encode(e.asInstanceOf[A]), pa.tag)
-        else if pb.matches(e) then (pb.encode(e.asInstanceOf[B]), pb.tag)
-        else if pc.matches(e) then (pc.encode(e.asInstanceOf[C]), pc.tag)
-        else (pd.encode(e.asInstanceOf[D]), pd.tag)
-      def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, A | B | C | D] =
-        decodeFromRoutes(tagRoutes, bytes, typeTag)
-
-  /**
-   * Explicit factory for a 5-member union codec.
-   *
-   * Called internally by [[zio.nats.service.ServiceEndpoint.failsWith]] when
-   * five type parameters are supplied. For more than five error types, model
-   * them as a sealed enum and use the single-type `failsWith[E]` overload
-   * instead.
-   */
-  private[nats] def union5[A, B, C, D, E](
-    pa: ErrorCodecPart[A],
-    pb: ErrorCodecPart[B],
-    pc: ErrorCodecPart[C],
-    pd: ErrorCodecPart[D],
-    pe: ErrorCodecPart[E]
-  ): TypedErrorCodec[A | B | C | D | E] =
-    new TypedErrorCodec[A | B | C | D | E]:
-      private[nats] val tagRoutes: Map[String, Chunk[Byte] => Either[NatsDecodeError, A | B | C | D | E]] =
-        Map(
-          pa.tag -> (b => pa.decode(b).map(a => a: A | B | C | D | E)),
-          pb.tag -> (b => pb.decode(b).map(v => v: A | B | C | D | E)),
-          pc.tag -> (b => pc.decode(b).map(v => v: A | B | C | D | E)),
-          pd.tag -> (b => pd.decode(b).map(v => v: A | B | C | D | E)),
-          pe.tag -> (b => pe.decode(b).map(v => v: A | B | C | D | E))
-        )
-      def encode(e: A | B | C | D | E): (Chunk[Byte], String) =
-        if pa.matches(e) then (pa.encode(e.asInstanceOf[A]), pa.tag)
-        else if pb.matches(e) then (pb.encode(e.asInstanceOf[B]), pb.tag)
-        else if pc.matches(e) then (pc.encode(e.asInstanceOf[C]), pc.tag)
-        else if pd.matches(e) then (pd.encode(e.asInstanceOf[D]), pd.tag)
-        else (pe.encode(e.asInstanceOf[E]), pe.tag)
-      def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, A | B | C | D | E] =
+      def decode(bytes: Chunk[Byte], typeTag: String): Either[NatsDecodeError, Err | E] =
         decodeFromRoutes(tagRoutes, bytes, typeTag)
