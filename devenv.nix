@@ -40,6 +40,14 @@ in
   # ---------------------------------------------------------------------------
 
   scripts = {
+    "sync-skills".exec = ''
+      if ! command -v skillshare >/dev/null 2>&1; then
+        echo "skillshare is not installed. Install it from https://skillshare.runkids.cc/ and rerun 'sync-skills'." >&2
+        exit 1
+      fi
+      skillshare sync -p
+    '';
+
     # Format all sources (main, test, and sbt files)
     format.exec = "sbt scalafmtAll";
 
@@ -71,6 +79,7 @@ in
     echo "zio-nats dev environment"
     echo ""
     echo "Scripts:"
+    echo "  sync-skills   sync project skills with skillshare"
     echo "  format        format all sources"
     echo "  check         verify formatting + compile (no tests)"
     echo "  run-examples  run example programs   (requires NATS service)"
