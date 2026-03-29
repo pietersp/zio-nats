@@ -21,7 +21,7 @@ import zio.nats.jetstream.*
 val publishBasic: ZIO[JetStream, NatsError, Unit] =
   ZIO.serviceWithZIO[JetStream] { js =>
     for {
-      ack <- js.publish(Subject("orders.new"), "order-123")
+      ack <- js.publish(subject"orders.new", "order-123")
       _   <- ZIO.debug(s"Stored in ${ack.stream} at seq ${ack.seqno}")
     } yield ()
   }
@@ -41,7 +41,7 @@ import zio.nats.jetstream.*
 val exactlyOnce: ZIO[JetStream, NatsError, Unit] =
   ZIO.serviceWithZIO[JetStream] { js =>
     js.publish(
-      Subject("orders.new"),
+      subject"orders.new",
       "order-123",
       JsPublishParams(options = Some(PublishOptions(messageId = Some("order-42"))))
     ).unit
@@ -60,7 +60,7 @@ import zio.nats.jetstream.*
 val asyncPublish: ZIO[JetStream, NatsError, Unit] =
   ZIO.serviceWithZIO[JetStream] { js =>
     for {
-      futureAck <- js.publishAsync(Subject("orders.new"), "order-123")
+      futureAck <- js.publishAsync(subject"orders.new", "order-123")
       ack       <- futureAck.orDie
       _         <- ZIO.debug(s"Stored at seq: ${ack.seqno}")
     } yield ()
@@ -145,7 +145,7 @@ val batchProcess: ZIO[JetStream, NatsError, Unit] =
     for {
       consumer <- js.consumer("ORDERS", "processor")
       _        <- consumer.fetch[String](FetchOptions(maxMessages = 10, expiresIn = 5.seconds))
-                    .mapZIO(env => ZIO.debug(env.value) *> env.message.ack)
+                    .mapZIO(env => ZIO.debug(env.value) *> env.ack)
                     .runDrain
     } yield ()
   }
@@ -165,7 +165,7 @@ val eventDriven: ZIO[JetStream, NatsError, Unit] =
     for {
       consumer <- js.consumer("ORDERS", "processor")
       _        <- consumer.consume[String]()
-                    .mapZIO(env => ZIO.debug(env.value) *> env.message.ack)
+                    .mapZIO(env => ZIO.debug(env.value) *> env.ack)
                     .runDrain
     } yield ()
   }
@@ -185,7 +185,7 @@ val pollingLoop: ZIO[JetStream, NatsError, Unit] =
     for {
       consumer <- js.consumer("ORDERS", "processor")
       _        <- consumer.iterate[String]()
-                    .mapZIO(env => ZIO.debug(env.value) *> env.message.ack)
+                    .mapZIO(env => ZIO.debug(env.value) *> env.ack)
                     .runDrain
     } yield ()
   }
@@ -205,7 +205,7 @@ val singleMessage: ZIO[JetStream, NatsError, Unit] =
     for {
       consumer <- js.consumer("ORDERS", "processor")
       maybeMsg <- consumer.next[String](5.seconds)
-      _        <- ZIO.foreach(maybeMsg)(env => ZIO.debug(env.value) *> env.message.ack)
+      _        <- ZIO.foreach(maybeMsg)(env => ZIO.debug(env.value) *> env.ack)
     } yield ()
   }
 ```
@@ -244,18 +244,39 @@ val tailLog: ZIO[JetStream, NatsError, Unit] =
 
 Acknowledgement tells the JetStream server how to advance a durable consumer's cursor. Unlike Core NATS, which forgets messages immediately, JetStream tracks every unacknowledged message and re-delivers it after the `ackWait` deadline expires.
 
-After receiving a `JetStreamMessage`, call one of these methods to signal the outcome to the server:
+After receiving a `JsEnvelope`, call one of these proxy methods to signal the outcome to the server. These methods delegate to the underlying `JetStreamMessage` but are more ergonomic to call directly on the envelope:
 
 | Method | Effect |
 |--------|--------|
-| `msg.ack` | Message processed - advance the cursor |
-| `msg.ackSync(timeout)` | Ack and wait for server confirmation |
-| `msg.nak` | Processing failed - redeliver immediately |
-| `msg.nakWithDelay(d)` | Processing failed - redeliver after delay `d` |
-| `msg.term` | Permanently reject - do not redeliver |
-| `msg.inProgress` | Still working - extend the ack deadline |
+| `env.ack` | Message processed - advance the cursor |
+| `env.ackSync(timeout)` | Ack and wait for server confirmation |
+| `env.nak` | Processing failed - redeliver immediately |
+| `env.nakWithDelay(d)` | Processing failed - redeliver after delay `d` |
+| `env.term` | Permanently reject - do not redeliver |
+| `env.inProgress` | Still working - extend the ack deadline |
 
-`msg.inProgress` is valuable for long-running handlers. Call it periodically to prevent the server from assuming the message was lost and triggering a redelivery while your handler is still running.
+`env.inProgress` is valuable for long-running handlers. Call it periodically to prevent the server from assuming the message was lost and triggering a redelivery while your handler is still running.
+
+### Auto-acknowledgement
+
+For simple worker patterns where you want to acknowledge on success and negatively-acknowledge on any failure, use the `runProcessAck` extension method. It runs the provided handler for every message and handles the acknowledgement boilerplate for you:
+
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.nats.jetstream.*
+
+val autoAck: ZIO[JetStream & Scope, NatsError, Unit] =
+  ZIO.serviceWithZIO[JetStream] { js =>
+    for {
+      consumer <- js.consumer("ORDERS", "processor")
+      _        <- consumer.consume[String]()
+                    .runProcessAck(id => Console.printLine(s"Processed $id").orDie)
+    } yield ()
+  }
+```
+
+If the handler (the function passed to `runProcessAck`) fails, `env.nak` is called automatically and the error is swallowed (but logged by the underlying NATS client).
 
 ## Next steps
 

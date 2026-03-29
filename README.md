@@ -45,13 +45,13 @@ object HelloNats extends ZIOAppDefault {
   def run =
     (for {
       nats  <- ZIO.service[Nats]
-      fiber <- nats.subscribe[String](Subject("greetings"))
+      fiber <- nats.subscribe[String](subject"greetings")
                  .take(1)
                  .tap(env => Console.printLine(s"Received: ${env.value}").orDie)
                  .runDrain
                  .fork
       _     <- ZIO.sleep(100.millis)
-      _     <- nats.publish(Subject("greetings"), "Hello, NATS!")
+      _     <- nats.publish(subject"greetings", "Hello, NATS!")
       _     <- fiber.join
     } yield ()).provide(Nats.default)
 }
@@ -77,8 +77,8 @@ object OrderPlaced { given Schema[OrderPlaced] = Schema.derived }
 val codecs = NatsCodec.fromFormat(JsonFormat)
 import codecs.derived  // NatsCodec[OrderPlaced] is now in scope
 
-nats.publish(Subject("orders.new"), OrderPlaced("ord-1", 59.99))
-nats.subscribe[OrderPlaced](Subject("orders.>")).map(_.value).runDrain
+nats.publish(subject"orders.new", OrderPlaced("ord-1", 59.99))
+nats.subscribe[OrderPlaced](subject"orders.>")).map(_.value).runDrain
 ```
 
 Switch `JsonFormat` to `AvroFormat` or `MsgPackFormat` and the wire format changes - your domain code does not.
@@ -89,11 +89,11 @@ Messages survive server restarts. Consumer positions are tracked server-side and
 
 ```scala
 // Publish with a delivery guarantee - blocks until the server confirms storage
-val ack: PublishAck = js.publish(Subject("orders.new"), order)
+val ack: PublishAck = js.publish(subject"orders.new", order)
 
 // Consume durably - ack each message to advance the server-side cursor
 consumer.consume[OrderPlaced]()
-  .mapZIO(env => fulfill(env.value) *> env.message.ack)
+  .mapZIO(env => fulfill(env.value) *> env.ack)
   .runDrain
 ```
 
@@ -139,7 +139,7 @@ nats.service(
 )
 
 // On the client side - call any instance by name, NATS picks one
-nats.request[String, Double](Subject("prices"), "item-42", 5.seconds)
+nats.request[String, Double](subject"prices", "item-42", 5.seconds)
 ```
 
 Typed domain errors accumulate through chained `failsWith` calls, so endpoints can expose as many distinct error variants as they need:

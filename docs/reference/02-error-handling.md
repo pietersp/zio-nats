@@ -135,7 +135,7 @@ import zio.*
 import zio.nats.*
 
 val result: IO[NatsError, Option[String]] =
-  nats.request[String, String](Subject("my-service.do-thing"), "input", 5.seconds)
+  nats.request[String, String](subject"my-service.do-thing", "input", 5.seconds)
     .map(env => Some(env.value))
     .catchSome {
       case NatsError.ServiceCallFailed(msg, code) =>

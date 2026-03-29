@@ -569,7 +569,7 @@ import codecs.derived
 val checkStock: ZIO[Nats, NatsError, Option[StockReply]] =
   ZIO.serviceWithZIO[Nats] { nats =>
     nats.request[StockRequest, StockReply](
-      Subject("inventory.stock-check"),
+      subject"inventory.stock-check",
       StockRequest("item-456"),
       timeout = 5.seconds
     )

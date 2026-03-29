@@ -38,6 +38,17 @@ object Subject {
   extension (s: Subject) def value: String = s
 }
 
+extension (sc: StringContext)
+  /**
+   * Ergonomic string interpolator for [[Subject]] constants.
+   *
+   * {{{
+   * val id = "123"
+   * val s  = subject"users.$id.events"
+   * }}}
+   */
+  def subject(args: Any*): Subject = Subject(sc.s(args: _*))
+
 // ---------------------------------------------------------------------------
 // Headers
 // ---------------------------------------------------------------------------

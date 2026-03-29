@@ -22,7 +22,7 @@ val withEvents: ZIO[Nats, NatsError, Unit] =
                .tap(e => ZIO.logInfo(s"[nats] $e"))
                .runDrain
                .fork
-    _    <- nats.publish(Subject("hello"), "world")
+    _    <- nats.publish(subject"hello", "world")
   } yield ()
 ```
 
