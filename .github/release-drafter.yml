@@ -14,27 +14,15 @@ categories:
   - title: Features
     labels:
       - feat
-      - feature
-      - enhancement
   - title: Fixes
     labels:
       - fix
-      - bug
-      - bugfix
   - title: Documentation
     labels:
       - docs
-      - documentation
   - title: Maintenance
     labels:
       - chore
-      - build
-      - dependencies
-      - deps
-      - perf
-      - refactor
-      - test
-      - ci
 
 exclude-labels:
   - skip-changelog
@@ -43,28 +31,14 @@ version-resolver:
   major:
     labels:
       - breaking
-      - major
-      - breaking-change
   minor:
     labels:
       - feat
-      - feature
-      - enhancement
   patch:
     labels:
       - fix
-      - bug
-      - bugfix
       - docs
-      - documentation
       - chore
-      - build
-      - dependencies
-      - deps
-      - perf
-      - refactor
-      - test
-      - ci
   default: patch
 
 autolabeler:
@@ -72,10 +46,10 @@ autolabeler:
     files:
       - 'docs/**'
       - 'README.md'
-  - label: ci
+  - label: chore
     files:
       - '.github/**'
-  - label: test
+  - label: chore
     files:
       - 'zio-nats-test/**'
       - 'zio-nats-testkit/**'

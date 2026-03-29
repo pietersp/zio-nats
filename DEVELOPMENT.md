@@ -64,16 +64,17 @@ This repository uses Release Drafter to build draft GitHub releases from merged 
 
 Recommended labels:
 
-- `feat`, `feature`, `enhancement` - new functionality; grouped under Features; suggests a minor version bump
-- `fix`, `bug`, `bugfix` - bug fixes; grouped under Fixes; suggests a patch version bump
-- `docs`, `documentation` - documentation-only changes; grouped under Documentation; suggests a patch version bump
-- `chore`, `build`, `dependencies`, `deps`, `perf`, `refactor`, `test`, `ci` - maintenance, tooling, dependency, performance, refactor, test, or CI work; grouped under Maintenance; suggests a patch version bump
-- `breaking`, `major`, `breaking-change` - breaking changes; suggests a major version bump
+- `feat` - new functionality; grouped under Features; suggests a minor version bump
+- `fix` - bug fixes; grouped under Fixes; suggests a patch version bump
+- `docs` - documentation-only changes; grouped under Documentation; suggests a patch version bump
+- `chore` - maintenance, tooling, dependency, performance, refactor, test, or CI work; grouped under Maintenance; suggests a patch version bump
+- `breaking` - breaking changes; suggests a major version bump
 - `skip-changelog` - exclude the PR from drafted release notes
 
 Guidelines:
 
 - Prefer exactly one primary release label per PR unless the change is genuinely cross-cutting.
+- Use `chore` for dependency bumps, CI updates, refactors, performance work, and test-only changes.
 - Use a breaking label on any PR that changes public API or behavior in a non-compatible way, even if it also has `feat` or `fix`.
 - If no release label is present, Release Drafter can still include the PR, but the category and version suggestion may be less useful.
 
