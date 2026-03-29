@@ -1,7 +1,7 @@
 val scala3 = "3.3.7"
 
 val zioVersion            = "2.1.24"
-val zioBlocksVersion      = "0.0.31"
+val zioBlocksVersion      = "0.0.32"
 val jnatsVersion          = "2.25.2"
 val testcontainersVersion = "0.44.1"
 val jsoniterScalaVersion  = "2.38.9"
