@@ -36,9 +36,9 @@ object PublishSubscribeSpec extends ZIOSpecDefault {
     test("publishes and receives a message") {
       for {
         nats  <- ZIO.service[Nats]
-        fiber <- nats.subscribe[String](Subject("t")).take(1).runCollect.fork
+        fiber <- nats.subscribe[String](subject"t").take(1).runCollect.fork
         _     <- ZIO.sleep(200.millis)
-        _     <- nats.publish(Subject("t"), "hello")
+        _     <- nats.publish(subject"t", "hello")
         msgs  <- fiber.join
       } yield assertTrue(msgs.head.value == "hello")
     }
@@ -70,7 +70,7 @@ object JetStreamSpec extends ZIOSpecDefault {
         jsm <- ZIO.service[JetStreamManagement]
         js  <- ZIO.service[JetStream]
         _   <- jsm.addStream(StreamConfig(name = "TEST", subjects = List("test.>")))
-        ack <- js.publish(Subject("test.one"), "payload")
+        ack <- js.publish(subject"test.one", "payload")
       } yield assertTrue(ack.seqno == 1L)
     }
 

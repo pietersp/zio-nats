@@ -28,14 +28,14 @@ import zio.nats.*
 val program: ZIO[Nats, NatsError, Unit] =
   for {
     nats  <- ZIO.service[Nats]
-    fiber <- nats.subscribe[String](Subject("greetings"))
+    fiber <- nats.subscribe[String](subject"greetings")
                .take(3)
                .tap(env => Console.printLine(s"Received: ${env.value}").orDie)
                .runDrain
                .fork
     _     <- ZIO.sleep(200.millis)
     _     <- ZIO.foreachDiscard(1 to 3) { i =>
-               nats.publish(Subject("greetings"), s"Hello #$i")
+               nats.publish(subject"greetings", s"Hello #$i")
              }
     _     <- fiber.join
   } yield ()
@@ -43,7 +43,7 @@ val program: ZIO[Nats, NatsError, Unit] =
 
 What's happening on the NATS side:
 
-1. `Subject("greetings")` - every NATS message is published to a subject. Subscribers match subjects exactly or via wildcards (`greetings.*`, `greetings.>`).
+1. `subject"greetings"` - every NATS message is published to a subject. Subscribers match subjects exactly or via wildcards (`greetings.*`, `greetings.>`).
 2. `Nats#subscribe[String]` - opens a live subscription as a `ZStream`. Each arriving payload is decoded via `NatsCodec[String]` and wrapped in an `Envelope`; the raw subject, headers, and reply-to are also available on `env.message`.
 3. `Nats#publish` - sends a message to the subject. Any active subscriber receives it; if there are none, the message is dropped (fire-and-forget semantics). For durability, use JetStream instead.
 

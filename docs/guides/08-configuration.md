@@ -90,7 +90,7 @@ import zio.*
 import zio.nats.*
 
 val envApp: ZIO[Any, Throwable, Unit] =
-  ZIO.serviceWithZIO[Nats](_.publish(Subject("shop.orders"), "order-123"))
+  ZIO.serviceWithZIO[Nats](_.publish(subject"shop.orders", "order-123"))
     .provide(Nats.live, NatsConfig.fromConfig)
 ```
 

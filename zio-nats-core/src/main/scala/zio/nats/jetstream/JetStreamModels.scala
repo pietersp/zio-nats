@@ -9,7 +9,7 @@ import io.nats.client.api.{
 }
 import io.nats.client.{FetchConsumeOptions, ConsumeOptions as JConsumeOptions, PublishOptions as JPublishOptions}
 import zio.*
-import zio.nats.Headers
+import zio.nats.{Headers, NatsError}
 
 import scala.jdk.CollectionConverters.*
 
@@ -52,7 +52,36 @@ type AccountStatistics = io.nats.client.api.AccountStatistics
  * @param message
  *   The raw [[JetStreamMessage]] that was received.
  */
-final case class JsEnvelope[+A](value: A, message: JetStreamMessage)
+final case class JsEnvelope[+A](value: A, message: JetStreamMessage) {
+
+  /** Acknowledge successful processing. */
+  def ack: IO[NatsError, Unit] = message.ack
+
+  /**
+   * Synchronous ack — blocks until the server confirms receipt.
+   *
+   * @param timeout
+   *   Maximum time to wait for the server ack.
+   */
+  def ackSync(timeout: Duration): IO[NatsError, Unit] = message.ackSync(timeout)
+
+  /** Negative-acknowledge — ask the server to redeliver this message. */
+  def nak: IO[NatsError, Unit] = message.nak
+
+  /**
+   * Negative-acknowledge with a redelivery delay.
+   *
+   * @param delay
+   *   How long the server should wait before redelivering.
+   */
+  def nakWithDelay(delay: Duration): IO[NatsError, Unit] = message.nakWithDelay(delay)
+
+  /** Terminate this message — it will not be redelivered. */
+  def term: IO[NatsError, Unit] = message.term
+
+  /** Extend the ack deadline (signal work in progress). */
+  def inProgress: IO[NatsError, Unit] = message.inProgress
+}
 
 // ---------------------------------------------------------------------------
 // JetStream publish types

@@ -11,7 +11,7 @@ Messages are delivered at-most-once. If no subscriber is listening when a messag
 
 ### Fire-and-forget
 
-The simplest `Nats#publish` call takes a subject and a payload. The type of the payload selects the `NatsCodec` automatically:
+The simplest `Nats#publish` call takes a subject and a payload. Use the `subject"..."` interpolator to create a `Subject` from a string — it is zero-cost and keeps your code clean. The type of the payload selects the `NatsCodec` automatically:
 
 ```scala mdoc:silent
 import zio.*
@@ -19,14 +19,29 @@ import zio.nats.*
 
 val publishBasic: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
+    val id = "123"
     for {
-      _ <- nats.publish(Subject("shop.orders"), "order-123")
-      _ <- nats.publish(Subject("shop.orders"), Chunk.fromArray("order-123".getBytes))
+      _ <- nats.publish(subject"shop.orders", "order-123")
+      _ <- nats.publish(subject"shop.orders.$id", Chunk.fromArray("order-123".getBytes))
     } yield ()
   }
 ```
 
 `"order-123"` resolves `NatsCodec[String]` (UTF-8 encode). `Chunk.fromArray(...)` resolves `NatsCodec[Chunk[Byte]]` (identity - no conversion). Both are built-in; no setup required.
+
+#### Dynamic subjects
+
+The `subject"..."` interpolator is the most ergonomic way to build subjects. For untrusted input from an external source, use `Subject.parse` to validate the string first:
+
+```scala mdoc:silent
+import zio.nats.*
+
+val id = "456"
+val s1 = subject"orders.$id" // Zero-cost constant or interpolated subject
+
+val raw = "invalid subject >"
+val s2  = Subject.parse(raw) // Returns Either[String, Subject]
+```
 
 ### With headers
 
@@ -56,7 +71,7 @@ import zio.nats.*
 val publishWithHeaders: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
     nats.publish(
-      Subject("shop.orders"),
+      subject"shop.orders",
       "order-123",
       PublishParams(headers = traceHeaders)
     )
@@ -74,9 +89,9 @@ import zio.nats.*
 val publishWithReplyTo: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
     nats.publish(
-      Subject("shop.pricing"),
+      subject"shop.pricing",
       "item-456",
-      PublishParams(replyTo = Some(Subject("_INBOX.my-gather-123")))
+      PublishParams(replyTo = Some(subject"_INBOX.my-gather-123"))
     )
   }
 ```
@@ -105,7 +120,7 @@ import zio.nats.*
 
 val subscribeWithEnvelope: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
-    nats.subscribe[String](Subject("shop.orders.>"))
+    nats.subscribe[String](subject"shop.orders.>")
       .tap(env => ZIO.debug(s"Order on ${env.message.subject}: ${env.value}"))
       .runDrain
   }
@@ -119,7 +134,7 @@ import zio.nats.*
 
 val subscribeValues: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
-    nats.subscribe[String](Subject("shop.orders.>"))
+    nats.subscribe[String](subject"shop.orders.>")
       .map(_.value)
       .tap(orderId => ZIO.debug(s"Processing: $orderId"))
       .runDrain
@@ -136,7 +151,7 @@ import zio.nats.*
 
 val subscribeRaw: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
-    nats.subscribe[Chunk[Byte]](Subject("shop.orders.>"))
+    nats.subscribe[Chunk[Byte]](subject"shop.orders.>")
       .tap(env => ZIO.debug(s"Forwarding ${env.value.length} bytes from ${env.message.subject}"))
       .runDrain
   }
@@ -154,7 +169,7 @@ import zio.nats.*
 
 val fulfillmentWorker: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
-    nats.subscribe[String](Subject("shop.fulfillment"), Some(QueueGroup("fulfillment-workers")))
+    nats.subscribe[String](subject"shop.fulfillment", Some(QueueGroup("fulfillment-workers")))
       .tap(env => ZIO.debug(s"Fulfilling order: ${env.value}"))
       .runDrain
   }
@@ -193,7 +208,7 @@ import zio.nats.*
 val stockCheck: ZIO[Nats, NatsError, Envelope[StockStatus]] =
   ZIO.serviceWithZIO[Nats] { nats =>
     nats.request[String, StockStatus](
-      Subject("shop.inventory"),
+      subject"shop.inventory",
       "item-456",
       timeout = 5.seconds
     )
@@ -211,7 +226,7 @@ import zio.nats.*
 val stockLevel: ZIO[Nats, NatsError, StockStatus] =
   ZIO.serviceWithZIO[Nats] { nats =>
     nats.request[String, StockStatus](
-          Subject("shop.inventory"),
+          subject"shop.inventory",
           "item-456",
           5.seconds
         ).payload

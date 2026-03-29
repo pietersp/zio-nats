@@ -76,15 +76,15 @@ object Main extends ZIOAppDefault {
   val program: ZIO[Nats, NatsError, Unit] =
     for {
       nats    <- ZIO.service[Nats]
-      subject  = Subject("users")
-      fiber   <- nats.subscribe[User](subject)
+      subj: Subject = subject"users"
+      fiber   <- nats.subscribe[User](subj)
                    .take(2)
                    .tap(env => Console.printLine(s"Received: ${env.value}").orDie)
                    .runDrain
                    .fork
       _       <- ZIO.sleep(200.millis)
-      _       <- nats.publish(subject, User("Alice", 30))
-      _       <- nats.publish(subject, User("Bob", 25))
+      _       <- nats.publish(subj, User("Alice", 30))
+      _       <- nats.publish(subj, User("Bob", 25))
       _       <- fiber.join
     } yield ()
 

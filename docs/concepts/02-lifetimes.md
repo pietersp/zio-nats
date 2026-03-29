@@ -37,7 +37,7 @@ import zio.nats.*
 val subscribeAndCancel: ZIO[Nats, NatsError, Unit] =
   for {
     nats  <- ZIO.service[Nats]
-    fiber <- nats.subscribe[String](Subject("events.>"))
+    fiber <- nats.subscribe[String](subject"events.>")
                  .tap(env => ZIO.debug(env.value))
                  .runDrain
                  .fork

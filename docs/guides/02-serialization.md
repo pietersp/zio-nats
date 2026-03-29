@@ -23,8 +23,8 @@ import zio.nats.*
 val builtins: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
     for {
-      _ <- nats.publish(Subject("shop.events"), "order-placed")
-      _ <- nats.publish(Subject("shop.events"), Chunk.fromArray("order-placed".getBytes))
+      _ <- nats.publish(subject"shop.events", "order-placed")
+      _ <- nats.publish(subject"shop.events", Chunk.fromArray("order-placed".getBytes))
     } yield ()
   }
 ```
@@ -74,8 +74,8 @@ import zio.nats.*
 val typedPubSub: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
     for {
-      _ <- nats.publish(Subject("shop.orders"), OrderPlaced("ord-1", "cust-42", 59.99))
-      _ <- nats.subscribe[OrderPlaced](Subject("shop.orders"))
+      _ <- nats.publish(subject"shop.orders", OrderPlaced("ord-1", "cust-42", 59.99))
+      _ <- nats.subscribe[OrderPlaced](subject"shop.orders")
              .map(_.value)
              .tap(o => ZIO.debug(s"Order ${o.orderId} from ${o.customerId}: £${o.total}"))
              .runDrain
@@ -160,8 +160,8 @@ object PriceUpdate {
 val priceUpdates: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
     for {
-      _ <- nats.publish(Subject("shop.pricing"), PriceUpdate("item-456", 12.99))
-      _ <- nats.subscribe[PriceUpdate](Subject("shop.pricing")).map(_.value).runDrain
+      _ <- nats.publish(subject"shop.pricing", PriceUpdate("item-456", 12.99))
+      _ <- nats.subscribe[PriceUpdate](subject"shop.pricing").map(_.value).runDrain
     } yield ()
   }
 ```
@@ -210,7 +210,7 @@ object ShipmentStatus {
 
 val shipmentEvents: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
-    nats.publish(Subject("shop.shipments"), ShipmentStatus("ord-1", "dispatched"))
+    nats.publish(subject"shop.shipments", ShipmentStatus("ord-1", "dispatched"))
   }
 ```
 
@@ -323,8 +323,8 @@ given NatsCodec[StockTick] = new NatsCodec[StockTick] {
 val ticks: ZIO[Nats, NatsError, Unit] =
   ZIO.serviceWithZIO[Nats] { nats =>
     for {
-      _ <- nats.publish(Subject("shop.ticks"), StockTick(42, 1299, 100))
-      _ <- nats.subscribe[StockTick](Subject("shop.ticks")).map(_.value).runDrain
+      _ <- nats.publish(subject"shop.ticks", StockTick(42, 1299, 100))
+      _ <- nats.subscribe[StockTick](subject"shop.ticks").map(_.value).runDrain
     } yield ()
   }
 ```

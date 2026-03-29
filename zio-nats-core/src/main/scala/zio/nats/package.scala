@@ -130,4 +130,33 @@ package object nats {
   type StatsResponse      = service.StatsResponse; val StatsResponse       = service.StatsResponse
   type EndpointStats      = service.EndpointStats; val EndpointStats       = service.EndpointStats
   type EndpointInfo       = service.EndpointInfo; val EndpointInfo         = service.EndpointInfo
+
+  // ---------------------------------------------------------------------------
+  // JetStream stream extensions
+  // ---------------------------------------------------------------------------
+
+  extension [R, A](stream: zio.stream.ZStream[R, NatsError, JsEnvelope[A]]) {
+
+    /**
+     * Process each message in the stream and automatically acknowledge on
+     * success or negatively-acknowledge on failure.
+     *
+     * If the handler succeeds, [[JsEnvelope.ack]] is called. If the handler
+     * fails, [[JsEnvelope.nak]] is called and the handler's error is swallowed
+     * (logged if it was a Throwable).
+     *
+     * @param f
+     *   The processing function for each message payload.
+     */
+    def runProcessAck[R1 <: R, E, B](f: A => ZIO[R1, E, B]): ZIO[R1 & Scope, NatsError, Unit] =
+      stream.mapZIO { env =>
+        f(env.value)
+          .tapBoth(
+            _ => env.nak.ignoreLogged,
+            _ => env.ack
+          )
+          .unit
+          .ignore // Ignore the error E from the handler, as we've already NAK'd
+      }.runDrain
+  }
 }
