@@ -1,0 +1,84 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+version-template: '$MAJOR.$MINOR.$PATCH'
+change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
+change-title-escapes: '\<*_&'
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+
+categories:
+  - title: Features
+    labels:
+      - feat
+      - feature
+      - enhancement
+  - title: Fixes
+    labels:
+      - fix
+      - bug
+      - bugfix
+  - title: Documentation
+    labels:
+      - docs
+      - documentation
+  - title: Maintenance
+    labels:
+      - chore
+      - build
+      - dependencies
+      - deps
+      - perf
+      - refactor
+      - test
+      - ci
+
+exclude-labels:
+  - skip-changelog
+
+version-resolver:
+  major:
+    labels:
+      - breaking
+      - major
+      - breaking-change
+  minor:
+    labels:
+      - feat
+      - feature
+      - enhancement
+  patch:
+    labels:
+      - fix
+      - bug
+      - bugfix
+      - docs
+      - documentation
+      - chore
+      - build
+      - dependencies
+      - deps
+      - perf
+      - refactor
+      - test
+      - ci
+  default: patch
+
+autolabeler:
+  - label: docs
+    files:
+      - 'docs/**'
+      - 'README.md'
+  - label: ci
+    files:
+      - '.github/**'
+  - label: test
+    files:
+      - 'zio-nats-test/**'
+      - 'zio-nats-testkit/**'
+
+sort-by: merged_at
+sort-direction: descending

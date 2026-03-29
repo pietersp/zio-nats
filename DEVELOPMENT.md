@@ -58,6 +58,36 @@ For the full test suite:
 sbt zioNatsTest/test
 ```
 
+## Release Labels
+
+This repository uses Release Drafter to build draft GitHub releases from merged pull requests. PR labels affect both the release notes grouping and the suggested semantic version bump, so please add the most accurate release label before merging.
+
+Recommended labels:
+
+- `feat`, `feature`, `enhancement` - new functionality; grouped under Features; suggests a minor version bump
+- `fix`, `bug`, `bugfix` - bug fixes; grouped under Fixes; suggests a patch version bump
+- `docs`, `documentation` - documentation-only changes; grouped under Documentation; suggests a patch version bump
+- `chore`, `build`, `dependencies`, `deps`, `perf`, `refactor`, `test`, `ci` - maintenance, tooling, dependency, performance, refactor, test, or CI work; grouped under Maintenance; suggests a patch version bump
+- `breaking`, `major`, `breaking-change` - breaking changes; suggests a major version bump
+- `skip-changelog` - exclude the PR from drafted release notes
+
+Guidelines:
+
+- Prefer exactly one primary release label per PR unless the change is genuinely cross-cutting.
+- Use a breaking label on any PR that changes public API or behavior in a non-compatible way, even if it also has `feat` or `fix`.
+- If no release label is present, Release Drafter can still include the PR, but the category and version suggestion may be less useful.
+
+## Releasing
+
+Releases are now created from GitHub rather than by creating tags locally.
+
+1. Merge PRs into `master` with the correct release labels.
+2. Open the draft release in GitHub Releases.
+3. Review the generated notes and confirm the proposed version tag.
+4. Publish the release in GitHub.
+
+When you publish the release, GitHub creates the tag and the release workflow publishes artifacts from that tag. You do not need to run `git tag` or push tags manually for normal releases.
+
 ## Notes
 
 - `.skillshare/skills` is the source of truth for shared project skills.
