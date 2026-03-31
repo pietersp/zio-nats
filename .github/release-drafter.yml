@@ -42,15 +42,23 @@ version-resolver:
   default: patch
 
 autolabeler:
+  - label: feat
+    title:
+      - '/^feat(\(.+\))?:/i'
+  - label: fix
+    title:
+      - '/^fix(\(.+\))?:/i'
   - label: docs
+    title:
+      - '/^docs(\(.+\))?:/i'
     files:
       - 'docs/**'
       - 'README.md'
   - label: chore
+    title:
+      - '/^chore(\(.+\))?:/i'
     files:
       - '.github/**'
-  - label: chore
-    files:
       - 'zio-nats-test/**'
       - 'zio-nats-testkit/**'
 
