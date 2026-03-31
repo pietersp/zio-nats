@@ -202,7 +202,7 @@ Both forms produce identical behaviour. The `(message, code)` pair is sent to ca
 
 #### Union error types
 
-When a handler can fail with more than one distinct error type, pass two to five type parameters to `ServiceEndpoint#failsWith`. The framework encodes the fully-qualified class name of the concrete error as a `Nats-Service-Error-Type` header on each reply, and the client dispatches decoding to the matching member codec using that tag:
+When a handler can fail with more than one distinct error type, chain multiple `failsWith` calls — one per error member. The framework encodes the fully-qualified class name of the concrete error as a `Nats-Service-Error-Type` header on each reply, and the client dispatches decoding to the matching member codec using that tag:
 
 ```scala mdoc:compile-only
 import zio.*
@@ -512,7 +512,7 @@ val checkBoth: ZIO[Nats, NatsError | StockError | PriceError, (StockReply, Price
   }
 ```
 
-`ServiceEndpoint#failsWith` only requires a `NatsCodec[E]` in scope - the same codec encodes the error on the server and decodes it on the client. `NatsCodec[E]` is derived automatically from the `Schema[E]` when using `NatsCodec.fromFormat`. A `ServiceErrorMapper[E]` is resolved automatically via the universal fallback; provide a specific instance to customise the `Nats-Service-Error` header value or status code. For multiple distinct error types, use the two- or three-parameter overloads described in the [union error types](#union-error-types) section above.
+`ServiceEndpoint#failsWith` only requires a `NatsCodec[E]` in scope — the same codec encodes the error on the server and decodes it on the client. `NatsCodec[E]` is derived automatically from the `Schema[E]` when using `NatsCodec.fromFormat`. A `ServiceErrorMapper[E]` is resolved automatically via the universal fallback; provide a specific instance to customise the `Nats-Service-Error` header value or status code. For multiple distinct error types, chain `failsWith` calls as described in the [union error types](#union-error-types) section above.
 
 ### Calling infallible endpoints
 
