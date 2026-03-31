@@ -61,7 +61,7 @@ When adding interrupt/cancellation tests:
 
 ## Project Layout
 
-Seven sbt subprojects:
+Eight sbt subprojects:
 
 | Subproject | Purpose |
 |-----------|---------|
@@ -69,6 +69,7 @@ Seven sbt subprojects:
 | `zio-nats-zio-blocks` | Optional zio-blocks integration (`NatsCodec.fromFormat`, `Builder`) |
 | `zio-nats-jsoniter` | Optional jsoniter-scala integration (`NatsCodecJsoniter.fromJsoniter`) |
 | `zio-nats-play-json` | Optional play-json integration (`NatsCodecPlayJson.fromPlayJson`) |
+| `zio-nats-zio-json` | Optional zio-json integration (`NatsCodecZioJson.fromZioJson`) |
 | `zio-nats` | Batteries-included wrapper — empty JAR, depends on `zio-nats-core` + `zio-nats-zio-blocks` |
 | `zio-nats-testkit` | `NatsTestLayers` for integration tests |
 | `zio-nats-test` | Integration test suite |
@@ -133,6 +134,18 @@ module (`zio-nats-core`) has **no zio-blocks dependency** — it only provides b
   nats.publish(Subject("persons"), Person("Alice", 30))
   ```
   For an explicit one-off codec, use `NatsCodecPlayJson.fromPlayJson(format)`.
+- For domain types with zio-json `JsonEncoder[A]` + `JsonDecoder[A]` (or a combined `JsonCodec[A]`),
+  add `zio-nats-zio-json`. A top-level `given fromZioJson` in `package zio.nats` automatically
+  bridges any `JsonEncoder[A]` + `JsonDecoder[A]` pair in implicit scope to `NatsCodec[A]` — no
+  builder step required. Same `NotGiven[NatsCodec[A]]` guard applies:
+  ```scala
+  given JsonEncoder[Person] = DeriveJsonEncoder.gen[Person]
+  given JsonDecoder[Person] = DeriveJsonDecoder.gen[Person]
+  // NatsCodec[Person] resolved automatically via import zio.nats.{given, *}
+  nats.publish(Subject("persons"), Person("Alice", 30))
+  ```
+  A combined `given JsonCodec[Person] = DeriveJsonCodec.gen[Person]` works equally well.
+  For an explicit one-off codec, use `NatsCodecZioJson.fromZioJson(encoder, decoder)`.
 - For custom codecs with no framework: implement `NatsCodec[A]` directly (depends only on core).
 - Multiple formats can coexist; per-type overrides are plain `given val`s.
 
@@ -227,10 +240,9 @@ Opaque types (`Subject`, `QueueGroup`) cannot be moved to sub-packages — re-ex
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocks.scala` | `NatsCodecZioBlocks.Builder` — derives `NatsCodec[A]` from a zio-blocks `Format` + `Schema`; caches in `ConcurrentHashMap` |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/NatsCodecZioBlocksExtensions.scala` | Extension methods `NatsCodec.fromFormat` and `NatsCodec.derived` (available via `import zio.nats.*`) |
 | `zio-nats-zio-blocks/src/main/scala/zio/nats/serialization/NatsSerializer.scala` | `CompiledCodec[A]` sealed trait, `makeFor[A](format)` factory (eager, can throw), `BinaryCompiledCodec` / `TextCompiledCodec` impls |
-| `zio-nats-jsoniter/src/main/scala/zio/nats/NatsCodecJsoniter.scala` | `NatsCodecJsoniter.wrap` — bridges `JsonValueCodec[A]` to `NatsCodec[A]`; top-level `given fromJsonValueCodec` with `NotGiven[NatsCodec[A]]` guard for automatic resolution |
-| `zio-nats-jsoniter/src/main/scala/zio/nats/NatsCodecJsoniter.scala` | `NatsCodecJsoniter.fromJsoniter` — explicit codec wrapper; `wrap` method; `given fromJsonValueCodec` for auto-bridging |
-| `zio-nats-play-json/src/main/scala/zio/nats/NatsCodecPlayJson.scala` | `NatsCodecPlayJson.wrap` — bridges play-json `Format[A]` to `NatsCodec[A]`; top-level `given fromPlayJsonFormat` with `NotGiven[NatsCodec[A]]` guard for automatic resolution |
-| `zio-nats-play-json/src/main/scala/zio/nats/NatsCodecPlayJson.scala` | `NatsCodecPlayJson.fromPlayJson` — explicit codec wrapper; `wrap` method; `given fromPlayJsonFormat` for auto-bridging |
+| `zio-nats-jsoniter/src/main/scala/zio/nats/NatsCodecJsoniter.scala` | `NatsCodecJsoniter.wrap` — bridges `JsonValueCodec[A]` to `NatsCodec[A]`; top-level `given fromJsonValueCodec` with `NotGiven[NatsCodec[A]]` guard for automatic resolution; `fromJsoniter` explicit one-off constructor |
+| `zio-nats-play-json/src/main/scala/zio/nats/NatsCodecPlayJson.scala` | `NatsCodecPlayJson.wrap` — bridges play-json `Format[A]` to `NatsCodec[A]`; top-level `given fromPlayJsonFormat` with `NotGiven[NatsCodec[A]]` guard for automatic resolution; `fromPlayJson` explicit one-off constructor |
+| `zio-nats-zio-json/src/main/scala/zio/nats/NatsCodecZioJson.scala` | `NatsCodecZioJson.wrap` — bridges zio-json `JsonEncoder[A]` + `JsonDecoder[A]` to `NatsCodec[A]`; top-level `given fromZioJson` with `NotGiven[NatsCodec[A]]` guard for automatic resolution; `fromZioJson` explicit one-off constructor |
 | `zio-nats-core/src/main/scala/zio/nats/JetStreamEnums.scala` | Scala 3 enums: `AckPolicy`, `DeliverPolicy`, `ReplayPolicy`, `DiscardPolicy`, `RetentionPolicy`, `CompressionOption`, `PriorityPolicy` — each with a `private[nats] def toJava` |
 | `zio-nats-core/src/main/scala/zio/nats/NatsError.scala` | Error hierarchy |
 | `zio-nats-core/src/main/scala/zio/nats/NatsCoreTypes.scala` | `Subject` (opaque), `QueueGroup` (opaque), `Headers`, `PublishParams`, `StorageType`, `ConnectionStatus`, `NatsServerInfo` |

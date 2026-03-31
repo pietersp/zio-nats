@@ -220,9 +220,78 @@ Use `NatsCodecPlayJson.fromPlayJson(format)` for an explicit one-off codec.
 Already on play-json and not planning to add zio-blocks? Swap `zio-nats` for `zio-nats-core` + `zio-nats-play-json` and keep the dependency tree minimal.
 :::
 
+## zio-json
+
+[zio-json](https://zio.dev/zio-json/) is the ZIO ecosystem's own JSON library. It uses compile-time derivation via Scala 3 `Mirror` and is co-published alongside ZIO, making it a natural fit if your project is already in the ZIO stack. Use `zio-nats-zio-json` when your project defines `JsonEncoder[A]` and `JsonDecoder[A]` instances for its domain types and you want to reuse them without any additional codec setup.
+
+Add to `build.sbt`:
+
+```scala
+libraryDependencies += "io.github.pietersp" %% "zio-nats-zio-json" % "@VERSION@"
+```
+
+### Automatic bridging
+
+Derive `JsonEncoder[A]` and `JsonDecoder[A]` for your type — or use a combined `JsonCodec[A]` — and import with `import zio.nats.{given, *}`. The library bridges them to `NatsCodec[A]` automatically:
+
+```scala mdoc:reset silent
+import zio.*
+import zio.nats.{given, *}
+import zio.json.{DeriveJsonEncoder, DeriveJsonDecoder, JsonEncoder, JsonDecoder}
+
+case class StockQuote(ticker: String, price: Double)
+object StockQuote {
+  given JsonEncoder[StockQuote] = DeriveJsonEncoder.gen[StockQuote]
+  given JsonDecoder[StockQuote] = DeriveJsonDecoder.gen[StockQuote]
+}
+
+val stockQuotes: ZIO[Nats, NatsError, Unit] =
+  ZIO.serviceWithZIO[Nats] { nats =>
+    for {
+      _ <- nats.publish(subject"shop.quotes", StockQuote("ACME", 42.50))
+      _ <- nats.subscribe[StockQuote](subject"shop.quotes").map(_.value).runDrain
+    } yield ()
+  }
+```
+
+A combined `JsonCodec[A]` (which extends both `JsonEncoder[A]` and `JsonDecoder[A]`) works equally well:
+
+```scala mdoc:silent
+import zio.json.{DeriveJsonCodec, JsonCodec}
+
+case class Heartbeat(serviceId: String, ts: Long)
+object Heartbeat {
+  given JsonCodec[Heartbeat] = DeriveJsonCodec.gen[Heartbeat]
+}
+
+// NatsCodec[Heartbeat] resolved automatically via the fromZioJson bridge
+```
+
+A `NotGiven[NatsCodec[A]]` guard ensures the bridge never shadows built-in codecs or any explicit `given NatsCodec[A]` already in scope.
+
+### Explicit one-off codec
+
+Use `NatsCodecZioJson.fromZioJson` when you need a codec for a single call without placing it in implicit scope:
+
+```scala mdoc:silent
+import zio.nats.*
+import zio.nats.NatsCodecZioJson
+import zio.json.{DeriveJsonEncoder, DeriveJsonDecoder}
+
+val stockQuoteCodec: NatsCodec[StockQuote] =
+  NatsCodecZioJson.fromZioJson(
+    DeriveJsonEncoder.gen[StockQuote],
+    DeriveJsonDecoder.gen[StockQuote]
+  )
+```
+
+:::tip
+Already on zio-json and not planning to add zio-blocks? Swap `zio-nats` for `zio-nats-core` + `zio-nats-zio-json` and keep the dependency tree minimal.
+:::
+
 ## Mixing codecs
 
-All three integration styles can coexist in the same project. Each type resolves its codec independently - zio-blocks for most types, jsoniter for the ones that need maximum throughput:
+All four integration styles can coexist in the same project. Each type resolves its codec independently - zio-blocks for most types, jsoniter for the ones that need maximum throughput:
 
 ```scala mdoc:silent
 import zio.*

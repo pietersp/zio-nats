@@ -14,7 +14,7 @@ zio-nats is split across several artifacts. Most projects need only one of the t
 libraryDependencies += "io.github.pietersp" %% "zio-nats" % "@VERSION@"
 
 // Option B: core only (no zio-blocks)
-// Use when you prefer jsoniter-scala, play-json, or a fully custom NatsCodec[A].
+// Use when you prefer jsoniter-scala, play-json, zio-json, or a fully custom NatsCodec[A].
 libraryDependencies += "io.github.pietersp" %% "zio-nats-core" % "@VERSION@"
 
 // Optional: jsoniter-scala serialization
@@ -25,6 +25,10 @@ libraryDependencies += "io.github.pietersp" %% "zio-nats-jsoniter" % "@VERSION@"
 // Pair with zio-nats-core, or add alongside zio-nats for selected types.
 libraryDependencies += "io.github.pietersp" %% "zio-nats-play-json" % "@VERSION@"
 
+// Optional: zio-json serialization
+// Pair with zio-nats-core, or add alongside zio-nats for selected types.
+libraryDependencies += "io.github.pietersp" %% "zio-nats-zio-json" % "@VERSION@"
+
 // Testkit: starts a real NATS server in Docker via testcontainers
 libraryDependencies += "io.github.pietersp" %% "zio-nats-testkit" % "@VERSION@" % Test
 ```
@@ -34,10 +38,11 @@ libraryDependencies += "io.github.pietersp" %% "zio-nats-testkit" % "@VERSION@" 
 | Artifact              | What it includes                                                                | When to use                                                             |
 |-----------------------|---------------------------------------------------------------------------------|-------------------------------------------------------------------------|
 | `zio-nats`            | `zio-nats-core` + `zio-nats-zio-blocks`                                        | Most projects - gets everything including zio-blocks serialization      |
-| `zio-nats-core`       | Pub/sub, JetStream, KV, Object Store, Service Framework, `String`/`Chunk[Byte]` codecs | When you want jsoniter-scala, play-json, or a fully custom codec |
+| `zio-nats-core`       | Pub/sub, JetStream, KV, Object Store, Service Framework, `String`/`Chunk[Byte]` codecs | When you want jsoniter-scala, play-json, zio-json, or a fully custom codec |
 | `zio-nats-zio-blocks` | `NatsCodec.fromFormat`, `Schema`-based codec derivation                         | Transitive via `zio-nats`; add explicitly only when using `zio-nats-core` |
 | `zio-nats-jsoniter`   | `NatsCodecJsoniter`, `given fromJsonValueCodec` auto-bridge                     | High-performance JSON; alternative or complement to zio-blocks          |
 | `zio-nats-play-json`  | `NatsCodecPlayJson`, `given fromPlayJsonFormat` auto-bridge                     | Play framework projects; alternative or complement to zio-blocks        |
+| `zio-nats-zio-json`   | `NatsCodecZioJson`, `given fromZioJson` auto-bridge                             | ZIO-native projects; alternative or complement to zio-blocks            |
 | `zio-nats-testkit`    | `NatsTestLayers.nats` - testcontainers-based `Nats` layer                       | Integration tests                                                       |
 
 ## Dependency graph
@@ -54,6 +59,9 @@ zio-nats-jsoniter
 zio-nats-play-json
   └── zio-nats-core  (provided by zio-nats or zio-nats-core)
 
+zio-nats-zio-json
+  └── zio-nats-core  (provided by zio-nats or zio-nats-core)
+
 zio-nats-testkit
   └── zio-nats-core
 ```
@@ -65,8 +73,10 @@ zio-nats-testkit
 | zio-blocks JSON only                         | `zio-nats`                                        |
 | jsoniter-scala only                          | `zio-nats-core` + `zio-nats-jsoniter`             |
 | play-json only                               | `zio-nats-core` + `zio-nats-play-json`            |
+| zio-json only                                | `zio-nats-core` + `zio-nats-zio-json`             |
 | zio-blocks + jsoniter for selected types     | `zio-nats` + `zio-nats-jsoniter`                  |
 | zio-blocks + play-json for selected types    | `zio-nats` + `zio-nats-play-json`                 |
+| zio-blocks + zio-json for selected types     | `zio-nats` + `zio-nats-zio-json`                  |
 
 ## Additional zio-blocks formats
 
