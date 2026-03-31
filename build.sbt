@@ -6,6 +6,7 @@ val jnatsVersion          = "2.25.2"
 val testcontainersVersion = "0.44.1"
 val jsoniterScalaVersion  = "2.38.9"
 val playJsonVersion       = "3.0.6"
+val zioJsonVersion        = "0.9.0"
 
 inThisBuild(
   List(
@@ -40,6 +41,7 @@ lazy val root = (project in file("."))
     zioNats,
     zioNatsJsoniter,
     zioNatsPlayJson,
+    zioNatsZioJson,
     zioNatsTestkit,
     zioNatsTest,
     zioNatsExamples,
@@ -106,6 +108,17 @@ lazy val zioNatsPlayJson = (project in file("zio-nats-play-json"))
     mimaPreviousArtifacts := Set.empty
   )
 
+lazy val zioNatsZioJson = (project in file("zio-nats-zio-json"))
+  .dependsOn(zioNatsCore)
+  .enablePlugins(MimaPlugin)
+  .settings(
+    name := "zio-nats-zio-json",
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio-json" % zioJsonVersion
+    ),
+    mimaPreviousArtifacts := Set.empty
+  )
+
 lazy val zioNatsTestkit = (project in file("zio-nats-testkit"))
   .dependsOn(zioNatsCore)
   .enablePlugins(MimaPlugin)
@@ -119,7 +132,7 @@ lazy val zioNatsTestkit = (project in file("zio-nats-testkit"))
   )
 
 lazy val zioNatsTest = (project in file("zio-nats-test"))
-  .dependsOn(zioNatsCore, zioNatsZioBlocks, zioNatsJsoniter, zioNatsPlayJson, zioNatsTestkit)
+  .dependsOn(zioNatsCore, zioNatsZioBlocks, zioNatsJsoniter, zioNatsPlayJson, zioNatsZioJson, zioNatsTestkit)
   .settings(
     name                  := "zio-nats-test",
     publish / skip        := true,
@@ -128,7 +141,8 @@ lazy val zioNatsTest = (project in file("zio-nats-test"))
       "dev.zio"                               %% "zio-test"              % zioVersion           % Test,
       "dev.zio"                               %% "zio-test-sbt"          % zioVersion           % Test,
       "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % jsoniterScalaVersion % Test,
-      "org.playframework"                     %% "play-json"             % playJsonVersion      % Test
+      "org.playframework"                     %% "play-json"             % playJsonVersion      % Test,
+      "dev.zio"                               %% "zio-json"              % zioJsonVersion       % Test
     ),
     // Podman/Docker socket configuration for testcontainers.
     // Forking is required so env vars are passed to the test JVM.
@@ -151,7 +165,7 @@ lazy val zioNatsTest = (project in file("zio-nats-test"))
 
 lazy val docs = project
   .in(file("zio-nats-docs"))
-  .dependsOn(zioNatsCore, zioNatsZioBlocks, zioNatsJsoniter, zioNatsPlayJson)
+  .dependsOn(zioNatsCore, zioNatsZioBlocks, zioNatsJsoniter, zioNatsPlayJson, zioNatsZioJson)
   .enablePlugins(MdocPlugin, DocusaurusPlugin)
   .settings(
     name                  := "zio-nats-docs",
