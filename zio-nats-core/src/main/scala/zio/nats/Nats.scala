@@ -13,7 +13,7 @@ import zio.nats.service.{
 }
 import zio.stream._
 
-import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
 import scala.jdk.CollectionConverters._
 
 /**
@@ -333,7 +333,16 @@ object Nats {
   private def connect(options: Options, drainTimeout: Duration): ZIO[Scope, NatsError, JConnection] =
     ZIO.acquireRelease(
       ZIO.attemptBlocking(io.nats.client.Nats.connect(options)).mapError(NatsError.fromThrowable)
-    )(conn => ZIO.attemptBlocking(conn.drain(drainTimeout.asJava)).ignoreLogged)
+    )(conn => releaseConnection(conn, drainTimeout))
+
+  private def releaseConnection(conn: JConnection, drainTimeout: Duration): UIO[Unit] = {
+    val awaitDrain =
+      ZIO.attemptBlockingInterrupt {
+        conn.drain(drainTimeout.asJava).get(drainTimeout.toMillis, TimeUnit.MILLISECONDS)
+      }.unit
+
+    awaitDrain.catchAllCause(_ => ZIO.attemptBlocking(conn.close()).ignoreLogged)
+  }
 
   /**
    * Drain `queue` into `hub` on a background fiber for the lifetime of the
