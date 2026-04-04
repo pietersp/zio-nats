@@ -1,11 +1,21 @@
 package zio.nats
 
+import io.nats.client.Connection.Status
 import zio.*
 import zio.nats.testkit.{NatsContainer, NatsTestLayers}
 import zio.test.*
 import zio.test.TestAspect.*
 
 object NatsPubSubSpec extends ZIOSpecDefault {
+
+  private def awaitClosedStatus(
+    conn: io.nats.client.Connection,
+    remainingPolls: Int
+  ): UIO[Status] =
+    ZIO.succeed(conn.getStatus).flatMap { status =>
+      if (status == Status.CLOSED || remainingPolls <= 0) ZIO.succeed(status)
+      else ZIO.sleep(100.millis) *> awaitClosedStatus(conn, remainingPolls - 1)
+    }
 
   def spec: Spec[Any, Throwable] = suite("Nats Pub/Sub")(
     test("publish and subscribe to a subject") {
@@ -193,6 +203,36 @@ object NatsPubSubSpec extends ZIOSpecDefault {
         msgs <- received.get
         // Subscriber was active and received messages; if drain threw, the test would fail
       } yield assertTrue(msgs.nonEmpty)
+    },
+
+    test("scope exit transitions the underlying jnats connection to CLOSED") {
+      val subject = Subject("drain.thread-cleanup")
+
+      for {
+        nats        <- ZIO.service[Nats]
+        container   <- ZIO.service[NatsContainer]
+        received    <- Promise.make[Nothing, Unit]
+        connRef     <- Ref.make(Option.empty[io.nats.client.Connection])
+        scopedFiber <- ZIO.scoped {
+                         Nats
+                           .make(NatsConfig(servers = List(container.clientUrl), drainTimeout = 2.seconds))
+                           .flatMap { scopedNats =>
+                             for {
+                               conn <- scopedNats.underlying
+                               _    <- connRef.set(Some(conn))
+                               _    <- scopedNats
+                                      .subscribe[Chunk[Byte]](subject)
+                                      .tap(_ => received.succeed(()))
+                                      .runDrain
+                             } yield ()
+                           }
+                       }.fork
+        _ <- (nats.publish(subject, Chunk.fromArray("probe".getBytes)) *>
+               received.await.timeout(100.millis)).repeatUntil(_.isDefined)
+        conn        <- connRef.get.someOrFailException
+        _           <- scopedFiber.interrupt
+        finalStatus <- awaitClosedStatus(conn, 50)
+      } yield assertTrue(finalStatus == Status.CLOSED)
     }
   ).provideShared(
     NatsTestLayers.container,
