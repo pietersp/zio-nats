@@ -233,6 +233,37 @@ val stockLevel: ZIO[Nats, NatsError, StockStatus] =
   }
 ```
 
+### With headers
+
+`Nats#request` accepts an optional `PublishParams` as its fourth argument, making request-reply symmetric with `Nats#publish`. Use this to attach cross-cutting metadata — a trace ID for distributed tracing, a correlation ID, or any context the receiver needs — without embedding it in the payload type.
+
+Pass a `PublishParams` after the timeout to include headers on the outgoing request:
+
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.blocks.schema.Schema
+import zio.blocks.schema.json.JsonFormat
+
+case class StockStatus(available: Int, onHold: Int)
+object StockStatus { given Schema[StockStatus] = Schema.derived }
+
+val codecs = NatsCodec.fromFormat(JsonFormat)
+import codecs.derived
+
+val stockCheckWithTrace: ZIO[Nats, NatsError, StockStatus] =
+  ZIO.serviceWithZIO[Nats] { nats =>
+    nats.request[String, StockStatus](
+      subject"shop.inventory",
+      "item-456",
+      5.seconds,
+      PublishParams(headers = Headers("X-Trace-Id" -> "req-abc123"))
+    ).payload
+  }
+```
+
+The receiver reads the header via `env.message.headers` on a raw subscription, or via `ServiceRequest#headers` in a typed service handler (see [Sending request headers](./04-service.md#sending-request-headers) in the Service Framework guide). The `replyTo` field of `PublishParams` is ignored for requests — NATS manages the reply inbox automatically.
+
 ## Next steps
 
 - [Serialization guide](./02-serialization.md) - publish and subscribe with domain types, not just `String` and `Chunk[Byte]`
