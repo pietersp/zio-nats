@@ -76,11 +76,17 @@ trait Nats {
    * `timeout`. Fails with [[NatsError.ServiceCallFailed]] if the responder is a
    * NATS Micro service endpoint that sent an error response (detected via the
    * standard `Nats-Service-Error` / `Nats-Service-Error-Code` headers).
+   *
+   * @param params
+   *   Optional [[PublishParams]] for outbound headers (defaults to
+   *   [[PublishParams.empty]]). The `replyTo` field of `params` is ignored —
+   *   NATS manages the reply inbox automatically for request/reply.
    */
   def request[A: NatsCodec, B: NatsCodec](
     subject: Subject,
     request: A,
-    timeout: Duration
+    timeout: Duration,
+    params: PublishParams = PublishParams.empty
   ): IO[NatsError, Envelope[B]]
 
   // -------------------------------------------------------------------------
@@ -193,11 +199,18 @@ trait Nats {
    *
    * For infallible endpoints (`Err = Nothing`) use [[request]] directly with
    * `endpoint.effectiveSubject`.
+   *
+   * @param params
+   *   Optional [[PublishParams]] for outbound headers (defaults to
+   *   [[PublishParams.empty]]). Headers arrive at the handler via
+   *   [[service.ServiceRequest#headers]]. The `replyTo` field of `params` is
+   *   ignored — NATS manages the reply inbox automatically.
    */
   def requestService[In, Err, Out](
     endpoint: ServiceEndpointDescriptor[In, Err, Out],
     input: In,
-    timeout: Duration
+    timeout: Duration,
+    params: PublishParams = PublishParams.empty
   ): IO[NatsError | Err, Out]
 
   /**
@@ -408,7 +421,8 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
   override def request[A: NatsCodec, B: NatsCodec](
     subject: Subject,
     request: A,
-    timeout: Duration
+    timeout: Duration,
+    params: PublishParams
   ): IO[NatsError, Envelope[B]] =
     ZIO
       .attempt(NatsCodec[A].encode(request))
@@ -416,19 +430,20 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
         NatsError.SerializationError(s"Failed to encode request for subject '${subject.value}': ${e.toString}", e)
       )
       .flatMap { bytes =>
-        ZIO
-          .attemptBlocking(Option(conn.request(subject.value, bytes.toArray, timeout.asJava)))
+        val send =
+          if (params.headers.isEmpty)
+            ZIO.attemptBlocking(Option(conn.request(subject.value, bytes.toArray, timeout.asJava)))
+          else {
+            val msg = NatsMessage.toJava(subject.value, bytes, headers = params.headers)
+            ZIO.attemptBlocking(Option(conn.request(msg, timeout.asJava)))
+          }
+        send
           .mapError(NatsError.fromThrowable)
           .flatMap {
             case None =>
               ZIO.fail(NatsError.Timeout(s"No reply received for subject '${subject.value}' within $timeout"))
             case Some(jMsg) =>
               val msg = NatsMessage.fromJava(jMsg)
-              // Check for NATS Micro protocol error headers before decoding.
-              // When a service handler fails, jnats sends an empty body with
-              // Nats-Service-Error / Nats-Service-Error-Code headers. Decoding
-              // an empty body would silently succeed (e.g. "" for String), so
-              // we must intercept this at the protocol level.
               extractServiceError(msg) match {
                 case Some((errMsg, code)) => ZIO.fail(NatsError.ServiceCallFailed(errMsg, code))
                 case None                 =>
@@ -442,7 +457,8 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
   override def requestService[In, Err, Out](
     endpoint: ServiceEndpointDescriptor[In, Err, Out],
     input: In,
-    timeout: Duration
+    timeout: Duration,
+    params: PublishParams
   ): IO[NatsError | Err, Out] =
     ZIO
       .attempt(endpoint.inCodec.encode(input))
@@ -453,10 +469,16 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
         )
       )
       .flatMap { bytes =>
-        ZIO
-          .attemptBlocking(
-            Option(conn.request(endpoint.effectiveSubject.value, bytes.toArray, timeout.asJava))
-          )
+        val send =
+          if (params.headers.isEmpty)
+            ZIO.attemptBlocking(
+              Option(conn.request(endpoint.effectiveSubject.value, bytes.toArray, timeout.asJava))
+            )
+          else {
+            val msg = NatsMessage.toJava(endpoint.effectiveSubject.value, bytes, headers = params.headers)
+            ZIO.attemptBlocking(Option(conn.request(msg, timeout.asJava)))
+          }
+        send
           .mapError(NatsError.fromThrowable)
           .flatMap {
             case None =>

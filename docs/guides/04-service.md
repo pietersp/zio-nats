@@ -583,6 +583,47 @@ val checkStock: ZIO[Nats, NatsError, Option[StockReply]] =
 
 The `code` field mirrors the HTTP status convention used by the NATS Micro protocol - a custom `ServiceErrorMapper` can emit any code.
 
+### Sending request headers
+
+Both `Nats#requestService` and `Nats#request` accept an optional `PublishParams` as a fourth argument, making typed service calls symmetric with `Nats#publish`. This is the idiomatic way to attach cross-cutting metadata — a trace ID, a correlation ID, or a contract version signal — to a service call without touching the payload type.
+
+Pass a `PublishParams` after the timeout and the headers arrive at the handler via `ServiceRequest#headers`. The server side reads them using `ServiceEndpoint#handleWith` (see [Implementing a handler](#implementing-a-handler)):
+
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+import zio.blocks.schema.Schema
+import zio.blocks.schema.json.JsonFormat
+
+case class StockRequest(itemId: String)
+case class StockReply(available: Int, reserved: Int)
+case class StockError(reason: String)
+
+object StockRequest { given Schema[StockRequest] = Schema.derived }
+object StockReply   { given Schema[StockReply]   = Schema.derived }
+object StockError   { given Schema[StockError]   = Schema.derived }
+
+val codecs = NatsCodec.fromFormat(JsonFormat)
+import codecs.derived
+
+val stockEndpoint = ServiceEndpoint("stock-check")
+  .in[StockRequest]
+  .out[StockReply]
+  .failsWith[StockError]
+
+val checkStock: ZIO[Nats, NatsError | StockError, Int] =
+  ZIO.serviceWithZIO[Nats] { nats =>
+    nats.requestService(
+      stockEndpoint,
+      StockRequest("item-456"),
+      5.seconds,
+      PublishParams(headers = Headers("X-Trace-Id" -> "req-abc123"))
+    ).map(_.available)
+  }
+```
+
+The `replyTo` field of `PublishParams` is ignored for all request operations — NATS manages the reply inbox automatically.
+
 ## Service discovery
 
 `ServiceDiscovery` queries all running instances of a service across the cluster by broadcasting to the `$SRV.*` subjects that NATS reserves for service metadata. It is a read-only client - use it from monitoring dashboards, health checks, or admin tooling, not from handlers themselves.
