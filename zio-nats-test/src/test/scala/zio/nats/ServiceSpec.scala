@@ -145,6 +145,30 @@ object ServiceSpec extends ZIOSpecDefault {
       }
     },
 
+    test("requestService sends headers visible in ServiceRequest.headers") {
+      ZIO.scoped {
+        for {
+          nats <- ZIO.service[Nats]
+          ep    = ServiceEndpoint("headers-echo").in[String].out[String]
+          _    <- nats.service(
+                 ServiceConfig("headers-echo-svc", "1.0.0"),
+                 ep.handleWith { req =>
+                   ZIO.succeed(req.headers.get("X-Version").headOption.getOrElse("missing"))
+                 }
+               )
+          _      <- awaitService("headers-echo-svc")
+          result <- nats
+                      .requestService(
+                        ep,
+                        "ignored",
+                        5.seconds,
+                        PublishParams(headers = Headers("X-Version" -> "42"))
+                      )
+                      .mapError(e => new RuntimeException(e.toString))
+        } yield assertTrue(result == "42")
+      }
+    },
+
     test("requestService fails with typed domain error") {
       ZIO.scoped {
         for {

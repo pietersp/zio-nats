@@ -88,6 +88,36 @@ object NatsPubSubSpec extends ZIOSpecDefault {
       } yield assertTrue(reply.value == "pong")
     },
 
+    test("request sends headers that the subscriber receives") {
+      val subject = Subject("test.request.headers")
+      for {
+        nats         <- ZIO.service[Nats]
+        headersLatch <- Promise.make[Nothing, Headers]
+        fiber        <- nats
+                   .subscribe[Chunk[Byte]](subject)
+                   .tap { env =>
+                     val capture = headersLatch.succeed(env.message.headers)
+                     env.message.replyTo match {
+                       case Some(reply) =>
+                         capture *> nats.publish(reply, Chunk.fromArray("pong".getBytes))
+                       case None => capture.unit
+                     }
+                   }
+                   .take(1)
+                   .runDrain
+                   .fork
+        _ <- nats.flush(5.seconds)
+        _ <- nats.request[Chunk[Byte], Chunk[Byte]](
+               subject,
+               Chunk.fromArray("ping".getBytes),
+               5.seconds,
+               PublishParams(headers = Headers("X-Version" -> "2"))
+             )
+        received <- headersLatch.await
+        _        <- fiber.interrupt
+      } yield assertTrue(received.get("X-Version") == Chunk("2"))
+    },
+
     test("rtt returns a positive duration for an active connection") {
       for {
         nats <- ZIO.service[Nats]
