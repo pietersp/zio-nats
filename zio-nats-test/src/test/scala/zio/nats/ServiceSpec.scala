@@ -295,6 +295,40 @@ object ServiceSpec extends ZIOSpecDefault {
       }
     },
 
+    test("handleWithZIO provides request metadata and required environment") {
+      ZIO.scoped {
+        for {
+          nats <- ZIO.service[Nats]
+          ep    = ServiceEndpoint("inspect-env").in[String].out[String]
+          _    <- nats
+                 .service[Prefix](
+                   ServiceConfig("inspect-env-svc", "1.0.0"),
+                   ep.handleWithZIO[Prefix] { req =>
+                     val traceId = req.headers.get("X-Trace-Id").headOption.getOrElse("none")
+                     ZIO.serviceWith[Prefix] { prefix =>
+                       s"${prefix.value} subj=${req.subject.value} trace=$traceId payload=${req.value}"
+                     }
+                   }
+                 )
+                 .provideSomeLayer[Scope](ZLayer.succeed(Prefix("env")))
+          _      <- awaitService("inspect-env-svc")
+          result <- nats
+                      .requestService(
+                        ep,
+                        "test",
+                        5.seconds,
+                        PublishParams(headers = Headers("X-Trace-Id" -> "trace-123"))
+                      )
+                      .mapError(e => new RuntimeException(e.toString))
+        } yield assertTrue(
+          result.contains("env"),
+          result.contains("subj=inspect-env"),
+          result.contains("trace=trace-123"),
+          result.contains("payload=test")
+        )
+      }
+    },
+
     test("stats reflect request count after handling requests") {
       ZIO.scoped {
         for {
