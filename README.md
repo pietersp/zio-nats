@@ -142,6 +142,19 @@ nats.service(
 nats.request[String, Double](subject"prices", "item-42", 5.seconds)
 ```
 
+Handlers that need services from the ZIO environment can use `handleZIO` or `handleWithZIO`. The required environment is carried to service registration:
+
+```scala
+trait Pricing {
+  def lookup(itemId: String): UIO[Double]
+}
+
+nats.service[Pricing](
+  ServiceConfig("pricing", "1.0.0"),
+  prices.handleZIO(itemId => ZIO.serviceWithZIO[Pricing](_.lookup(itemId)))
+)
+```
+
 Typed domain errors accumulate through chained `failsWith` calls, so endpoints can expose as many distinct error variants as they need:
 
 ```scala

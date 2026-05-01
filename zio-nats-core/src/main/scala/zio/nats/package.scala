@@ -121,15 +121,16 @@ package object nats {
   type EndpointIn[In]                = service.EndpointIn[In]
   type ServiceEndpoint[In, Err, Out] = service.ServiceEndpoint[In, Err, Out]
   val ServiceEndpoint = service.ServiceEndpoint
-  type BoundEndpoint      = service.BoundEndpoint
-  type ServiceRequest[+A] = service.ServiceRequest[A]; val ServiceRequest  = service.ServiceRequest
-  type NatsService        = service.NatsService
-  type ServiceDiscovery   = service.ServiceDiscovery; val ServiceDiscovery = service.ServiceDiscovery
-  type PingResponse       = service.PingResponse; val PingResponse         = service.PingResponse
-  type InfoResponse       = service.InfoResponse; val InfoResponse         = service.InfoResponse
-  type StatsResponse      = service.StatsResponse; val StatsResponse       = service.StatsResponse
-  type EndpointStats      = service.EndpointStats; val EndpointStats       = service.EndpointStats
-  type EndpointInfo       = service.EndpointInfo; val EndpointInfo         = service.EndpointInfo
+  type BoundEndpoint       = service.BoundEndpoint[Any]
+  type BoundEndpointOf[-R] = service.BoundEndpoint[R]
+  type ServiceRequest[+A]  = service.ServiceRequest[A]; val ServiceRequest  = service.ServiceRequest
+  type NatsService         = service.NatsService
+  type ServiceDiscovery    = service.ServiceDiscovery; val ServiceDiscovery = service.ServiceDiscovery
+  type PingResponse        = service.PingResponse; val PingResponse         = service.PingResponse
+  type InfoResponse        = service.InfoResponse; val InfoResponse         = service.InfoResponse
+  type StatsResponse       = service.StatsResponse; val StatsResponse       = service.StatsResponse
+  type EndpointStats       = service.EndpointStats; val EndpointStats       = service.EndpointStats
+  type EndpointInfo        = service.EndpointInfo; val EndpointInfo         = service.EndpointInfo
 
   // ---------------------------------------------------------------------------
   // JetStream stream extensions

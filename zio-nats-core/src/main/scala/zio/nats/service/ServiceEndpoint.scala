@@ -195,8 +195,23 @@ final class ServiceEndpoint[In, Err, Out](
    * val bound = echo.handle(name => ZIO.succeed(s"Hello, $name!"))
    * }}}
    */
-  def handle(handler: In => IO[Err, Out]): BoundEndpoint =
-    new BoundEndpointLive[In, Err, Out](
+  def handle(handler: In => IO[Err, Out]): BoundEndpoint[Any] =
+    new BoundEndpointLive[Any, In, Err, Out](
+      name = name,
+      endpoint = this,
+      handler = req => handler(req.value)
+    )
+
+  /**
+   * Bind an environment-aware handler function to this endpoint.
+   *
+   * Use this variant when the handler needs services from the ZIO environment,
+   * such as tracing, logging context, repositories, or application services.
+   * The required environment becomes part of the returned [[BoundEndpoint]] and
+   * is required when registering the endpoint with [[zio.nats.Nats#service]].
+   */
+  def handleZIO[R](handler: In => ZIO[R, Err, Out]): BoundEndpoint[R] =
+    new BoundEndpointLive[R, In, Err, Out](
       name = name,
       endpoint = this,
       handler = req => handler(req.value)
@@ -218,8 +233,23 @@ final class ServiceEndpoint[In, Err, Out](
    * }
    * }}}
    */
-  def handleWith(handler: ServiceRequest[In] => IO[Err, Out]): BoundEndpoint =
-    new BoundEndpointLive[In, Err, Out](
+  def handleWith(handler: ServiceRequest[In] => IO[Err, Out]): BoundEndpoint[Any] =
+    new BoundEndpointLive[Any, In, Err, Out](
+      name = name,
+      endpoint = this,
+      handler = handler
+    )
+
+  /**
+   * Bind an environment-aware handler that also receives request metadata
+   * (subject, headers).
+   *
+   * This is the environment-aware counterpart to [[handleWith]]. It is useful
+   * for middleware-like integrations such as tracing extraction,
+   * authentication, or request-scoped context propagation.
+   */
+  def handleWithZIO[R](handler: ServiceRequest[In] => ZIO[R, Err, Out]): BoundEndpoint[R] =
+    new BoundEndpointLive[R, In, Err, Out](
       name = name,
       endpoint = this,
       handler = handler
@@ -323,21 +353,22 @@ object ServiceEndpoint {
  * An endpoint with its handler bound, ready to be registered on a
  * [[NatsService]].
  *
- * Created by calling [[ServiceEndpoint.handle]] or
- * [[ServiceEndpoint.handleWith]]. The input/output types are erased at this
+ * Created by calling [[ServiceEndpoint.handle]],
+ * [[ServiceEndpoint.handleWith]], [[ServiceEndpoint.handleZIO]], or
+ * [[ServiceEndpoint.handleWithZIO]]. The input/output types are erased at this
  * level — the codec and handler are captured inside. This allows multiple
  * `BoundEndpoint`s with different type signatures to be passed together to
  * [[zio.nats.Nats.service]].
  *
  * Users never construct this directly.
  */
-trait BoundEndpoint {
+trait BoundEndpoint[-R] {
 
   /** The endpoint name, used for introspection and logging. */
   def name: String
 
   /** Build the jnats ServiceEndpoint for registration. Internal use only. */
-  private[nats] def buildJava(conn: JConnection, runtime: Runtime[Any]): JServiceEndpoint
+  private[nats] def buildJava(conn: JConnection, runtime: Runtime[R]): JServiceEndpoint
 }
 
 // ---------------------------------------------------------------------------
@@ -345,18 +376,18 @@ trait BoundEndpoint {
 // ---------------------------------------------------------------------------
 
 /** jnats-backed implementation of [[BoundEndpoint]]. */
-private[nats] class BoundEndpointLive[In, Err, Out](
+private[nats] class BoundEndpointLive[R, In, Err, Out](
   val name: String,
   endpoint: ServiceEndpoint[In, Err, Out],
-  handler: ServiceRequest[In] => IO[Err, Out]
-) extends BoundEndpoint {
+  handler: ServiceRequest[In] => ZIO[R, Err, Out]
+) extends BoundEndpoint[R] {
 
   /**
    * Build the jnats [[ServiceMessageHandler]] that decodes requests, runs the
    * user handler, and encodes replies — isolated from the builder wiring in
    * [[buildJava]].
    */
-  private def makeHandler(conn: JConnection, runtime: Runtime[Any]): ServiceMessageHandler = {
+  private def makeHandler(conn: JConnection, runtime: Runtime[R]): ServiceMessageHandler = {
     val inCodec     = endpoint.inCodec
     val outCodec    = endpoint.outCodec
     val errorMapper = endpoint.errorMapper
@@ -366,7 +397,7 @@ private[nats] class BoundEndpointLive[In, Err, Out](
       Unsafe.unsafe { implicit unsafe =>
         runtime.unsafe.fork {
           // Error channel: Left = typed domain error, Right = infrastructure (message, code)
-          val program: IO[Either[Err, (String, Int)], Unit] = for {
+          val program: ZIO[R, Either[Err, (String, Int)], Unit] = for {
             // Decode the incoming bytes as In
             in <- ZIO
                     .fromEither(inCodec.decode(Chunk.fromArray(Option(jMsg.getData).getOrElse(Array.emptyByteArray))))
@@ -418,7 +449,7 @@ private[nats] class BoundEndpointLive[In, Err, Out](
     }
   }
 
-  private[nats] def buildJava(conn: JConnection, runtime: Runtime[Any]): JServiceEndpoint = {
+  private[nats] def buildJava(conn: JConnection, runtime: Runtime[R]): JServiceEndpoint = {
     val b = JServiceEndpoint
       .builder()
       .endpointName(endpoint.name)

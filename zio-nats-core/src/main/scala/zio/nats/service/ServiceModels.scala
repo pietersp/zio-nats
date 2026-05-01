@@ -19,11 +19,13 @@ import scala.jdk.CollectionConverters._
  * An incoming service request with the payload already decoded as `A`.
  *
  * Provides access to request metadata (subject, headers) alongside the decoded
- * value. Used with [[ServiceEndpoint.implementWithRequest]] when the handler
- * needs more than just the payload.
+ * value. Used with [[ServiceEndpoint.handleWith]] or
+ * [[ServiceEndpoint.handleWithZIO]] when the handler needs more than just the
+ * payload.
  *
  * For the common case where only the payload is needed, use
- * [[ServiceEndpoint.implement]] instead — it receives `A` directly.
+ * [[ServiceEndpoint.handle]] or [[ServiceEndpoint.handleZIO]] instead — they
+ * receive `A` directly.
  *
  * @tparam A
  *   The decoded payload type.
