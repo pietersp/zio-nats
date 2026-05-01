@@ -212,14 +212,15 @@ ServiceEndpoint("name")                    // NamedEndpoint  — no types yet
   .failsWith[ValidationError]               // ServiceEndpoint[In, StockError | ValidationError, Out]
   .failsWith[RateLimited]                   // ServiceEndpoint[In, StockError | ValidationError | RateLimited, Out]
   .handle { req => ... }                    // BoundEndpoint  — handler bound
+  .handleZIO[R] { req => ... }               // BoundEndpointOf[R] — environment-aware handler
 ```
 
-Configuration (`.inGroup`, `.inSubject`, `.withQueueGroup`, `.withMetadata`) is set on `NamedEndpoint` before `.in`. The descriptor (`ServiceEndpoint[In, Err, Out]`) is inert and can be shared between client and server. Handlers run on the ZIO executor via `runtime.unsafe.fork` — jnats dispatcher threads are never blocked.
+Configuration (`.inGroup`, `.inSubject`, `.withQueueGroup`, `.withMetadata`) is set on `NamedEndpoint` before `.in`. The descriptor (`ServiceEndpoint[In, Err, Out]`) is inert and can be shared between client and server. Handlers run on the ZIO executor via `runtime.unsafe.fork` — jnats dispatcher threads are never blocked. Use `.handle` / `.handleWith` for handlers that need no environment, and `.handleZIO` / `.handleWithZIO` for handlers that require services such as tracing, repositories, or request context. `Nats#service[R]` requires the combined endpoint environment.
 
 Key types (all re-exported from `package object nats`):
 - `NamedEndpoint` — step 1 of the builder; holds name and non-type config
 - `EndpointIn[In]` — step 2; `In` type fixed, waiting for `.out`
-- `ServiceEndpoint[In, Err, Out]` — full typed descriptor; call `.handle` or `.handleWith` to get a `BoundEndpoint`; call `.failsWith[E]` repeatedly to accumulate domain error types into the error channel
+- `ServiceEndpoint[In, Err, Out]` — full typed descriptor; call `.handle` / `.handleWith` to get a `BoundEndpoint`, or `.handleZIO[R]` / `.handleWithZIO[R]` to get an environment-aware `BoundEndpointOf[R]`; call `.failsWith[E]` repeatedly to accumulate domain error types into the error channel
 - `ServiceConfig` — name, version, description, metadata for a service
 - `ServiceGroup` — subject prefix group for organizing endpoints
 - `QueueGroupPolicy` — Default / Disabled / Custom queue group control

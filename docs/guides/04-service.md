@@ -68,6 +68,30 @@ val bound = ServiceEndpoint("stock-check")
   }
 ```
 
+When a handler needs services from the ZIO environment, use `handleZIO`. The required environment becomes part of the bound endpoint and is required by `Nats#service`:
+
+```scala mdoc:compile-only
+import zio.*
+import zio.nats.*
+
+trait StockRepository {
+  def available(itemId: String): UIO[Int]
+}
+
+case class StockRequest(itemId: String)
+case class StockReply(available: Int)
+
+given NatsCodec[StockRequest] = ???
+given NatsCodec[StockReply]   = ???
+
+val bound = ServiceEndpoint("stock-check")
+  .in[StockRequest]
+  .out[StockReply]
+  .handleZIO[StockRepository] { req =>
+    ZIO.serviceWithZIO[StockRepository](_.available(req.itemId).map(StockReply(_)))
+  }
+```
+
 When you need the raw request envelope - to read a header, inspect the originating subject, or propagate a trace ID - use `ServiceEndpoint#handleWith` instead:
 
 ```scala mdoc:compile-only
@@ -94,6 +118,8 @@ val boundWithMeta = ServiceEndpoint("stock-check")
       ZIO.succeed(StockReply(available = 42, reserved = 3))
   }
 ```
+
+`handleWithZIO` combines both forms: it receives the full `ServiceRequest` and may require an environment. This is the preferred shape for generic middleware integrations such as authentication, request-scoped context, or tracing extraction.
 
 ### Handling errors
 

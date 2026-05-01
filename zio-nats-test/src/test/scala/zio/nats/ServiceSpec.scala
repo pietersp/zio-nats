@@ -13,6 +13,8 @@ object ServiceSpec extends ZIOSpecDefault {
   private case class ServiceUnavailable(reason: String)
   private case class RateLimited(retryAfter: Int)
   private case class Conflict(detail: String)
+  private case class Prefix(value: String)
+  private case class Suffix(value: String)
 
   private given NatsCodec[NotFound] = new NatsCodec[NotFound]:
     def encode(e: NotFound): Chunk[Byte]                              = NatsCodec.stringCodec.encode(e.resource)
@@ -89,6 +91,43 @@ object ServiceSpec extends ZIOSpecDefault {
           _     <- awaitService("echo-svc")
           reply <- nats.request[String, String](Subject("echo"), "hello", 5.seconds)
         } yield assertTrue(reply.value == "hello")
+      }
+    },
+
+    test("environment-aware endpoint handler can require services") {
+      ZIO.scoped {
+        for {
+          nats <- ZIO.service[Nats]
+          ep    = ServiceEndpoint("env-echo").in[String].out[String]
+          _    <- nats
+                 .service[Prefix](
+                   ServiceConfig("env-echo-svc", "1.0.0"),
+                   ep.handleZIO[Prefix](value => ZIO.serviceWith[Prefix](prefix => s"${prefix.value}:$value"))
+                 )
+                 .provideSomeLayer[Scope](ZLayer.succeed(Prefix("from-env")))
+          _     <- awaitService("env-echo-svc")
+          reply <- nats.request[String, String](Subject("env-echo"), "hello", 5.seconds)
+        } yield assertTrue(reply.value == "from-env:hello")
+      }
+    },
+
+    test("service registration combines environments from multiple endpoints") {
+      ZIO.scoped {
+        for {
+          nats <- ZIO.service[Nats]
+          left  = ServiceEndpoint("env-left").in[String].out[String]
+          right = ServiceEndpoint("env-right").in[String].out[String]
+          _    <- nats
+                 .service[Prefix & Suffix](
+                   ServiceConfig("env-combined-svc", "1.0.0"),
+                   left.handleZIO[Prefix](value => ZIO.serviceWith[Prefix](prefix => s"${prefix.value}:$value")),
+                   right.handleZIO[Suffix](value => ZIO.serviceWith[Suffix](suffix => s"$value:${suffix.value}"))
+                 )
+                 .provideSomeLayer[Scope](ZLayer.succeed(Prefix("left")) ++ ZLayer.succeed(Suffix("right")))
+          _  <- awaitService("env-combined-svc")
+          r1 <- nats.request[String, String](Subject("env-left"), "value", 5.seconds)
+          r2 <- nats.request[String, String](Subject("env-right"), "value", 5.seconds)
+        } yield assertTrue(r1.value == "left:value", r2.value == "value:right")
       }
     },
 

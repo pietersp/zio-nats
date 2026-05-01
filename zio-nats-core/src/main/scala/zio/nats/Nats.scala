@@ -221,44 +221,44 @@ trait Nats {
    * [[Scope]] ends.
    *
    * Endpoints are created by declaring a [[service.ServiceEndpoint]] and
-   * binding a handler via `implement`:
+   * binding a handler via `handle`, `handleWith`, `handleZIO`, or
+   * `handleWithZIO`:
    *
    * ==Example: single endpoint==
    * {{{
-   * val greet = ServiceEndpoint[String, String]("greet")
+   * val greet = ServiceEndpoint("greet").in[String].out[String]
    *
    * nats.service(
    *   ServiceConfig("greeter", "1.0.0"),
-   *   greet.implement(name => ZIO.succeed(s"Hello, $name!"))
+   *   greet.handle(name => ZIO.succeed(s"Hello, $name!"))
    * )
    * }}}
    *
    * ==Example: grouped endpoints==
    * {{{
-   * val sort = ServiceGroup("sort")
-   * val asc  = ServiceEndpoint[List[Int], List[Int]]("ascending",  group = Some(sort))
-   * val desc = ServiceEndpoint[List[Int], List[Int]]("descending", group = Some(sort))
+   * val asc  = ServiceEndpoint("ascending").inGroup("sort").in[List[Int]].out[List[Int]]
+   * val desc = ServiceEndpoint("descending").inGroup("sort").in[List[Int]].out[List[Int]]
    *
    * nats.service(
    *   ServiceConfig("sorter", "1.0.0"),
-   *   asc.implement(nums  => ZIO.succeed(nums.sorted)),
-   *   desc.implement(nums => ZIO.succeed(nums.sorted.reverse))
+   *   asc.handle(nums  => ZIO.succeed(nums.sorted)),
+   *   desc.handle(nums => ZIO.succeed(nums.sorted.reverse))
    * )
    * }}}
    *
    * @param config
    *   Service name, version, description, and metadata.
    * @param endpoints
-   *   One or more [[service.BoundEndpoint]]s produced by
-   *   [[service.ServiceEndpoint.implement]] or
-   *   [[service.ServiceEndpoint.implementWithRequest]].
+   *   One or more [[service.BoundEndpoint]]s produced by the endpoint handler
+   *   binding methods. Environment-aware endpoints require their environment
+   *   here, so `handleZIO[R]` endpoints make this effect require `R`.
    * @return
    *   A [[service.NatsService]] handle for querying stats and identity.
    */
-  def service(
+  def service[R](
     config: ServiceConfig,
-    endpoints: BoundEndpoint*
-  ): ZIO[Scope, NatsError, NatsService]
+    endpoints: BoundEndpoint[R]*
+  ): ZIO[R & Scope, NatsError, NatsService]
 
   /**
    * Escape hatch: access the raw jnats `Connection` for advanced or unsupported
@@ -602,19 +602,19 @@ private[nats] final class NatsLive(conn: JConnection, hub: Hub[NatsEvent]) exten
   override def outgoingPendingBytes: UIO[Long] =
     ZIO.succeed(conn.outgoingPendingBytes())
 
-  override def service(
+  override def service[R](
     config: ServiceConfig,
-    endpoints: BoundEndpoint*
-  ): ZIO[Scope, NatsError, NatsService] =
+    endpoints: BoundEndpoint[R]*
+  ): ZIO[R & Scope, NatsError, NatsService] =
     for {
-      runtime  <- ZIO.runtime[Any]
+      runtime  <- ZIO.runtime[R]
       jService <- buildAndStartService(config, endpoints.toSeq, runtime)
     } yield new NatsServiceLive(jService)
 
-  private def buildAndStartService(
+  private def buildAndStartService[R](
     config: ServiceConfig,
-    endpoints: Seq[BoundEndpoint],
-    runtime: Runtime[Any]
+    endpoints: Seq[BoundEndpoint[R]],
+    runtime: Runtime[R]
   ): ZIO[Scope, NatsError, JService] =
     ZIO.acquireRelease(
       ZIO.attempt {
