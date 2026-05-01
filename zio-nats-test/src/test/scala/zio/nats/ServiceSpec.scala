@@ -118,7 +118,7 @@ object ServiceSpec extends ZIOSpecDefault {
           left  = ServiceEndpoint("env-left").in[String].out[String]
           right = ServiceEndpoint("env-right").in[String].out[String]
           _    <- nats
-                 .service[Prefix & Suffix](
+                 .service(
                    ServiceConfig("env-combined-svc", "1.0.0"),
                    left.handleZIO[Prefix](value => ZIO.serviceWith[Prefix](prefix => s"${prefix.value}:$value")),
                    right.handleZIO[Suffix](value => ZIO.serviceWith[Suffix](suffix => s"$value:${suffix.value}"))

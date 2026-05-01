@@ -211,8 +211,10 @@ ServiceEndpoint("name")                    // NamedEndpoint  — no types yet
   .failsWith[StockError]                    // ServiceEndpoint[In, StockError, Out] — single error (optional)
   .failsWith[ValidationError]               // ServiceEndpoint[In, StockError | ValidationError, Out]
   .failsWith[RateLimited]                   // ServiceEndpoint[In, StockError | ValidationError | RateLimited, Out]
-  .handle { req => ... }                    // BoundEndpoint  — handler bound
-  .handleZIO[R] { req => ... }               // BoundEndpointOf[R] — environment-aware handler
+
+// Then bind one handler form:
+.handle { req => ... }                      // BoundEndpoint  — handler bound
+.handleZIO[R] { req => ... }                 // BoundEndpointOf[R] — environment-aware handler
 ```
 
 Configuration (`.inGroup`, `.inSubject`, `.withQueueGroup`, `.withMetadata`) is set on `NamedEndpoint` before `.in`. The descriptor (`ServiceEndpoint[In, Err, Out]`) is inert and can be shared between client and server. Handlers run on the ZIO executor via `runtime.unsafe.fork` — jnats dispatcher threads are never blocked. Use `.handle` / `.handleWith` for handlers that need no environment, and `.handleZIO` / `.handleWithZIO` for handlers that require services such as tracing, repositories, or request context. `Nats#service[R]` requires the combined endpoint environment.
